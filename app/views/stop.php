@@ -1,4 +1,7 @@
 <?php
+if (!isset($_COOKIE)) {
+    echo "<pre>"; print_r($_COOKIE); echo "</pre>";
+}
 if ( !isset($_GET) || !isset($_GET['id']) ) {
 	echo "_GET or id, not setted";
 	exit;
@@ -44,20 +47,24 @@ foreach($stopsList as $stop){
 	<body>
 		<div class="container-desktop" id="layout">
 			<div data-v-93878d43="" class="desktop-topbar" style="--radius: 0;">
-				<a data-v-93878d43="" href="/aut" rel="noopener noreferrer" target="_parent" class="logo">
-					<div data-v-e59c4665="" data-v-93878d43="" class="icon-wrapper" height="100%" width="auto" style="--3ba3f6f5: auto; --1f0bedd8: 100%;">
-						<img data-v-e59c4665="" src="https://oraritemporeale.actv.it/aut/logo-icon.png">
+				<a data-v-93878d43="" href="/" rel="noopener noreferrer" target="_parent" class="logo">
+					<div data-v-e59c4665="" data-v-93878d43="" class="icon-wrapper" style="--3ba3f6f5: auto; --1f0bedd8: 100%; height:100% width:auto">
+						<img data-v-e59c4665="" src="<?=URL_PATH?>/svg/logo-icon.svg" alt="Logo">
 					</div>
 				</a>
 			</div>
 			<div data-v-6bf8e597="" class="page">
 				<div data-v-aaf446aa="" data-v-6bf8e597="" class="topbar">
 					<div data-v-aaf446aa="" class="left">
-						<a data-v-aaf446aa="" href="/" class="material-symbols-rounded color-main pointer"> <- </a>
+						<a data-v-aaf446aa="" href="/stopList" class="material-symbols-rounded color-main pointer">
+                            <img src="<?=URL_PATH?>/svg/arrow_back.svg" alt="">
+                        </a>
 					</div>
 					<div data-v-aaf446aa="" class="center text-regular bold uppercase color-main"></div>
 					<div data-v-aaf446aa="" class="right">
-						<span data-v-aaf446aa="" class="material-symbols-rounded color-main pointer"> * </span>
+						<span data-v-aaf446aa="" class="material-symbols-rounded color-main pointer" id="favorite">
+                            <img src="<?=URL_PATH?>/svg/star.svg" alt="">
+                        </span>
 					</div>
 				</div>
 				<div data-v-6bf8e597="" class="heading">
@@ -107,7 +114,7 @@ foreach($stopsList as $stop){
 							<th data-v-6bf8e597="" class="bold color-main">Destinazione</th>
 						</tr>
 						</thead>
-						<tbody data-v-6bf8e597="">
+						<tbody data-v-6bf8e597="" id="passages">
 
                             <?php
                             for($i = 0; $i < sizeof($passages); $i++) {
@@ -116,7 +123,7 @@ foreach($stopsList as $stop){
                                 <tr data-v-82e7a48c="" data-v-6bf8e597="" class="pointer">
                                     <td data-v-82e7a48c="">
                                         <div data-v-82e7a48c="" class="time">
-                                            <span data-v-82e7a48c="" class="text-xregular material-symbols-rounded">
+                                            <span data-v-82e7a48c="" class="text-xregular material-symbols-rounded" style="height: 25px; width: 25px;">
                                                 <?php
                                                 if(!$currentPassage['real']) {
                                                     ?>
@@ -141,7 +148,7 @@ foreach($stopsList as $stop){
                                     <td data-v-82e7a48c="">
                                         <span data-v-82e7a48c="" class="text-regular bold"><?=$currentPassage['destination']?></span>
                                         <div data-v-82e7a48c="" class="description">
-                                            <div data-v-82e7a48c="" class="text-small bold uppercase"><?=$currentPassage['path']?></div>
+                                            <div data-v-82e7a48c="" class="text-small bold uppercase" style="color: #999; overflow: clip; white-space: nowrap;"><?=$currentPassage['path']?></div>
                                         </div>
                                     </td>
                                 </tr>
@@ -151,7 +158,7 @@ foreach($stopsList as $stop){
 						</tbody>
 					</table>
 					<div data-v-6bf8e597="" class="footer-passages align-center">
-						<button data-v-12055c0b="" data-v-6bf8e597="" class="button pointer main round">
+						<button data-v-12055c0b="" data-v-6bf8e597="" class="button pointer main round" id="refresh-btn">
 							<span data-v-12055c0b="" class="uppercase bold">Visualizza successive</span>
 							<span data-v-12055c0b="" class="material-symbols-rounded">
                                 <img src="<?=URL_PATH?>/svg/refresh.svg" alt="">
@@ -162,4 +169,103 @@ foreach($stopsList as $stop){
 			</div>
 		</div>
 	</body>
+    <script>
+        const stopId = "<?=$stopId?>";
+		console.log( "stopId: ", stopId)
+
+		// add to local storage
+        function toggleFavorite() {
+
+			function addFavorite(stopId) {
+				// add to local storage
+				localStorage.setItem("favoriteStops", JSON.stringify(
+					[
+						...JSON.parse(localStorage.getItem("favoriteStops") || "[]"),
+						stopId
+					]
+				));
+				document.getElementById("favorite").src = '<?=URL_PATH?>/svg/star_fill.svg';
+            }
+			function removeFavorite(stopId) {
+				// remove from local storage
+				localStorage.setItem("favoriteStops", JSON.stringify(
+					localStorage.getItem("favoriteStops").split(",").filter(
+						item => item !== stopId)
+				));
+				//remove filled star
+				document.getElementById("favorite").src = '<?=URL_PATH?>/svg/star.svg';
+            }
+
+			if (localStorage.getItem("favoriteStops") == null || !localStorage.getItem("favoriteStops").includes(stopId)) {
+				addFavorite(stopId);
+            }
+
+			if (localStorage.getItem("favoriteStops").includes(stopId)) {
+				removeFavorite(stopId);
+			}
+		}
+		async function autoUpdate() {
+			try {
+				let response = await fetch("https://oraritemporeale.actv.it/aut/backend/passages/"+stopId);
+				if (!response.ok) {
+					throw new Error(`Response status: ${response.status}`);
+				}
+
+				return await response.json();
+
+			} catch (error) {
+				console.error(error.message);
+			}
+		}
+		function updatePassages(data) {
+			let tbody = document.getElementById("passages");
+			tbody.innerHTML = "";
+
+			for(let i = 0; i < data.length; i++) {
+				let currentPassage = data[i];
+				let row = document.createElement("tr");
+                let imgSrc = "<?=URL_PATH?>/svg/update.svg";
+				if (currentPassage.real) imgSrc = "<?=URL_PATH?>/svg/share_location.svg";
+				let eta_time = currentPassage.time;
+				let line = currentPassage.line;
+				let lineId = currentPassage.lineId;
+				let destination = currentPassage.destination;
+				let path = currentPassage.path;
+
+				row.innerHTML = `
+					<tr data-v-82e7a48c="" data-v-6bf8e597="" class="pointer">
+                        <td data-v-82e7a48c="">
+                            <div data-v-82e7a48c="" class="time">
+                                <span data-v-82e7a48c="" class="text-xregular material-symbols-rounded" style="height: 25px; width: 25px;">
+                                    <img style="aspect-ratio: 1; height: 24px;width: 24px;" src="${imgSrc}" alt="">
+                                </span>
+                                <span data-v-82e7a48c="" class="text-regular bold">${eta_time}</span>
+                            </div>
+                        </td>
+                        <td data-v-82e7a48c="">
+                            <img data-v-d1106676="" data-v-82e7a48c="" class="line-img" src="https://oraritemporeale.actv.it/aut/lines/${line}.png?>" alt="${line}">
+                        </td>
+                        <td data-v-82e7a48c="" class="stop">
+                            <span data-v-d1106676="" data-v-82e7a48c="" class="text-regular bold">${lineId}</span>
+                        </td>
+                        <td data-v-82e7a48c="">
+                            <span data-v-82e7a48c="" class="text-regular bold">${destination}</span>
+                            <div data-v-82e7a48c="" class="description">
+                                <div data-v-82e7a48c="" class="text-small bold uppercase" style="color: #999; overflow: clip; white-space: nowrap;">${path}</div>
+                            </div>
+                        </td>
+                    </tr>
+				`;
+				tbody.appendChild(row);
+			}
+        }
+
+		document.getElementById("favorite").addEventListener("click", toggleFavorite);
+		document.getElementById("refresh-btn").addEventListener("click", async () => {
+            updatePassages( await autoUpdate() );
+		});
+
+		setInterval(autoUpdate, 15000);
+
+    </script>
 </html>

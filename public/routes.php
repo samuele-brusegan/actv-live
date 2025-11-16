@@ -7,5 +7,7 @@
 global $router;
 
 // === Pagine ===
-$router->add('/'              , 'Controller', 'index');
-$router->add('/aut/stops/stop', 'Controller', 'stop');
+$router->add('/'               , 'Controller', 'index');
+$router->add('/stopList'       , 'Controller', 'stops');
+$router->add('/aut/stops/stop' , 'Controller', 'stop');
+$router->add('/api/addFavorite', 'Controller', 'favorite');
