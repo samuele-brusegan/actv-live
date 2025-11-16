@@ -34,8 +34,14 @@ echo "</pre>";*/
             <div class="page">
                 <div class="stop_results">
                     <?php
+                    //Ordino $resp per la proprietà description
+                    usort($resp, function($a, $b) {
+                        return strcmp($a['description'], $b['description']);
+                    });
+
                     for($i = 0; $i < sizeof($resp); $i++) {
                         $currentStop = $resp[$i];
+                        if(sizeof($currentStop['lines']) == 0) continue;
                         ?>
                         <a data-v-02845fd5="" data-v-996d2d02="" href="/aut/stops/stop?id=<?=$currentStop['name']?>" class="stop_single_result glass pointer" style="--index: 1;">
                             <div data-v-02845fd5="" class="stop_head">
