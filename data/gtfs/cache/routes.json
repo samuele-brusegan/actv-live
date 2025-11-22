@@ -1,0 +1,578 @@
+{
+    "11_UL": {
+        "id": "11_UL",
+        "short_name": "11",
+        "long_name": "Santa Maria Elisabetta - Pellestrina Cimitero",
+        "type": 3
+    },
+    "A_UL": {
+        "id": "A_UL",
+        "short_name": "A",
+        "long_name": "Santa Maria Elisabetta - Faro Rocchetta",
+        "type": 3
+    },
+    "B_UL": {
+        "id": "B_UL",
+        "short_name": "B",
+        "long_name": "Santa Maria Elisabetta - Malamocco Beato",
+        "type": 3
+    },
+    "C_UL": {
+        "id": "C_UL",
+        "short_name": "C",
+        "long_name": "Santa Maria Elisabetta - Santa Maria Elisabetta",
+        "type": 3
+    },
+    "N_UL": {
+        "id": "N_UL",
+        "short_name": "N",
+        "long_name": "Santa Maria Elisabetta - Pellestrina Cimitero",
+        "type": 3
+    },
+    "V_UL": {
+        "id": "V_UL",
+        "short_name": "V",
+        "long_name": "Santa Maria Elisabetta - Colombo",
+        "type": 3
+    },
+    "10E_EN": {
+        "id": "10E_EN",
+        "short_name": "10E",
+        "long_name": "Mirano Ospedale - Mirano Ospedale",
+        "type": 3
+    },
+    "11E_EN": {
+        "id": "11E_EN",
+        "short_name": "11E",
+        "long_name": "Scorze' IV Novembre - Mirano Scuole",
+        "type": 3
+    },
+    "12E_EN": {
+        "id": "12E_EN",
+        "short_name": "12E",
+        "long_name": "Scorze' IV Novembre - VENEZIA",
+        "type": 3
+    },
+    "14E_EN": {
+        "id": "14E_EN",
+        "short_name": "14E",
+        "long_name": "Quarto d'Altino Augusta - Mogliano FS",
+        "type": 3
+    },
+    "16E_EN": {
+        "id": "16E_EN",
+        "short_name": "16E",
+        "long_name": "Trebaseleghe - Scorze' IV Novembre",
+        "type": 3
+    },
+    "17E_EN": {
+        "id": "17E_EN",
+        "short_name": "17E",
+        "long_name": "Caltana Marinoni - Mirano Scuole",
+        "type": 3
+    },
+    "2E_EN": {
+        "id": "2E_EN",
+        "short_name": "2E",
+        "long_name": "Zero Branco Via Scandolar - Scorze' IV Novembre",
+        "type": 3
+    },
+    "3E_EN": {
+        "id": "3E_EN",
+        "short_name": "3E",
+        "long_name": "San Michele delle Badesse - Mirano Matteotti",
+        "type": 3
+    },
+    "4E_EN": {
+        "id": "4E_EN",
+        "short_name": "4E",
+        "long_name": "Noale - Mirano Scuole",
+        "type": 3
+    },
+    "5E_EN": {
+        "id": "5E_EN",
+        "short_name": "5E",
+        "long_name": "Noale - VENEZIA",
+        "type": 3
+    },
+    "6E_EN": {
+        "id": "6E_EN",
+        "short_name": "6E",
+        "long_name": "Scorze' IV Novembre - VENEZIA",
+        "type": 3
+    },
+    "7E_EN": {
+        "id": "7E_EN",
+        "short_name": "7E",
+        "long_name": "Mirano Matteotti - VENEZIA",
+        "type": 3
+    },
+    "8E_EN": {
+        "id": "8E_EN",
+        "short_name": "8E",
+        "long_name": "Treviso - VENEZIA",
+        "type": 3
+    },
+    "8AE_EN": {
+        "id": "8AE_EN",
+        "short_name": "8AE",
+        "long_name": "Marcon Mattei - Stazione MESTRE FS C1",
+        "type": 3
+    },
+    "9E_EN": {
+        "id": "9E_EN",
+        "short_name": "9E",
+        "long_name": "Quarto d'Altino FS - 27 Ottobre D2",
+        "type": 3
+    },
+    "53E_ES": {
+        "id": "53E_ES",
+        "short_name": "53E",
+        "long_name": "Stazione Padova - VENEZIA",
+        "type": 3
+    },
+    "54E_ES": {
+        "id": "54E_ES",
+        "short_name": "54E",
+        "long_name": "Bojon Chiesa - Dolo Scuole",
+        "type": 3
+    },
+    "55E_ES": {
+        "id": "55E_ES",
+        "short_name": "55E",
+        "long_name": "Dolo Scuole - Vigonovo 1 Maggio",
+        "type": 3
+    },
+    "55SE_ES": {
+        "id": "55SE_ES",
+        "short_name": "55SE",
+        "long_name": "Dolo Scuole - Stra Piazza Marconi",
+        "type": 3
+    },
+    "56E_ES": {
+        "id": "56E_ES",
+        "short_name": "56E",
+        "long_name": "Dolo Centro - Mirano Matteotti",
+        "type": 3
+    },
+    "57E_ES": {
+        "id": "57E_ES",
+        "short_name": "57E",
+        "long_name": "VENEZIA - Scaltenigo",
+        "type": 3
+    },
+    "58E_ES": {
+        "id": "58E_ES",
+        "short_name": "58E",
+        "long_name": "Adria Ospedale - Dolo Centro",
+        "type": 3
+    },
+    "58RE_ES": {
+        "id": "58RE_ES",
+        "short_name": "58RE",
+        "long_name": "Adria Fs - VENEZIA",
+        "type": 3
+    },
+    "59E_ES": {
+        "id": "59E_ES",
+        "short_name": "59E",
+        "long_name": "Dolo Scuole - Mirano Matteotti",
+        "type": 3
+    },
+    "60E_ES": {
+        "id": "60E_ES",
+        "short_name": "60E",
+        "long_name": "Cavarzere - Stra Piazza Marconi",
+        "type": 3
+    },
+    "66E_ES": {
+        "id": "66E_ES",
+        "short_name": "66E",
+        "long_name": "Dolo Scuole - Mellaredo Cavinello",
+        "type": 3
+    },
+    "67E_ES": {
+        "id": "67E_ES",
+        "short_name": "67E",
+        "long_name": "Stra Piazza Marconi - Piove di Sacco",
+        "type": 3
+    },
+    "67RE_ES": {
+        "id": "67RE_ES",
+        "short_name": "67RE",
+        "long_name": "Piove di Sacco - VENEZIA",
+        "type": 3
+    },
+    "72E_ES": {
+        "id": "72E_ES",
+        "short_name": "72E",
+        "long_name": "Cavarzere - Pettorazza Santuario",
+        "type": 3
+    },
+    "73E_ES": {
+        "id": "73E_ES",
+        "short_name": "73E",
+        "long_name": "Cavarzere - Cavarzere",
+        "type": 3
+    },
+    "81E_ES": {
+        "id": "81E_ES",
+        "short_name": "81E",
+        "long_name": "Adria Ospedale - Sottomarina",
+        "type": 3
+    },
+    "82E_ES": {
+        "id": "82E_ES",
+        "short_name": "82E",
+        "long_name": "Dolo Centro - Sottomarina",
+        "type": 3
+    },
+    "83E_ES": {
+        "id": "83E_ES",
+        "short_name": "83E",
+        "long_name": "Cavarzere - Adria Ospedale",
+        "type": 3
+    },
+    "10_UM": {
+        "id": "10_UM",
+        "short_name": "10",
+        "long_name": "Asseggiano Chiesa - Asseggiano Chiesa",
+        "type": 3
+    },
+    "12L_UM": {
+        "id": "12L_UM",
+        "short_name": "12L",
+        "long_name": "VENEZIA - 27 Ottobre D4",
+        "type": 3
+    },
+    "13_UM": {
+        "id": "13_UM",
+        "short_name": "13",
+        "long_name": "Trieste Robinie - Camporese Gritti",
+        "type": 3
+    },
+    "15_UM": {
+        "id": "15_UM",
+        "short_name": "15",
+        "long_name": "Aeroporto MARCO POLO - Stazione MESTRE FS C1",
+        "type": 3
+    },
+    "19_UM": {
+        "id": "19_UM",
+        "short_name": "19",
+        "long_name": "VENEZIA - Marcon Cooperazione",
+        "type": 3
+    },
+    "2_UM": {
+        "id": "2_UM",
+        "short_name": "2",
+        "long_name": "VENEZIA - Don Sturzo Vallon",
+        "type": 3
+    },
+    "20_UM": {
+        "id": "20_UM",
+        "short_name": "20",
+        "long_name": "Martellago - Camporese Gritti",
+        "type": 3
+    },
+    "21_UM": {
+        "id": "21_UM",
+        "short_name": "21",
+        "long_name": "Martellago - Stazione MESTRE FS C1",
+        "type": 3
+    },
+    "24_UM": {
+        "id": "24_UM",
+        "short_name": "24",
+        "long_name": "VENEZIA - VENEZIA",
+        "type": 3
+    },
+    "3_UM": {
+        "id": "3_UM",
+        "short_name": "3",
+        "long_name": "Ilaria Alpi SFMR ospedale - Salici Villabona",
+        "type": 3
+    },
+    "31_UM": {
+        "id": "31_UM",
+        "short_name": "31",
+        "long_name": "Pertini Foscari - Stazione MESTRE FS C1",
+        "type": 3
+    },
+    "32_UM": {
+        "id": "32_UM",
+        "short_name": "32",
+        "long_name": "Stazione MESTRE FS C4 - Camporese Gritti",
+        "type": 3
+    },
+    "4_UM": {
+        "id": "4_UM",
+        "short_name": "4",
+        "long_name": "VENEZIA - Altinia Ca' Rezzonico",
+        "type": 3
+    },
+    "44_UM": {
+        "id": "44_UM",
+        "short_name": "44",
+        "long_name": "Triestina ulss 3 - Vallon Borgoforte",
+        "type": 3
+    },
+    "5_UM": {
+        "id": "5_UM",
+        "short_name": "5",
+        "long_name": "VENEZIA - Aeroporto MARCO POLO",
+        "type": 3
+    },
+    "53_UM": {
+        "id": "53_UM",
+        "short_name": "53",
+        "long_name": "27 Ottobre D4 - Malcontenta Chiesa",
+        "type": 3
+    },
+    "6_UM": {
+        "id": "6_UM",
+        "short_name": "6",
+        "long_name": "VENEZIA - SFMR Spinea",
+        "type": 3
+    },
+    "66_UM": {
+        "id": "66_UM",
+        "short_name": "66",
+        "long_name": "VENEZIA - Risorgimento Miranese",
+        "type": 3
+    },
+    "7_UM": {
+        "id": "7_UM",
+        "short_name": "7",
+        "long_name": "Camporese Gritti - Fornase Perugia",
+        "type": 3
+    },
+    "7L_UM": {
+        "id": "7L_UM",
+        "short_name": "7L",
+        "long_name": "VENEZIA - Brendole",
+        "type": 3
+    },
+    "8\/_UM": {
+        "id": "8\/_UM",
+        "short_name": "8\/",
+        "long_name": "Gatta Pisacane - Risorgimento Miranese",
+        "type": 3
+    },
+    "80_UM": {
+        "id": "80_UM",
+        "short_name": "80",
+        "long_name": "VENEZIA - Martellago",
+        "type": 3
+    },
+    "81F_UM": {
+        "id": "81F_UM",
+        "short_name": "81F",
+        "long_name": "Rizzardi Carrer - Rizzardi Carrer",
+        "type": 3
+    },
+    "84_UM": {
+        "id": "84_UM",
+        "short_name": "84",
+        "long_name": "VENEZIA - Marcon Cooperazione",
+        "type": 3
+    },
+    "86_UM": {
+        "id": "86_UM",
+        "short_name": "86",
+        "long_name": "Stazione MESTRE FS C5 - Azoto Sottana",
+        "type": 3
+    },
+    "N1_UM": {
+        "id": "N1_UM",
+        "short_name": "N1",
+        "long_name": "VENEZIA - VENEZIA",
+        "type": 3
+    },
+    "N2_UM": {
+        "id": "N2_UM",
+        "short_name": "N2",
+        "long_name": "VENEZIA - VENEZIA",
+        "type": 3
+    },
+    "GSB_US": {
+        "id": "GSB_US",
+        "short_name": "GSB",
+        "long_name": "SFMR Spinea - SFMR Spinea",
+        "type": 3
+    },
+    "GSG_US": {
+        "id": "GSG_US",
+        "short_name": "GSG",
+        "long_name": "SFMR Spinea - SFMR Spinea",
+        "type": 3
+    },
+    "4L_UM": {
+        "id": "4L_UM",
+        "short_name": "4L",
+        "long_name": "VENEZIA - Mestre Centro B1",
+        "type": 3
+    },
+    "T1_UM": {
+        "id": "T1_UM",
+        "short_name": "T1",
+        "long_name": "Monte Celo Favaro - VENEZIA CORSIA C",
+        "type": 0
+    },
+    "45_UM": {
+        "id": "45_UM",
+        "short_name": "45",
+        "long_name": "Tevere Baglioni - Paliaga Ca' Noghera",
+        "type": 3
+    },
+    "16_UM": {
+        "id": "16_UM",
+        "short_name": "16",
+        "long_name": "27 Ottobre D4 - Marghera Arduino",
+        "type": 3
+    },
+    "45H_UM": {
+        "id": "45H_UM",
+        "short_name": "45H",
+        "long_name": "Ospedale dell'Angelo - Paliaga Ca' Noghera",
+        "type": 3
+    },
+    "6L_UM": {
+        "id": "6L_UM",
+        "short_name": "6L",
+        "long_name": "VENEZIA - Marghera Salamonio",
+        "type": 3
+    },
+    "24H_UM": {
+        "id": "24H_UM",
+        "short_name": "24H",
+        "long_name": "VENEZIA - Tosatto Impastato",
+        "type": 3
+    },
+    "34H_UM": {
+        "id": "34H_UM",
+        "short_name": "34H",
+        "long_name": "Ospedale dell'Angelo - Pertini Carrer",
+        "type": 3
+    },
+    "33H_UM": {
+        "id": "33H_UM",
+        "short_name": "33H",
+        "long_name": "Ospedale dell'Angelo - Cavergnago Taliercio",
+        "type": 3
+    },
+    "4DE_EN": {
+        "id": "4DE_EN",
+        "short_name": "4DE",
+        "long_name": "Noale - VENEZIA",
+        "type": 3
+    },
+    "7DE_EN": {
+        "id": "7DE_EN",
+        "short_name": "7DE",
+        "long_name": "Mirano Matteotti - VENEZIA",
+        "type": 3
+    },
+    "T2_UM": {
+        "id": "T2_UM",
+        "short_name": "T2",
+        "long_name": "MESTRE CENTRO A2 - Salamonio Marghera",
+        "type": 0
+    },
+    "47H_UM": {
+        "id": "47H_UM",
+        "short_name": "47H",
+        "long_name": "Ospedale dell'Angelo - Cavanis Capolinea",
+        "type": 3
+    },
+    "43_UM": {
+        "id": "43_UM",
+        "short_name": "43",
+        "long_name": "VENEZIA - Favretti MESTRE FS C2",
+        "type": 3
+    },
+    "54RE_ES": {
+        "id": "54RE_ES",
+        "short_name": "54RE",
+        "long_name": "Bojon Chiesa - VENEZIA",
+        "type": 3
+    },
+    "31H_UM": {
+        "id": "31H_UM",
+        "short_name": "31H",
+        "long_name": "Ospedale dell'Angelo - Ospedale dell'Angelo",
+        "type": 3
+    },
+    "32H_UM": {
+        "id": "32H_UM",
+        "short_name": "32H",
+        "long_name": "Ospedale dell'Angelo - Ospedale dell'Angelo",
+        "type": 3
+    },
+    "HE_EN": {
+        "id": "HE_EN",
+        "short_name": "HE",
+        "long_name": "Noale - Martellago",
+        "type": 3
+    },
+    "48H_UM": {
+        "id": "48H_UM",
+        "short_name": "48H",
+        "long_name": "Martellago - Mestre Centro B1",
+        "type": 3
+    },
+    "10S_UM": {
+        "id": "10S_UM",
+        "short_name": "10S",
+        "long_name": "Altinia Ca' Rezzonico - Asseggiano Volta",
+        "type": 3
+    },
+    "18_UM": {
+        "id": "18_UM",
+        "short_name": "18",
+        "long_name": "Capolinea Ca' Sabbioni - Favretti MESTRE FS C2",
+        "type": 3
+    },
+    "OMN1_ES": {
+        "id": "OMN1_ES",
+        "short_name": "OMN1",
+        "long_name": "Dolo Centro - Ballo' FS",
+        "type": 3
+    },
+    "OMN2_ES": {
+        "id": "OMN2_ES",
+        "short_name": "OMN2",
+        "long_name": "Mirano Ospedale - Miranese Marano FS",
+        "type": 3
+    },
+    "OMN3_ES": {
+        "id": "OMN3_ES",
+        "short_name": "OMN3",
+        "long_name": "Mira Stazione FS - Miranese Marano FS",
+        "type": 3
+    },
+    "PK1_UM": {
+        "id": "PK1_UM",
+        "short_name": "PK1",
+        "long_name": "Tronchetto Tronchetto Fer - Tronchetto Tronchetto Fer",
+        "type": 3
+    },
+    "PM_UM": {
+        "id": "PM_UM",
+        "short_name": "PM",
+        "long_name": "Piazzale Roma - Tronchetto",
+        "type": 3
+    },
+    "9S_UM": {
+        "id": "9S_UM",
+        "short_name": "9S",
+        "long_name": "Asseggiano Volta - Marcon Cooperazione",
+        "type": 3
+    },
+    "15E_EN": {
+        "id": "15E_EN",
+        "short_name": "15E",
+        "long_name": "Badoere - Mogliano Liceo",
+        "type": 3
+    }
+}

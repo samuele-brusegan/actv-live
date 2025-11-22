@@ -1,0 +1,3 @@
+service_id,date,exception_type
+AUT_67_5B1706_000,20251208,1
+AUT_67_5B1701_000,20251208,2
