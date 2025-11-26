@@ -17,3 +17,5 @@ $router->add('/aut/stops/stop' , 'Controller', 'stop');
 $router->add('/api/addFavorite', 'Controller', 'favorite');
 $router->add('/api/plan-route' , 'Controller', 'planRoute');
 $router->add('/api/stops'      , 'Controller', 'stopsJson');
+$router->add('/lines-map'      , 'Controller', 'linesMap');
+$router->add('/api/lines-shapes', 'Controller', 'linesShapes');

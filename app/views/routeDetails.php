@@ -6,146 +6,25 @@
     <title>Dettagli Viaggio - ACTV</title>
     <?php require COMMON_HTML_HEAD; ?>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #F5F5F5;
-            margin: 0;
-            padding: 0;
-        }
-
-        /* Header Verde */
-        .header-green {
-            background: #009E61;
-            padding: 2rem 1.5rem 4rem;
-            color: white;
-            clip-path: polygon(0 0, 100% 0, 100% 75%, 0 100%);
-            margin-bottom: -2rem;
-            position: relative;
-            z-index: 1;
-        }
-
-        .back-button {
-            color: white;
-            text-decoration: none;
-            font-size: 24px;
-            display: inline-block;
-            border: 2px solid white;
-            border-radius: 50%;
-            width: 32px;
-            height: 32px;
-            text-align: center;
-            line-height: 28px;
-        }
-
-        .main-content {
-            padding: 0 1.5rem 1.5rem;
-            position: relative;
-            z-index: 2;
-        }
-
-        .details-card {
-            background: #FFFFFF;
-            box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
-            border-radius: 15px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            min-height: 400px;
-        }
-
-        /* Timeline Styles */
-        .timeline {
-            position: relative;
-            padding-left: 10px;
-            margin-top: 1rem;
-        }
-
-        .timeline-item {
-            display: flex;
-            align-items: flex-start;
-            position: relative;
-            margin-bottom: 0;
-        }
-
-        .timeline-icon {
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            flex-shrink: 0;
-            z-index: 2;
-            background: white;
-        }
-        
-        .icon-circle {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            border: 3px solid #009E61;
-            background: white;
-        }
-        
-        .icon-walk {
-            font-size: 20px;
-            color: #000;
-        }
-        
-        .icon-location {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            border: 2px solid #009E61;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #009E61;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .timeline-content {
-            flex: 1;
-            padding-bottom: 20px;
-        }
-
-        .timeline-title {
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 700;
-            font-size: 18px;
-            color: #000;
-            margin-bottom: 5px;
-        }
-
-        .timeline-desc {
-            font-family: 'SF Pro', sans-serif;
-            font-size: 14px;
-            color: #666;
-            line-height: 1.4;
-        }
-
-        .line-badge {
-            background: #E60000; /* Red for line number */
-            color: white;
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 4px;
-            display: inline-block;
-            margin-bottom: 5px;
-        }
-
-        /* Connector Lines */
+        /* Page specific overrides */
         .timeline-connector {
-            position: absolute;
-            left: 21px; /* Center of icon (24px width -> center 12px + 10px padding-left? No, relative to timeline div) */
-            /* Actually, icon is 24px wide. Center is 12px. */
-            /* Let's adjust based on visual check */
-            left: 12px; 
-            top: 24px;
-            bottom: -10px;
-            width: 0;
-            border-left: 3px solid #009E61; /* Green solid line */
-            z-index: 1;
+            /* Override for routeDetails specific connector positioning if needed */
+            /* In style.css I used generic connector styles. 
+               routeDetails had: left: 12px; top: 24px; bottom: -10px; width: 0; border-left: 3px solid #009E61;
+               style.css has: margin-left: 7px; border-left: 2px solid... 
+               The structure in routeDetails seems slightly different or I merged them.
+               Let's check the HTML structure in routeDetails.
+            */
+             position: absolute;
+             left: 12px; 
+             top: 24px;
+             bottom: -10px;
+             width: 0;
+             border-left: 3px solid #009E61;
+             z-index: 1;
+             margin-left: 0; /* Reset style.css margin */
+             padding: 0; /* Reset style.css padding */
+             display: block; /* Reset flex */
         }
         
         .timeline-connector.dashed {
@@ -153,20 +32,12 @@
             border-color: #999;
         }
 
-        /* Map Button */
-        .btn-map {
-            background: #0152BB;
-            color: white;
-            border: none;
-            border-radius: 25px;
-            padding: 15px;
-            width: 100%;
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 700;
-            font-size: 18px;
-            cursor: pointer;
-            margin-top: 2rem;
-            box-shadow: 0 4px 10px rgba(1, 82, 187, 0.3);
+        .timeline-item {
+            margin-bottom: 0;
+        }
+        
+        .timeline {
+            margin-top: 1rem;
         }
         
         .header-info {

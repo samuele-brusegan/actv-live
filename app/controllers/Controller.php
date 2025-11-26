@@ -83,4 +83,70 @@ class Controller {
 	function favorite(){
 		require_once BASE_PATH . '/app/models/addToFavorites.php';
 	}
+
+    function linesMap() {
+        require_once BASE_PATH . '/app/views/linesMap.php';
+    }
+
+    function linesShapes() {
+        // Increase memory limit and execution time for this heavy operation
+        ini_set('memory_limit', '256M');
+        set_time_limit(60);
+
+        $cacheDir = BASE_PATH . '/data/gtfs/cache';
+        $routesFile = $cacheDir . '/routes.json';
+        $stopsFile = $cacheDir . '/stops.json';
+
+        if (!file_exists($routesFile) || !file_exists($stopsFile)) {
+            header('HTTP/1.1 500 Internal Server Error');
+            echo json_encode(['error' => 'Cache files not found']);
+            return;
+        }
+
+        $routes = json_decode(file_get_contents($routesFile), true);
+        $stops = json_decode(file_get_contents($stopsFile), true);
+        
+        $shapes = [];
+
+        foreach ($routes as $routeId => $routeInfo) {
+            // Load specific route file
+            // Sanitize route ID for filename
+            $safeRouteId = preg_replace('/[^a-zA-Z0-9_-]/', '_', $routeId);
+            $routeFile = $cacheDir . '/routes/route_' . $safeRouteId . '.json';
+
+            if (file_exists($routeFile)) {
+                $trips = json_decode(file_get_contents($routeFile), true);
+                
+                // Take the first trip as representative
+                // Ideally we should find the "longest" trip or merge them, but first is a good start
+                $firstTrip = reset($trips);
+                
+                if ($firstTrip) {
+                    $path = [];
+                    foreach ($firstTrip as $stop) {
+                        $stopId = $stop['stop_id'];
+                        if (isset($stops[$stopId])) {
+                            $path[] = [
+                                'lat' => $stops[$stopId]['lat'],
+                                'lng' => $stops[$stopId]['lon'], // Note: stops.json uses 'lon' usually, check structure if needed
+                                'name' => $stops[$stopId]['name']
+                            ];
+                        }
+                    }
+                    
+                    if (!empty($path)) {
+                        $shapes[] = [
+                            'route_id' => $routeId,
+                            'route_short_name' => $routeInfo['short_name'],
+                            'route_long_name' => $routeInfo['long_name'],
+                            'path' => $path
+                        ];
+                    }
+                }
+            }
+        }
+
+        header('Content-Type: application/json');
+        echo json_encode($shapes);
+    }
 }

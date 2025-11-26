@@ -98,7 +98,6 @@
             margin: 0.5rem auto;
             font-size: 18px;
         }
-
         .datetime-section {
             margin-top: 1.5rem;
         }
@@ -110,25 +109,24 @@
             color: #000;
             margin-bottom: 0.5rem;
         }
-
         .datetime-inputs {
             display: flex;
             gap: 0.5rem;
             margin-bottom: 1rem;
         }
-
+ 
         .datetime-input {
             flex: 1;
             padding: 0.875rem;
             border: 1px solid #e0e0e0;
             border-radius: 12px;
-            font-family: 'Inter', sans-serif;
-            font-size: 15px;
-            background: #FFFFFF;
-            box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.08);
-            transition: all 0.2s ease;
-        }
-        
+             font-family: 'Inter', sans-serif;
+             font-size: 15px;
+             background: #FFFFFF;
+             box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.08);
+             transition: all 0.2s ease;
+         }
+         
         .datetime-input:focus {
             outline: none;
             border-color: #009E61;
@@ -322,182 +320,7 @@
         </div>
     </div>
 
-    <style>
-        /* New Styles for Custom Pickers */
-        .datetime-trigger {
-            flex: 1;
-            padding: 1rem;
-            background: #FFFFFF;
-            border-radius: 12px;
-            box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.08);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 600;
-            font-size: 16px;
-        }
-
-        .chevron {
-            color: #ccc;
-            font-size: 20px;
-            transform: rotate(90deg);
-        }
-
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            display: none;
-            align-items: flex-end; /* Bottom sheet */
-            justify-content: center;
-        }
-
-        .modal-content {
-            background: #F2F2F7; /* iOS grouped background color */
-            width: 100%;
-            max-width: 400px;
-            border-top-left-radius: 20px;
-            border-top-right-radius: 20px;
-            padding: 1.5rem;
-            animation: slideUp 0.3s ease-out;
-            position: relative;
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
-
-        .modal-handle {
-            width: 40px;
-            height: 5px;
-            background: #D1D1D6;
-            border-radius: 3px;
-            margin: 0 auto 1.5rem;
-        }
-
-        .modal-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            margin-top: 2rem;
-        }
-
-        .btn-primary {
-            background: #0152BB;
-            color: white;
-            border: none;
-            border-radius: 12px;
-            padding: 1rem;
-            font-weight: 700;
-            font-size: 16px;
-            width: 100%;
-        }
-
-        .btn-outline {
-            background: transparent;
-            color: #0152BB;
-            border: 2px solid #0152BB;
-            border-radius: 12px;
-            padding: 0.8rem;
-            font-weight: 700;
-            font-size: 16px;
-            width: 100%;
-        }
-
-        /* Calendar Styles */
-        .calendar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            font-weight: 700;
-        }
-        
-        .calendar-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 5px;
-            text-align: center;
-        }
-        
-        .calendar-day {
-            padding: 10px;
-            border-radius: 50%;
-            cursor: pointer;
-        }
-        
-        .calendar-day.selected {
-            background: #0152BB;
-            color: white;
-        }
-
-        /* Time Picker Styles */
-        .time-picker-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 200px;
-            position: relative;
-            overflow: hidden;
-            background: #fff;
-            border-radius: 15px;
-        }
-
-        .time-picker-wheel {
-            height: 100%;
-            overflow-y: scroll;
-            scroll-snap-type: y mandatory;
-            width: 60px;
-            text-align: center;
-            padding-top: 80px; /* Half height - item height/2 */
-            padding-bottom: 80px;
-            scrollbar-width: none; /* Firefox */
-        }
-        
-        .time-picker-wheel::-webkit-scrollbar {
-            display: none;
-        }
-
-        .time-item {
-            height: 40px;
-            line-height: 40px;
-            scroll-snap-align: center;
-            font-size: 24px;
-            color: #ccc;
-        }
-        
-        .time-item.active {
-            color: #000;
-            font-weight: bold;
-            font-size: 28px;
-        }
-
-        .time-picker-highlight {
-            position: absolute;
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 40px;
-            margin-top: -20px;
-            background: rgba(0, 0, 0, 0.05);
-            pointer-events: none;
-            border-top: 1px solid #ddd;
-            border-bottom: 1px solid #ddd;
-        }
-        
-        .time-picker-separator {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 0 10px;
-        }
-    </style>
+    <!-- Custom Pickers Styles moved to style.css -->
 
     <script>
         let selectedOrigin = null;
@@ -672,6 +495,14 @@
             localStorage.setItem('route_departure_time', timeStr);
 
             window.location.href = '/route-results';
+        }
+
+        function toggleReturn() {
+            console.log("Toggle return not implemented yet");
+            // dopo tot sec unchecka #return-toggle
+            setTimeout(() => {
+                document.getElementById('return-toggle').checked = false;
+            }, 400);
         }
 
         window.addEventListener('DOMContentLoaded', () => {

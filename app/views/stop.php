@@ -7,145 +7,37 @@
     <?php
     require COMMON_HTML_HEAD;
     ?>
+    <link rel="stylesheet" href="/css/style.css" />
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #F5F5F5;
-            margin: 0;
-            padding: 0;
-        }
-
-        /* Header Verde */
+        /* Page specific overrides */
         .header-green {
-            background: #009E61;
-            padding: 2rem 1.5rem 6rem;
-            color: white;
-            border-bottom-left-radius: 0;
-            border-bottom-right-radius: 0;
-            clip-path: polygon(0 0, 100% 0, 100% 75%, 0 100%);
-            margin-bottom: -4rem;
-        }
-
-        .header-title {
-            font-family: 'Inter', sans-serif;
-            font-weight: 800;
-            font-size: 28px;
-            line-height: 1.2;
-            margin-top: 1rem;
-        }
-        
-        .header-subtitle {
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 500;
-            font-size: 16px;
-            opacity: 0.9;
-            margin-top: 0.5rem;
-        }
-
-        /* Sezioni Titoli */
-        .section-title {
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 590;
-            font-size: 20px;
-            color: #000000;
-            margin: 1.5rem 1.5rem 0.5rem;
-        }
-
-        /* Card Passaggio */
-        .passage-card {
-            background: #FFFFFF;
-            box-shadow: 2px 0px 9.7px -4px rgba(0, 0, 0, 0.24);
-            border-radius: 15px;
-            padding: 1rem;
-            margin: 0.5rem 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
             position: relative;
         }
-
-        .passage-info {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .passage-dest {
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 700;
-            font-size: 18px;
-            color: #000000;
-            margin-bottom: 0.2rem;
-        }
-
-        .passage-meta {
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 510;
-            font-size: 14px;
-            color: #666;
-        }
-
-        /* Badge Linea */
-        .line-badge {
-            background: #0152BB;
-            border-radius: 7px;
-            color: #FFFFFF;
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 700;
-            font-size: 18px;
-            padding: 4px 10px;
-            min-width: 45px;
-            text-align: center;
-            display: inline-block;
-            margin-right: 15px;
+        
+        .favorite-button {
+            position: absolute;
+            top: 2rem;
+            right: 1.5rem;
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            transition: transform 0.2s;
         }
         
-        .time-badge {
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 700;
-            font-size: 18px;
-            color: #009E61;
+        .favorite-button:active {
+            transform: scale(0.9);
         }
         
-        .time-badge.real-time {
-            color: #009E61;
+        .favorite-button.favorited {
+            color: #FFD700;
         }
         
-        .time-badge.scheduled {
-            color: #333;
+        .favorite-button:not(.favorited) {
+            color: rgba(255, 255, 255, 0.5);
         }
-        
-        .real-time-indicator {
-            width: 8px;
-            height: 8px;
-            background-color: #009E61;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 5px;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% {
-                transform: scale(0.95);
-                box-shadow: 0 0 0 0 rgba(0, 158, 97, 0.7);
-            }
-            70% {
-                transform: scale(1);
-                box-shadow: 0 0 0 10px rgba(0, 158, 97, 0);
-            }
-            100% {
-                transform: scale(0.95);
-                box-shadow: 0 0 0 0 rgba(0, 158, 97, 0);
-            }
-        }
-
-        /* Loading */
-        #loading {
-            text-align: center;
-            padding: 2rem;
-            color: #666;
-        }
-
     </style>
 </head>
 <body>
@@ -157,6 +49,9 @@
         </div> 
         <div class="header-title" id="station-name">Caricamento...</div>
         <div class="header-subtitle" id="station-id"></div>
+        <button class="favorite-button" id="favorite-btn" onclick="toggleFavorite()" title="Aggiungi ai preferiti">
+            ★
+        </button>
     </div>
 
     <!-- Contenuto Principale -->
@@ -184,15 +79,76 @@
         const stationId = urlParams.get('id');
         const stationName = urlParams.get('name');
 
+        // Favorite management functions
+        function getFavorites() {
+            const favorites = localStorage.getItem('favorite_stops');
+            return favorites ? JSON.parse(favorites) : [];
+        }
+
+        function isFavorite() {
+            const favorites = getFavorites();
+            // Check if any favorite has this ID (could be in ids array)
+            return favorites.some(fav => {
+                if (fav.ids && Array.isArray(fav.ids)) {
+                    return fav.ids.some(id => stationId.includes(id) || id === stationId.split('-')[0]);
+                }
+                return fav.id === stationId || stationId.includes(fav.id);
+            });
+        }
+
+        function toggleFavorite() {
+            let favorites = getFavorites();
+            const favoriteBtn = document.getElementById('favorite-btn');
+            
+            if (isFavorite()) {
+                // Remove from favorites
+                favorites = favorites.filter(fav => {
+                    if (fav.ids && Array.isArray(fav.ids)) {
+                        return !fav.ids.some(id => stationId.includes(id) || id === stationId.split('-')[0]);
+                    }
+                    return fav.id !== stationId && !stationId.includes(fav.id);
+                });
+                favoriteBtn.classList.remove('favorited');
+                favoriteBtn.title = 'Aggiungi ai preferiti';
+            } else {
+                // Add to favorites
+                // Parse IDs from stationId (format: "4825" or "4825-4826")
+                const ids = stationId.split('-');
+                favorites.push({
+                    id: ids[0],
+                    ids: ids,
+                    name: stationName || `Fermata ${stationId}`
+                });
+                favoriteBtn.classList.add('favorited');
+                favoriteBtn.title = 'Rimuovi dai preferiti';
+            }
+            
+            localStorage.setItem('favorite_stops', JSON.stringify(favorites));
+        }
+
+        function updateFavoriteButton() {
+            const favoriteBtn = document.getElementById('favorite-btn');
+            if (isFavorite()) {
+                favoriteBtn.classList.add('favorited');
+                favoriteBtn.title = 'Rimuovi dai preferiti';
+            } else {
+                favoriteBtn.classList.remove('favorited');
+                favoriteBtn.title = 'Aggiungi ai preferiti';
+            }
+        }
+
         if (!stationId) {
             document.getElementById('station-name').innerText = "Errore: ID mancante";
             document.getElementById('loading').style.display = 'none';
         } else {
-            if(stationName) {
+            console.log(urlParams.get('name'), urlParams.get('id'));
+            console.log(stationName);
+            document.getElementById('station-name').innerText = stationName ?? "Fermata " + stationId;
+            /*if(stationName) {
                 document.getElementById('station-name').innerText = stationName;
             } else {
                 document.getElementById('station-name').innerText = "Fermata " + stationId;
-            }
+            }*/
             document.getElementById('station-id').innerText = stationId;
         }
 
@@ -200,7 +156,7 @@
             if (!stationId) return;
 
             try {
-                let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stationId}`);
+                let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stationId}-web-aut`);
                 if (!response.ok) {
                     throw new Error(`Response status: ${response.status}`);
                 }
@@ -229,6 +185,9 @@
             // Set ID in header temporarily
             document.getElementById('station-id').innerText = stationId;
             
+            // Update favorite button state
+            updateFavoriteButton();
+            
             let passages = await getPassages();
             document.getElementById('loading').style.display = 'none';
             
@@ -237,7 +196,7 @@
 
             if(passages.length === 0) {
                 listContainer.innerHTML = "<p class='text-center text-muted'>Nessun passaggio previsto.</p>";
-                document.getElementById('station-name').innerText = "Fermata " + stationId;
+                //document.getElementById('station-name').innerText = "Fermata " + stationId;
                 return;
             }
             
@@ -253,22 +212,39 @@
             // document.getElementById('station-name').innerText = "Fermata " + stationId;
 
             passages.forEach(p => {
-                let lineName = p.line; // e.g. "GSB_US" or "7E" if lucky
+                let lineNameRaw = p.line; // e.g. "GSB_US" or "7E" if lucky
                 let dest = p.destination;
                 let time = p.time;
                 let isReal = p.real;
+                let stop = p.stop ?? stationId;
+                
+                
+                //Split line name
+                let lineNameParts = lineNameRaw.split("_");
+                let lineName = lineNameParts[0];
+                let lineTag = lineNameParts[1];
+
+                
+                let badgeColor = "badge-red"
+                if(lineTag === "US" || lineTag === "UN" || lineTag === "EN") {
+                    badgeColor = "badge-blue"
+                }
+                if(lineName.startsWith("N")) {
+                    badgeColor = "badge-night"
+                }
+
                 
                 let timeHtml = isReal 
                     ? `<div class="d-flex align-items-center"><div class="real-time-indicator"></div><span class="time-badge real-time">${time}</span></div>`
                     : `<span class="time-badge scheduled">${time}</span>`;
 
-                listContainer.innerHTML += `
+                listContainer.innerHTML += /*html*/`
                 <div class="passage-card">
                     <div class="d-flex align-items-center">
-                        <div class="line-badge">${lineName}</div>
+                        <div class="line-badge ${badgeColor}">${lineName}</div>
                         <div class="passage-info">
-                            <span class="passage-dest">${dest}</span>
-                            <span class="passage-meta">Verso ${dest}</span>
+                            <span class="passage-dest"><b>${dest}</b></span><br/>
+                            <span class="passage-meta">Presso <b>${stop}</b></span>
                         </div>
                     </div>
                     <div>

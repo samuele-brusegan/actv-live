@@ -99,6 +99,27 @@
             margin-bottom: 2px;
         }
         
+        /* Stop IDs Container */
+        .stop-ids-container {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 60px;
+            align-items: center;
+        }
+        
+        .stop-id-badge {
+            background: #007bff;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            min-width: 50px;
+            line-height: 1.2;
+        }
+        
         /* Search Input */
         .search-container {
             padding: 0 1.5rem;
@@ -157,8 +178,10 @@
             <?php if (empty($stations)): ?>
                 <p class='text-center text-muted'>Nessuna stazione trovata.</p>
             <?php else: ?>
-                <?php foreach ($stations as $station): ?>
-                    <?php
+                <?php 
+                    // Merge stations by clean name
+                    $mergedStations = [];
+                    foreach ($stations as $station) {
                         $rawName = $station['description'];
                         // Extract IDs from description (e.g. "Name [123] [456]")
                         preg_match_all('/\[(\d+)\]/', $rawName, $matches);
@@ -167,54 +190,86 @@
                         // Clean name by removing IDs
                         $cleanName = trim(preg_replace('/\[\d+\]/', '', $rawName));
                         
-                        // If no IDs found, use a placeholder or the original name logic
-                        if (empty($ids)) {
-                            $ids = ['']; 
+                        // If no IDs found, skip this station
+                        if (empty($ids)) continue;
+                        
+                        // Use clean name as key for merging
+                        if (!isset($mergedStations[$cleanName])) {
+                            $mergedStations[$cleanName] = [
+                                'name' => $cleanName,
+                                'ids' => [],
+                                'lines' => $station['lines'] ?? []
+                            ];
                         }
-
-                        // Generate a unique group ID based on the raw name
-                        $groupId = md5($rawName);
-
-                        $lines = $station['lines'] ?? [];
-                        // Prepare lines HTML (all lines, as we can't filter by sub-ID yet)
-                        $linesHtml = '';
-                        if (!empty($lines)) {
-                            foreach ($lines as $line) {
-                                $linesHtml .= '<span class="badge bg-secondary me-1" style="font-size: 0.7em; background-color: #6c757d; color: white; padding: 2px 5px; border-radius: 4px;">' . htmlspecialchars($line['alias']) . '</span>';
+                        
+                        // Add all IDs to this station
+                        $mergedStations[$cleanName]['ids'] = array_merge(
+                            $mergedStations[$cleanName]['ids'],
+                            $ids
+                        );
+                        
+                        // Merge lines (avoid duplicates)
+                        if (!empty($station['lines'])) {
+                            $existingLineAliases = array_column($mergedStations[$cleanName]['lines'], 'alias');
+                            foreach ($station['lines'] as $line) {
+                                if (!in_array($line['alias'], $existingLineAliases)) {
+                                    $mergedStations[$cleanName]['lines'][] = $line;
+                                    $existingLineAliases[] = $line['alias'];
+                                }
                             }
                         }
+                    }
+                ?>
+                
+                <?php foreach ($mergedStations as $station): ?>
+                    <?php
+                        // Prepare lines HTML for subtitle
+                        $linesHtml = '';
+                        if (!empty($station['lines'])) {
+                            $lineAliases = array_map(function($line) {
+                                return htmlspecialchars($line['alias']);
+                            }, array_slice($station['lines'], 0, 5)); // Show max 5 lines
+                            $linesHtml = implode(', ', $lineAliases);
+                            if (count($station['lines']) > 5) {
+                                $linesHtml .= '...';
+                            }
+                        } else {
+                            $linesHtml = 'Nessuna linea disponibile';
+                        }
+                        
+                        // Use first ID for the link
+                        $primaryId = $station['ids'][0];
+                        $strIds = $station['ids'][0];
+                        if (count($station['ids']) > 1) {
+                            $strIds .= "-" . $station['ids'][1];
+                        }
+                        // Create a data attribute with all IDs
+                        $allIdsJson = htmlspecialchars(json_encode($station['ids']));
                     ?>
-
-                    <?php foreach ($ids as $stopId): ?>
-                        <a href="/aut/stops/stop?id=<?= urlencode($stopId ?: $station['name']) ?>&name=<?= urlencode($cleanName) ?>" 
-                           class="stop-card station-item" 
-                           data-name="<?= htmlspecialchars(strtoupper($cleanName)) ?>"
-                           data-station-id="<?= htmlspecialchars($stopId) ?>"
-                           data-group-id="<?= $groupId ?>"
-                           data-original-name="<?= htmlspecialchars($rawName) ?>"
-                           id="card-<?= htmlspecialchars($stopId) ?>">
+                    
+                    <a href="/aut/stops/stop?id=<?= urlencode($strIds) ?>&name=<?= urlencode($station['name']) ?>" 
+                       class="stop-card station-item" 
+                       data-name="<?= htmlspecialchars(strtoupper($station['name'])) ?>"
+                       data-all-ids='<?= $allIdsJson ?>'>
+                        
+                        <div class="d-flex align-items-center" style="width: 100%;">
+                            <!-- Stop IDs Container (vertically stacked badges) -->
+                            <div class="stop-ids-container">
+                                <?php foreach ($station['ids'] as $stopId): ?>
+                                    <div class="stop-id-badge"><?= htmlspecialchars($stopId) ?></div>
+                                <?php endforeach; ?>
+                            </div>
                             
-                            <div class="d-flex align-items-center" style="width: 100%;">
-                                <!-- Blue rectangle with Station ID -->
-                                <div style="min-width: 60px; text-align: center;">
-                                    <div class="line-badge" style="width: auto; padding: 5px 10px; background-color: #007bff; color: white; border-radius: 5px; font-weight: bold;">
-                                        <?= htmlspecialchars($stopId) ?>
-                                    </div>
-                                </div>
-                                
-                                <div class="stop-info ms-3" style="flex-grow: 1;">
-                                    <span class="stop-name d-block"><?= htmlspecialchars($cleanName) ?></span>
-                                    <!-- Subtitle for Direction -->
-                                    <span class="stop-desc direction-subtitle" id="subtitle-<?= htmlspecialchars($stopId) ?>">
-                                        <span class="spinner-border spinner-border-sm text-muted" role="status"></span> Caricamento...
-                                    </span>
-                                </div>
+                            <div class="stop-info ms-3" style="flex-grow: 1;">
+                                <span class="stop-name d-block"><?= htmlspecialchars($station['name']) ?></span>
+                                <!-- Subtitle for Lines -->
+                                <span class="stop-desc">Linee: <?= $linesHtml ?></span>
                             </div>
-                            <div class="quick-action">
-                                <span style="font-size: 20px; color: #ccc;">&rsaquo;</span>
-                            </div>
-                        </a>
-                    <?php endforeach; ?>
+                        </div>
+                        <div class="quick-action">
+                            <span style="font-size: 20px; color: #ccc;">&rsaquo;</span>
+                        </div>
+                    </a>
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
@@ -233,109 +288,6 @@
                     cards[i].style.display = "flex";
                 } else {
                     cards[i].style.display = "none";
-                }
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchDirections();
-        });
-
-        async function fetchDirections() {
-            const cards = document.querySelectorAll('.station-item');
-            const groups = {};
-
-            // Group cards by group-id
-            cards.forEach(card => {
-                const groupId = card.getAttribute('data-group-id');
-                if (!groups[groupId]) {
-                    groups[groupId] = [];
-                }
-                groups[groupId].push(card);
-            });
-
-            // Process each group
-            for (const groupId in groups) {
-                const groupCards = groups[groupId];
-                const promises = groupCards.map(async (card) => {
-                    const stationId = card.getAttribute('data-station-id');
-                    if (!stationId) return { card, data: [] };
-
-                    try {
-                        const response = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stationId}-web-aut`);
-                        if (!response.ok) throw new Error('Network response was not ok');
-                        const data = await response.json();
-                        return { card, data };
-                    } catch (error) {
-                        console.error('Error fetching data for', stationId, error);
-                        return { card, data: [] };
-                    }
-                });
-
-                // Wait for all fetches in this group
-                const results = await Promise.all(promises);
-
-                // Check if ALL in group are empty
-                const allEmpty = results.every(r => r.data.length === 0);
-
-                if (allEmpty && groupCards.length > 1) {
-                    // MERGE LOGIC
-                    const firstCard = groupCards[0];
-                    const originalName = firstCard.getAttribute('data-original-name');
-                    
-                    // Hide others
-                    for (let i = 1; i < groupCards.length; i++) {
-                        groupCards[i].style.display = 'none';
-                        groupCards[i].classList.add('merged-hidden');
-                    }
-
-                    // Update first card
-                    const nameEl = firstCard.querySelector('.stop-name');
-                    const subtitleEl = firstCard.querySelector('.direction-subtitle');
-                    const badgeEl = firstCard.querySelector('.line-badge');
-
-                    if (nameEl) nameEl.textContent = originalName.replace(/\[\d+\]/g, '').trim();
-                    
-                    if (subtitleEl) {
-                        subtitleEl.textContent = "Nessun autobus in arrivo";
-                        subtitleEl.style.color = "#dc3545";
-                    }
-                    
-                    // Stack IDs vertically in badge
-                    const allIds = groupCards.map(c => c.getAttribute('data-station-id'));
-                    if (badgeEl) {
-                        badgeEl.innerHTML = allIds.map(id => `<div style="line-height: 1.2;">${id}</div>`).join('');
-                        badgeEl.style.backgroundColor = '#6c757d';
-                        badgeEl.style.color = '#fff';
-                        badgeEl.style.padding = '5px 8px';
-                    }
-
-                } else {
-                    // NOT ALL EMPTY (or single card)
-                    results.forEach(({ card, data }) => {
-                        const subtitleEl = card.querySelector('.direction-subtitle');
-                        if (!subtitleEl) return;
-
-                        if (data.length === 0) {
-                            subtitleEl.textContent = "Nessun arrivo previsto";
-                            subtitleEl.style.color = "#6c757d";
-                        } else {
-                            // Calculate frequent destination
-                            const destinations = {};
-                            data.forEach(bus => {
-                                const dest = bus.destination;
-                                destinations[dest] = (destinations[dest] || 0) + 1;
-                            });
-                            
-                            // Sort by frequency
-                            const sortedDest = Object.entries(destinations).sort((a, b) => b[1] - a[1]);
-                            const mostFreq = sortedDest[0][0];
-
-                            subtitleEl.textContent = "Dir. " + mostFreq;
-                            subtitleEl.style.color = "#000";
-                            subtitleEl.style.fontWeight = "500";
-                        }
-                    });
                 }
             }
         }

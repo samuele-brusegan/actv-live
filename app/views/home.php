@@ -7,124 +7,6 @@
     <!-- CSS di Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <?php require COMMON_HTML_HEAD; ?>
-    <style>
-        body {
-            font-size: 28px;
-            line-height: 1.2;
-            /*margin-top: 1rem;*/
-        }
-
-        /* Header Verde */
-        .header-green {
-            background: #009E61;
-            padding: 2rem 1.5rem 6rem;
-            color: white;
-            border-bottom-left-radius: 0;
-            border-bottom-right-radius: 0;
-            clip-path: polygon(0 0, 100% 0, 100% 75%, 0 100%);
-            margin-bottom: -4rem;
-        }
-
-        .header-title {
-            font-family: 'Inter', sans-serif;
-            font-weight: 800;
-            font-size: 28px;
-            line-height: 1.2;
-            margin-top: 1rem;
-        }
-
-        /* Sezioni Titoli */
-        .section-title {
-            font-family: 'SF Pro', sans-serif; /* Fallback se SF Pro non c'è */
-            font-weight: 590; /* 600 approx */
-            font-size: 20px;
-            color: #000000;
-            margin: 1.5rem 1.5rem 0.5rem;
-        }
-
-        /* Card Fermata */
-        .stop-card {
-            background: #FFFFFF;
-            box-shadow: 2px 0px 9.7px -4px rgba(0, 0, 0, 0.24);
-            border-radius: 15px;
-            padding: 1rem;
-            margin: 0.5rem 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            text-decoration: none;
-            color: inherit;
-            position: relative;
-            transition: transform 0.1s;
-        }
-        
-        .stop-card:active {
-            transform: scale(0.98);
-        }
-
-        .stop-info {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .stop-name {
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 700;
-            font-size: 20px;
-            color: #000000;
-            margin-bottom: 0.2rem;
-        }
-
-        .stop-desc {
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 510; /* 500 approx */
-            font-size: 14px;
-            color: #666; /* Slightly lighter than black for description */
-        }
-
-        /* Badge Linea */
-        .line-badge {
-            background: #0152BB;
-            border-radius: 7px;
-            color: #FFFFFF;
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 700;
-            font-size: 14px;
-            padding: 2px 8px;
-            min-width: 36px;
-            text-align: center;
-            display: inline-block;
-            margin-right: 5px;
-        }
-
-        /* Quick Action (Arrow/Icon placeholder) */
-        .quick-action {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 24px;
-            color: #333;
-        }
-
-        /* Mappa */
-        #map-container {
-            padding: 1.5rem;
-        }
-        #map {
-            height: 300px;
-            width: 100%;
-            border-radius: 15px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-        
-        /* Status bar */
-        #status {
-            margin: 0 1.5rem 1rem;
-            border-radius: 15px;
-        }
-
-    </style>
 </head>
 <body>
 
@@ -137,6 +19,12 @@
 
     <!-- Contenuto Principale -->
     <div class="main-content pb-5">
+        
+        <!-- Sezione Fermate Preferite -->
+        <div id="favorites-section" style="display: none;">
+            <div class="section-title">Fermate Preferite</div>
+            <div id="favorites-list"></div>
+        </div>
         
         <!-- Sezione Fermate Vicine (Dinamica) -->
         <div class="section-title">Fermate più vicine</div>
@@ -174,6 +62,51 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     
     <script>
+        // Render favorites
+        function renderFavorites() {
+            const favorites = JSON.parse(localStorage.getItem('favorite_stops') || '[]');
+            const favoritesSection = document.getElementById('favorites-section');
+            const favoritesList = document.getElementById('favorites-list');
+            
+            if (favorites.length === 0) {
+                favoritesSection.style.display = 'none';
+                return;
+            }
+            
+            favoritesSection.style.display = 'block';
+            favoritesList.innerHTML = '';
+            
+            favorites.forEach(stop => {
+                const stopCard = document.createElement('a');
+                stopCard.href = `/aut/stops/stop?id=${stop.ids.join('-')}&name=${encodeURIComponent(stop.name)}`;
+                stopCard.className = 'stop-card';
+                stopCard.style.textDecoration = 'none';
+                stopCard.style.color = 'inherit';
+                
+                // Create ID badges HTML
+                const idBadgesHtml = stop.ids.map(id => 
+                    `<div style="background: #007bff; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; text-align: center; min-width: 50px; line-height: 1.2;">${id}</div>`
+                ).join('');
+                
+                stopCard.innerHTML = `
+                    <div class="d-flex align-items-center" style="width: 100%;">
+                        <div style="display: flex; flex-direction: column; gap: 4px; min-width: 60px; align-items: center;">
+                            ${idBadgesHtml}
+                        </div>
+                        <div class="stop-info ms-3" style="flex-grow: 1;">
+                            <span class="stop-name d-block">${stop.name}</span>
+                            <span class="stop-desc">★ Preferita</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center;">
+                        <span style="font-size: 20px; color: #ccc;">›</span>
+                    </div>
+                `;
+                
+                favoritesList.appendChild(stopCard);
+            });
+        }
+    
         // Funzione per recuperare le stazioni
         async function getStations() {
             try {
@@ -205,10 +138,13 @@
         }
 
         window.onload = async function() {
+            // Render favorites first
+            renderFavorites();
+            
             const statusElement = document.getElementById('status');
             
             // Inizializza Mappa
-            var map = L.map('map').setView([45.4384, 12.3359], 12); // Venezia centro
+            var map = L.map('map', {attributionControl: false}).setView([45.4384, 12.3359], 12); // Venezia centro
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -254,7 +190,7 @@
             if(actvStations) {
                 actvStations.forEach(station => {
                     station.marker = L.circleMarker([station.lat, station.lng], defaultCircleStyle)
-                        .bindPopup(`**Stazione:** ${station.name}`)
+                        .bindPopup(`<b>Stazione:</b> ${station.name}`)
                         .addTo(map);
                 });
             }
@@ -265,7 +201,7 @@
                 const userLng = e.latlng.lng;
 
                 statusElement.className = "alert alert-success d-flex align-items-center mx-3 mb-3";
-                statusElement.innerHTML = `
+                statusElement.innerHTML = /*html*/`
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-geo-alt-fill me-2" viewBox="0 0 16 16">
                       <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/>
                     </svg>
@@ -297,8 +233,8 @@
                         const isClosest = closestStations.includes(station);
                         const style = isClosest ? highlightedCircleStyle : defaultCircleStyle;
                         const popupText = isClosest
-                            ? `**Stazione:** ${station.name}<br>Distanza: ${station.distance.toFixed(2)} km`
-                            : `**Stazione:** ${station.name}`;
+                            ? `<b>Stazione:</b> ${station.name}<br>Distanza: ${station.distance.toFixed(2)} km`
+                            : `<b>Stazione:</b> ${station.name}`;
 
                         station.marker = L.circleMarker([station.lat, station.lng], style)
                             .bindPopup(popupText)
@@ -306,7 +242,9 @@
                     });
 
                     // Aggiorna lista visuale
-                    renderClosestStationsList(closestStations);
+                    if (typeof renderClosestStationsList === 'function') {
+                        renderClosestStationsList(closestStations);
+                    }
 
                     // Centra mappa
                     const bounds = L.latLngBounds([e.latlng]);
@@ -317,6 +255,12 @@
 
             function onLocationError(e) {
                 console.error("Errore geolocalizzazione:", e.message);
+            }
+            
+            // Request location
+            map.locate({setView: true, maxZoom: 16});
+            map.on('locationfound', onLocationFound);
+            map.on('locationerror', onLocationError);
         };
     </script>
 

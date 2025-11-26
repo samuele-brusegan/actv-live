@@ -129,19 +129,91 @@ class RoutePlanner {
                 }
             }
         }
+
+        // --- NEXT DAY SEARCH LOGIC ---
+        // If we found no results (or very few), try searching for the next day
+        if (empty($results)) {
+            $nextDayDepartureTime = '00:00:00';
+            $nextDayResults = [];
+
+            // 1. Direct connections (Next Day)
+            foreach ($commonRoutes as $routeId) {
+                $tripResults = $this->findTripsForRoute($routeId, $originId, $destId, $nextDayDepartureTime);
+                foreach ($tripResults as &$trip) {
+                    $trip['day_offset'] = 1; // Mark as next day
+                    $trip['duration'] += 24 * 60; // Add 24 hours to duration for sorting/display logic if needed
+                }
+                $nextDayResults = array_merge($nextDayResults, $tripResults);
+            }
+
+            // 2. Connections with 1 transfer (Next Day)
+            // Reuse the same logic but with nextDayDepartureTime
+            // NOTE: For brevity, repeating the transfer logic here. Ideally, refactor into a private method.
+            $routesChecked = 0;
+            foreach ($originRoutes as $routeId) {
+                if (in_array($routeId, $commonRoutes)) continue;
+                if ($routesChecked++ > $maxRoutesToCheck) break;
+                
+                $routeStops = $this->getRouteStopsAfter($routeId, $originId);
+                foreach ($routeStops as $stopId => $timeFromOrigin) {
+                    if (!isset($this->stopRoutesIndex[$stopId])) continue;
+                    $transferRoutes = $this->stopRoutesIndex[$stopId];
+                    $connectingRoutes = array_intersect($transferRoutes, $destRoutes);
+                    
+                    if (!empty($connectingRoutes)) {
+                        $leg1Trips = $this->findTripsForRoute($routeId, $originId, $stopId, $nextDayDepartureTime);
+                        if (empty($leg1Trips)) continue;
+                        $leg1 = $leg1Trips[0];
+                        $minTransferTime = $this->addMinutes($leg1['arrival_time'], 2);
+                        $bestLeg2 = null;
+                        foreach ($connectingRoutes as $connRouteId) {
+                            $leg2Trips = $this->findTripsForRoute($connRouteId, $stopId, $destId, $minTransferTime);
+                            if (!empty($leg2Trips)) {
+                                $candidateLeg2 = $leg2Trips[0];
+                                if ($bestLeg2 === null || $candidateLeg2['arrival_time'] < $bestLeg2['arrival_time']) {
+                                    $bestLeg2 = $candidateLeg2;
+                                }
+                            }
+                        }
+                        if ($bestLeg2) {
+                            $nextDayResults[] = [
+                                'type' => 'transfer',
+                                'departure_time' => $leg1['departure_time'],
+                                'arrival_time' => $bestLeg2['arrival_time'],
+                                'duration' => $this->calculateDuration($leg1['departure_time'], $bestLeg2['arrival_time']) + (24 * 60),
+                                'stops_count' => $leg1['stops_count'] + $bestLeg2['stops_count'],
+                                'legs' => [$leg1, $bestLeg2],
+                                'transfer_stop' => $this->stops[$stopId]['name'] ?? $stopId,
+                                'route_short_name' => $leg1['route_short_name'] . ' → ' . $bestLeg2['route_short_name'],
+                                'route_long_name' => 'Cambio a ' . ($this->stops[$stopId]['name'] ?? $stopId),
+                                'day_offset' => 1
+                            ];
+                        }
+                    }
+                }
+            }
+            $results = array_merge($results, $nextDayResults);
+        }
         
-        // Sort by weighted score (Arrival Time + Penalty for Transfers)
+        // Sort by weighted score (Arrival Time + Penalty for Transfers + Day Offset)
         usort($results, function($a, $b) {
             $penaltyPerTransfer = 15 * 60; // 15 minutes penalty for a transfer
-            
+            $secondsPerDay = 24 * 3600;
+
             $scoreA = $this->gtfsToSeconds($a['arrival_time']);
             if ($a['type'] === 'transfer') {
                 $scoreA += $penaltyPerTransfer;
+            }
+            if (isset($a['day_offset'])) {
+                $scoreA += $a['day_offset'] * $secondsPerDay;
             }
             
             $scoreB = $this->gtfsToSeconds($b['arrival_time']);
             if ($b['type'] === 'transfer') {
                 $scoreB += $penaltyPerTransfer;
+            }
+            if (isset($b['day_offset'])) {
+                $scoreB += $b['day_offset'] * $secondsPerDay;
             }
             
             if ($scoreA == $scoreB) {

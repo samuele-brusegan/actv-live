@@ -598,6 +598,24 @@
             }
         }
 
+        function getLineBadgeInfo(lineNameRaw) {
+            if (!lineNameRaw) return { name: '?', class: 'badge-red' };
+
+            let lineNameParts = lineNameRaw.split("_");
+            let lineName = lineNameParts[0];
+            let lineTag = lineNameParts[1];
+
+            let badgeColor = "badge-red";
+            if(lineTag === "US" || lineTag === "UN" || lineTag === "EN") {
+                badgeColor = "badge-blue";
+            }
+            if(lineName.startsWith("N")) {
+                badgeColor = "badge-night";
+            }
+
+            return { name: lineName, class: badgeColor };
+        }
+
         function displayRoutes(routes) {
             const loadingEl = document.getElementById('loading');
             const containerEl = document.getElementById('routes-container');
@@ -618,6 +636,9 @@
                         const leg1 = route.legs[0];
                         const leg2 = route.legs[1];
                         
+                        const badge1 = getLineBadgeInfo(leg1.route_short_name);
+                        const badge2 = getLineBadgeInfo(leg2.route_short_name);
+
                         legsHtml = `
                             <div class="timeline-item">
                                 <div class="timeline-marker start"></div>
@@ -627,7 +648,7 @@
                                 </div>
                             </div>
                             <div class="timeline-connector">
-                                <div class="line-badge" style="background-color: #E60000;">${leg1.route_short_name}</div>
+                                <div class="line-badge ${badge1.class}">${badge1.name}</div>
                                 <div class="connector-info">per ${leg1.stops_count} fermate</div>
                             </div>
                             <div class="timeline-item">
@@ -638,7 +659,7 @@
                                 </div>
                             </div>
                              <div class="timeline-connector">
-                                <div class="line-badge" style="background-color: #E60000;">${leg2.route_short_name}</div>
+                                <div class="line-badge ${badge2.class}">${badge2.name}</div>
                                  <div class="connector-info">per ${leg2.stops_count} fermate</div>
                             </div>
                             <div class="timeline-item">
@@ -651,6 +672,8 @@
                         `;
                     } else {
                         // Direct Logic
+                        const badge = getLineBadgeInfo(route.route_short_name);
+
                         legsHtml = `
                             <div class="timeline-item">
                                 <div class="timeline-marker start"></div>
@@ -660,7 +683,7 @@
                                 </div>
                             </div>
                             <div class="timeline-connector">
-                                <div class="line-badge" style="background-color: #E60000;">${route.route_short_name}</div>
+                                <div class="line-badge ${badge.class}">${badge.name}</div>
                                 <div class="connector-info">viaggia per ${route.stops_count} fermate</div>
                             </div>
                             <div class="timeline-item">

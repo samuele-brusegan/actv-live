@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Stop Merging</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-result {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .stop-example {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-left: 3px solid #007bff;
+        }
+        .badge {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 3px;
+            margin-right: 5px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Stop Merging Logic</h1>
+    <div id="results"></div>
+
+    <script>
+        async function testMerging() {
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                // Fetch stops from API
+                const response = await fetch('https://actv-live.test/api/stops');
+                const data = await response.json();
+                
+                // Apply merging logic
+                const stopsMap = new Map();
+                Object.values(data).forEach(stop => {
+                    const normalizedName = stop.name.trim().toLowerCase().replace(/\s+/g, ' ');
+                    const cleanName = stop.name.trim();
+                    
+                    if (stopsMap.has(normalizedName)) {
+                        stopsMap.get(normalizedName).ids.push(stop.id);
+                    } else {
+                        stopsMap.set(normalizedName, {
+                            ids: [stop.id],
+                            name: cleanName,
+                            lines: [],
+                            lat: stop.lat,
+                            lng: stop.lon
+                        });
+                    }
+                });
+                
+                const allStops = Array.from(stopsMap.values()).map(stop => ({
+                    id: stop.ids[0],
+                    ids: stop.ids,
+                    name: stop.name,
+                    lines: stop.lines,
+                    lat: stop.lat,
+                    lng: stop.lon
+                }));
+                
+                // Get merged stops
+                const mergedStops = allStops.filter(s => s.ids.length > 1);
+                
+                // Display results
+                resultsDiv.innerHTML = `
+                    <div class="test-result success">
+                        <h2>✓ Merge Successful</h2>
+                        <p><strong>Total stops before merge:</strong> ${Object.keys(data).length}</p>
+                        <p><strong>Total stops after merge:</strong> ${allStops.length}</p>
+                        <p><strong>Stops with multiple IDs:</strong> ${mergedStops.length}</p>
+                    </div>
+                    
+                    <h2>Examples of Merged Stops:</h2>
+                    ${mergedStops.slice(0, 10).map(stop => `
+                        <div class="stop-example">
+                            <strong>${stop.name}</strong><br>
+                            IDs: ${stop.ids.map(id => `<span class="badge">${id}</span>`).join('')}
+                        </div>
+                    `).join('')}
+                `;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="test-result error">
+                        <h2>✗ Error</h2>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        testMerging();
+    </script>
+</body>
+</html>
