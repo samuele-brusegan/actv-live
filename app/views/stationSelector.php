@@ -157,7 +157,7 @@
             const container = document.getElementById('favorites-list');
             
             if (favorites.length === 0) {
-                container.innerHTML = '<div class="no-results">Nessuna fermata preferita</div>';
+                //container.innerHTML = '<div class="no-results">Nessuna fermata preferita</div>';
                 return;
             }
 
@@ -169,7 +169,7 @@
             const container = document.getElementById('recent-list');
             
             if (recent.length === 0) {
-                container.innerHTML = '<div class="no-results">Nessuna fermata recente</div>';
+                //container.innerHTML = '<div class="no-results">Nessuna fermata recente</div>';
                 return;
             }
 

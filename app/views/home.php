@@ -25,10 +25,9 @@
             <div class="section-title">Fermate Preferite</div>
             <div id="favorites-list"></div>
         </div>
-        
-        <!-- Sezione Fermate Vicine (Dinamica) -->
-        <div class="section-title">Fermate più vicine</div>
-        
+
+        <hr>
+        <div class="section-title">Mappa</div>
         <!-- Status Geolocation -->
         <div id="status" class="alert alert-info d-flex align-items-center" role="alert">
             <svg class="bi flex-shrink-0 me-2" width="24" height="24" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>
@@ -41,10 +40,18 @@
         <div id="map-container">
             <div id="map"></div>
         </div>
+
+        <hr>
+        
+        <!-- Sezione Fermate Vicine (Dinamica) -->
+        <div id="nearby-section">
+            <div class="section-title">Fermate più vicine</div>
+            <div id="nearby-list"></div>
+        </div>
         
         <!-- Pulsante Lista Completa -->
-        <div class="text-center mt-4 mb-5">
-            <button class="btn btn-outline-primary rounded-pill px-4 py-2" onclick="window.location.href='/stopList'">
+        <div class="text-center mt-4 mb-3">
+            <button class="btn btn-outline-primary rounded-pill px-4 py-2" onclick="window.location.href='/stopList'" style="width: 100%;">
                 Vedi tutte le stazioni
             </button>
         </div>
@@ -56,10 +63,18 @@
             </button>
         </div>
 
+        <!-- Pulsante Mappa Linee -->
+        <div class="text-center mt-4 mb-3">
+            <button class="btn btn-secondary rounded-pill px-4 py-2" onclick="window.location.href='/lines-map'">
+                Mappa linee (NON definitivo)
+            </button>
+        </div>
+
     </div>
 
     <!-- JavaScript di Leaflet -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="/components/StopCard.js"></script>
     
     <script>
         // Render favorites
@@ -207,6 +222,10 @@
                     </svg>
                     <div>Posizione trovata. Ecco le stazioni più vicine.</div>`;
 
+                setTimeout(() => {
+                    statusElement.style.display = 'none';
+                }, 5000);
+
                 if (userMarker) map.removeLayer(userMarker);
 
                 userMarker = L.circleMarker(e.latlng, {
@@ -228,13 +247,59 @@
                         .sort((a, b) => a.distance - b.distance)
                         .slice(0, N);
                     
+                    // Aggiorna lista visuale con StopListItem
+                    const closestStationsList = document.getElementById('nearby-list');
+                    if (closestStationsList) {
+                        console.log(closestStations);
+                        
+                        closestStationsList.innerHTML = '';
+                        closestStations.forEach(stop => {
+                            console.log(stop);
+                            
+                            let stopIds = stop.id.split('-web-aut')[0].split('-');
+
+                            const stopCard = document.createElement('a');
+                            stopCard.href = `/aut/stops/stop?id=${stopIds.join('-')}&name=${encodeURIComponent(stop.name)}`;
+                            stopCard.className = 'stop-card';
+                            stopCard.style.textDecoration = 'none';
+                            stopCard.style.color = 'inherit';
+                            
+                            // Create ID badges HTML
+                            const idBadgesHtml = stopIds.map(id => 
+                                `<div style="background: #007bff; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; text-align: center; min-width: 50px; line-height: 1.2;">${id}</div>`
+                            ).join('');
+                            
+                            stopCard.innerHTML = `
+                                <div class="d-flex align-items-center" style="width: 100%;">
+                                    <div style="display: flex; flex-direction: column; gap: 4px; min-width: 60px; align-items: center;">
+                                        ${idBadgesHtml}
+                                    </div>
+                                    <div class="stop-info ms-3" style="flex-grow: 1;">
+                                        <span class="stop-name d-block">${stop.name}</span>
+                                        <span class="stop-desc">${stop.distance.toFixed(2)} km</span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center;">
+                                    <span style="font-size: 20px; color: #ccc;">›</span>
+                                </div>
+                            `;
+                            
+                            closestStationsList.appendChild(stopCard);
+                            
+                        });
+                    }
+
+                    if (closestStations != null && closestStations.length <= 0) {
+                        document.getElementById('nearby-section').style.display = 'none';
+                    }
+
                     // Ridisegna stazioni
                     actvStations.forEach(station => {
                         const isClosest = closestStations.includes(station);
                         const style = isClosest ? highlightedCircleStyle : defaultCircleStyle;
                         const popupText = isClosest
-                            ? `<b>Stazione:</b> ${station.name}<br>Distanza: ${station.distance.toFixed(2)} km`
-                            : `<b>Stazione:</b> ${station.name}`;
+                            ? `<b>Stazione:</b> ${station.name}<br>Distanza: ${station.distance.toFixed(2)} km<br>Link: <a href="/aut/stops/stop?id=${station.id.split('-web-aut')[0]}&name=${encodeURIComponent(station.name)}">${station.id.split('-web-aut')[0]}</a>`
+                            : `<b>Stazione:</b> ${station.name}<br>Link: <a href="/aut/stops/stop?id=${station.id.split('-web-aut')[0]}&name=${encodeURIComponent(station.name)}">${station.id.split('-web-aut')[0]}</a>`;
 
                         station.marker = L.circleMarker([station.lat, station.lng], style)
                             .bindPopup(popupText)
@@ -258,7 +323,7 @@
             }
             
             // Request location
-            map.locate({setView: true, maxZoom: 16});
+            map.locate({setView: true, maxZoom: 16, maximumAge: 60000, timeout: 5000});
             map.on('locationfound', onLocationFound);
             map.on('locationerror', onLocationError);
         };

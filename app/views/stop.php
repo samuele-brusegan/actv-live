@@ -144,11 +144,6 @@
             console.log(urlParams.get('name'), urlParams.get('id'));
             console.log(stationName);
             document.getElementById('station-name').innerText = stationName ?? "Fermata " + stationId;
-            /*if(stationName) {
-                document.getElementById('station-name').innerText = stationName;
-            } else {
-                document.getElementById('station-name').innerText = "Fermata " + stationId;
-            }*/
             document.getElementById('station-id').innerText = stationId;
         }
 
@@ -194,8 +189,12 @@
             let listContainer = document.getElementById('passages-list');
             listContainer.innerHTML = "";
 
-            if(passages.length === 0) {
-                listContainer.innerHTML = "<p class='text-center text-muted'>Nessun passaggio previsto.</p>";
+            if(passages.length === 0 ) {
+                if (passages.message === null || passages.message === undefined){
+                    listContainer.innerHTML = "<p class='text-center text-muted'>Nessun passaggio previsto.</p>";
+                } else {
+                    listContainer.innerHTML = "<p class='text-center text-muted'>" + passages.message + "</p>";
+                }
                 //document.getElementById('station-name').innerText = "Fermata " + stationId;
                 return;
             }
@@ -235,7 +234,11 @@
 
                 
                 let timeHtml = isReal 
-                    ? `<div class="d-flex align-items-center"><div class="real-time-indicator"></div><span class="time-badge real-time">${time}</span></div>`
+                    ? 
+                    `<div class="d-flex align-items-center">
+                        <div class="real-time-indicator"></div>
+                        <span class="time-badge real-time">${time}</span>
+                    </div>`
                     : `<span class="time-badge scheduled">${time}</span>`;
 
                 listContainer.innerHTML += /*html*/`

@@ -228,9 +228,9 @@
                         if (!empty($station['lines'])) {
                             $lineAliases = array_map(function($line) {
                                 return htmlspecialchars($line['alias']);
-                            }, array_slice($station['lines'], 0, 5)); // Show max 5 lines
+                            }, array_slice($station['lines'], 0, 4)); // Show max 5 lines
                             $linesHtml = implode(', ', $lineAliases);
-                            if (count($station['lines']) > 5) {
+                            if (count($station['lines']) > 4) {
                                 $linesHtml .= '...';
                             }
                         } else {
