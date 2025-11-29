@@ -25,8 +25,17 @@
             <div class="section-title">Fermate Preferite</div>
             <div id="favorites-list"></div>
         </div>
+        
+        <hr>
+        
+        <!-- Sezione Fermate Vicine (Dinamica) -->
+        <div id="nearby-section">
+            <div class="section-title">Fermate più vicine</div>
+            <div id="nearby-list"></div>
+        </div>
 
         <hr>
+        
         <div class="section-title">Mappa</div>
         <!-- Status Geolocation -->
         <div id="status" class="alert alert-info d-flex align-items-center" role="alert">
@@ -41,13 +50,6 @@
             <div id="map"></div>
         </div>
 
-        <hr>
-        
-        <!-- Sezione Fermate Vicine (Dinamica) -->
-        <div id="nearby-section">
-            <div class="section-title">Fermate più vicine</div>
-            <div id="nearby-list"></div>
-        </div>
         
         <!-- Pulsante Lista Completa -->
         <div class="text-center mt-4 mb-3">
