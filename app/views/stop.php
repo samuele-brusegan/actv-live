@@ -174,14 +174,8 @@
         // The docs/data.md example for passages has "stop": "4825" and "timingPoints" with "stop": "Spinea Centro Sportivo".
         // Maybe we can use that?
         
-        async function init() {
+        async function loadPassages() {
             if (!stationId) return;
-            
-            // Set ID in header temporarily
-            document.getElementById('station-id').innerText = stationId;
-            
-            // Update favorite button state
-            updateFavoriteButton();
             
             let passages = await getPassages();
             document.getElementById('loading').style.display = 'none';
@@ -256,6 +250,21 @@
                 </div>
                 `;
             });
+        }
+
+        async function init() {
+            if (!stationId) return;
+            
+            // Set ID in header temporarily
+            document.getElementById('station-id').innerText = stationId;
+            
+            // Update favorite button state
+            updateFavoriteButton();
+            
+            await loadPassages();
+
+            // Refresh every 15 seconds
+            setInterval(loadPassages, 15000);
         }
 
         window.onload = init;
