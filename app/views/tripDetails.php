@@ -103,12 +103,37 @@
             const container = document.getElementById('stops-container');
             let html = '<div class="timeline">';
             
-            let foundCurrent = false;
+            // 1. Find current stop index
             let currentStopIndex = -1;
             
+            // Debug logs
+            console.log('Target stopId:', stopId);
+            
+            // Try to find by ID first
+            if (stopId) {
+                currentStopIndex = stops.findIndex(s => s.id == stopId || stopId.includes(s.id));
+            }
+            
+            // Fallback: Try to find by Name if ID failed (and we have a way to know which one... 
+            // actually if we don't have ID match, maybe we are just viewing the trip without a specific target?
+            // But the user said "passed" issue implies we HAVE a target but it's not matching.
+            // Let's try matching by name if ID fails, assuming 'dest' might be the target? 
+            // No, 'stopId' param is the user's selected stop.
+            
+            if (currentStopIndex === -1 && stopId) {
+                console.warn('Stop ID match failed. Trying loose match or name match...');
+                // Logic to try to match by name if we had the name passed, but we only have stopId from URL.
+                // If the API returned stops with different IDs than what we have in URL (e.g. 123 vs 123_1), try partial match
+                currentStopIndex = stops.findIndex(s => String(s.id).includes(String(stopId)) || String(stopId).includes(String(s.id)));
+            }
+
+            console.log('Found current stop index:', currentStopIndex);
+
+            // If still -1, it means we are either at the start or the stop wasn't found in this trip.
+            // To be safe and avoid "PASSATO" everywhere, we treat -1 as "Start of trip" (all future) 
+            // UNLESS we want to show error. But "All Future" is safer than "All Passed".
+            
             // Helper for badge color (same as stop.php)
-
-
             if (line.includes('N')) {
                 lineBadgeClass = 'badge-night';
             } else if ( tag === "US" || tag === "UN" || tag === "EN" ) {
@@ -118,34 +143,16 @@
             }
 
             document.getElementById('line-number').className += ' ' + lineBadgeClass;
-
-            /* const getBadgeColor = (lineName) => {
-                if (lineName.includes('N')) return 'bg-dark'; // Night
-                if (['2', '6', '6L', '7', '7L', '5E'].includes(lineName)) return 'bg-primary'; // Blue
-                return 'bg-danger'; // Default Red
-            };
-            
-            const badgeClass = getBadgeColor(line);
-            const lineBadge = document.getElementById('line-number');
-            lineBadge.className = `line-box ${badgeClass}`;
-            
-            // Override styles based on class logic (since we don't have bootstrap loaded fully or want custom colors)
-            if (line.includes('N')) lineBadge.style.backgroundColor = '#000';
-            else if (['2', '6', '6L', '7', '7L', '5E'].includes(line)) lineBadge.style.backgroundColor = '#0056b3';
-            else lineBadge.style.backgroundColor = '#E30613'; */
-
             
             stops.forEach((stop, index) => {
                 let isCurrent = false;
                 let isPassed = false;
                 
-                if (!foundCurrent) {
-                    if (stopId && (stop.id == stopId || stopId.includes(stop.id))) {
-                        isCurrent = true;
-                        foundCurrent = true;
-                        currentStopIndex = index;
-                    } else {
+                if (currentStopIndex !== -1) {
+                    if (index < currentStopIndex) {
                         isPassed = true;
+                    } else if (index === currentStopIndex) {
+                        isCurrent = true;
                     }
                 }
                 
@@ -172,19 +179,15 @@
                     timeDisplay = time ? time : 'ORA';
                 } else {
                     // Future stops
-                    // We don't have real schedule, so we can't show exact time easily without more data.
-                    // But the user asked "Actual value". 
-                    // If we have the current time (e.g. 10 min), we could estimate +2 min per stop?
-                    // Or just leave empty or "IN ARRIVO".
-                    // Let's try to be smart: if 'time' is "X min", we can add X + (diff * 2) min.
                     if (time && time.includes('min')) {
                         const currentMin = parseInt(time);
-                        const diff = index - currentStopIndex;
+                        // If we know current stop index, we can estimate. 
+                        // If we don't (currentStopIndex == -1), we assume we are at start (index 0 effectively for time calc?)
+                        // actually if currentStopIndex is -1, we can't estimate relative time easily.
+                        const baseIndex = currentStopIndex === -1 ? 0 : currentStopIndex;
+                        const diff = index - baseIndex;
                         const estMin = currentMin + (diff * 2); // Rough estimate
                         timeDisplay = `${estMin} min`;
-                    } else if (time && time.includes(':')) {
-                         // It's absolute time like 14:30. Hard to add minutes without date obj.
-                         timeDisplay = 'IN ARRIVO';
                     } else {
                         timeDisplay = 'IN ARRIVO';
                     }
@@ -210,14 +213,8 @@
                 const currentEl = document.querySelector('.current-stop-item');
                 if (currentEl) {
                     currentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                } else {
-                    // Fallback: try to find by class 'current' in marker
-                    const currentMarker = document.querySelector('.stop-marker.current');
-                    if (currentMarker) {
-                         currentMarker.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
                 }
-            }, 500); // Increased timeout to ensure rendering is done
+            }, 500);
         }
         
         function openMap() {

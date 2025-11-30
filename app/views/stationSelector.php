@@ -6,6 +6,7 @@
     <title>Seleziona Fermata - ACTV</title>
     <?php require COMMON_HTML_HEAD; ?>
 
+    <link rel="stylesheet" href="/css/stopList.css">
     <link rel="stylesheet" href="/css/stationSelector.css">
 </head>
 <body>
@@ -125,7 +126,7 @@
             const container = document.getElementById('favorites-list');
             
             if (favorites.length === 0) {
-                //container.innerHTML = '<div class="no-results">Nessuna fermata preferita</div>';
+                container.innerHTML = '<div class="no-results">Nessuna fermata preferita</div>';
                 return;
             }
 
@@ -137,7 +138,7 @@
             const container = document.getElementById('recent-list');
             
             if (recent.length === 0) {
-                //container.innerHTML = '<div class="no-results">Nessuna fermata recente</div>';
+                container.innerHTML = '<div class="no-results">Nessuna fermata recente</div>';
                 return;
             }
 
@@ -152,14 +153,19 @@
             });
         }
 
-        function selectStop(stop) {
+        function selectStop(stop, event) {
             selectedStop = stop;
             
             // Visual feedback
             document.querySelectorAll('.stop-card').forEach(card => {
                 card.style.background = '#FFFFFF';
             });
-            event.currentTarget.style.background = '#E8F5E9';
+            
+            // Handle event if passed directly or from window.event
+            const e = event || window.event;
+            if (e && e.currentTarget) {
+                e.currentTarget.style.background = '#E8F5E9';
+            }
 
             // Add to recent
             addToRecent(stop);
