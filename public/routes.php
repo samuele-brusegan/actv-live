@@ -19,3 +19,5 @@ $router->add('/api/plan-route' , 'Controller', 'planRoute');
 $router->add('/api/stops'      , 'Controller', 'stopsJson');
 $router->add('/lines-map'      , 'Controller', 'linesMap');
 $router->add('/api/lines-shapes', 'Controller', 'linesShapes');
+$router->add('/trip-details'   , 'Controller', 'tripDetails');
+$router->add('/api/trip-stops' , 'Controller', 'tripStops');

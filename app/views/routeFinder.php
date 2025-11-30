@@ -5,210 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trova Percorso - ACTV</title>
     <?php require COMMON_HTML_HEAD; ?>
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #F5F5F5;
-            margin: 0;
-            padding: 0;
-        }
-
-        /* Header Verde */
-        .header-green {
-            background: #009E61;
-            padding: 2rem 1.5rem 4rem;
-            color: white;
-            clip-path: polygon(0 0, 100% 0, 100% 75%, 0 100%);
-            margin-bottom: -2rem;
-            position: relative;
-            z-index: 1;
-        }
-
-        .header-title {
-            font-family: 'Inter', sans-serif;
-            font-weight: 800;
-            font-size: 28px;
-            line-height: 1.2;
-            margin-top: 1rem;
-        }
-
-        .main-content {
-            padding: 0 1.5rem 1.5rem;
-            position: relative;
-            z-index: 2;
-        }
-
-        .selection-card {
-            background: #FFFFFF;
-            box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
-            border-radius: 15px;
-            padding: 1.25rem 1rem;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .selection-card:active {
-            transform: scale(0.98);
-            box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.15);
-        }
-
-        .selection-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #F5F5F5;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 1rem;
-            font-size: 20px;
-        }
-
-        .selection-content {
-            flex-grow: 1;
-        }
-
-        .selection-label {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 0.25rem;
-        }
-
-        .selection-value {
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 700;
-            font-size: 16px;
-            color: #000;
-        }
-
-        .swap-button {
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            margin: 0.5rem auto;
-            font-size: 18px;
-        }
-        .datetime-section {
-            margin-top: 1.5rem;
-        }
-
-        .section-label {
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 600;
-            font-size: 14px;
-            color: #000;
-            margin-bottom: 0.5rem;
-        }
-        .datetime-inputs {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
- 
-        .datetime-input {
-            flex: 1;
-            padding: 0.875rem;
-            border: 1px solid #e0e0e0;
-            border-radius: 12px;
-             font-family: 'Inter', sans-serif;
-             font-size: 15px;
-             background: #FFFFFF;
-             box-shadow: 0px 1px 4px rgba(0, 0, 0, 0.08);
-             transition: all 0.2s ease;
-         }
-         
-        .datetime-input:focus {
-            outline: none;
-            border-color: #009E61;
-            box-shadow: 0px 2px 8px rgba(0, 158, 97, 0.2);
-        }
-
-        .toggle-container {
-            display: flex;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .toggle-label {
-            font-family: 'SF Pro', sans-serif;
-            font-size: 14px;
-            margin-right: 0.5rem;
-        }
-
-        .toggle-switch {
-            position: relative;
-            width: 50px;
-            height: 28px;
-        }
-
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: 0.4s;
-            border-radius: 28px;
-        }
-
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 20px;
-            width: 20px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: 0.4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .toggle-slider {
-            background-color: #009E61;
-        }
-
-        input:checked + .toggle-slider:before {
-            transform: translateX(22px);
-        }
-
-        .search-button {
-            background: #0152BB;
-            color: white;
-            border: none;
-            border-radius: 12px;
-            padding: 1rem;
-            width: 100%;
-            font-family: 'SF Pro', sans-serif;
-            font-weight: 700;
-            font-size: 16px;
-            cursor: pointer;
-            margin-top: 1.5rem;
-            transition: all 0.2s ease;
-        }
-
-        .search-button:active {
-            transform: scale(0.98);
-            background: #013d99;
-        }
-    </style>
+    <link rel="stylesheet" href="/css/routeFinder.css">
 </head>
 <body>
 
@@ -416,6 +213,12 @@
                 el.className = 'time-item';
                 el.textContent = i.toString().padStart(2, '0');
                 if (i === selectedHour) el.classList.add('active');
+                
+                el.onclick = () => {
+                    selectedHour = i;
+                    renderTimePicker(); // Re-render to update active class
+                };
+
                 hWheel.appendChild(el);
             }
             
@@ -425,17 +228,26 @@
                 el.className = 'time-item';
                 el.textContent = i.toString().padStart(2, '0');
                 if (i === selectedMinute) el.classList.add('active');
+                
+                el.onclick = () => {
+                    selectedMinute = i;
+                    renderTimePicker();
+                };
+
                 mWheel.appendChild(el);
             }
             
-            // Scroll to selected (simplified)
-            // In a real app, we'd need complex scroll handling.
-            // For now, let's just set the values on click/scroll
+            // Scroll to selected
+            setTimeout(() => {
+                const itemHeight = 40; // Approx height
+                hWheel.scrollTop = selectedHour * itemHeight - (hWheel.clientHeight / 2) + (itemHeight / 2);
+                mWheel.scrollTop = (selectedMinute / 5) * itemHeight - (mWheel.clientHeight / 2) + (itemHeight / 2);
+            }, 10);
             
             hWheel.onscroll = () => {
                 // Calculate selected based on scroll position
                 const index = Math.round(hWheel.scrollTop / 40);
-                selectedHour = index;
+                // selectedHour = index; // Don't auto-select on scroll, user clicks or we just use visual
                 // Update styling
                 Array.from(hWheel.children).forEach((c, i) => {
                     c.classList.toggle('active', i === index);
@@ -444,12 +256,71 @@
             
              mWheel.onscroll = () => {
                 const index = Math.round(mWheel.scrollTop / 40);
-                selectedMinute = index * 5;
+                // selectedMinute = index * 5;
                  Array.from(mWheel.children).forEach((c, i) => {
                     c.classList.toggle('active', i === index);
                 });
             };
         }
+
+        // --- Pull to Cancel Logic ---
+        function initPullToCancel(modalId, closeFunc) {
+            const modal = document.getElementById(modalId);
+            const content = modal.querySelector('.modal-content');
+            const handle = modal.querySelector('.modal-handle');
+            
+            let startY = 0;
+            let currentY = 0;
+            let isDragging = false;
+            
+            const onTouchStart = (e) => {
+                // Only trigger if touching the handle or top of content
+                if (e.target === handle || e.target.closest('.modal-handle')) {
+                    startY = e.touches[0].clientY;
+                    isDragging = true;
+                    content.style.transition = 'none';
+                }
+            };
+            
+            const onTouchMove = (e) => {
+                if (!isDragging) return;
+                currentY = e.touches[0].clientY;
+                const diff = currentY - startY;
+                
+                if (diff > 0) {
+                    e.preventDefault();
+                    content.style.transform = `translateY(${diff}px)`;
+                }
+            };
+            
+            const onTouchEnd = (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                const diff = currentY - startY;
+                
+                content.style.transition = 'transform 0.3s ease';
+                
+                if (diff > 100) { // Threshold to close
+                    content.style.transform = 'translateY(100%)';
+                    setTimeout(() => {
+                        closeFunc();
+                        content.style.transform = ''; // Reset
+                    }, 300);
+                } else {
+                    content.style.transform = ''; // Bounce back
+                }
+            };
+            
+            handle.addEventListener('touchstart', onTouchStart, {passive: false});
+            window.addEventListener('touchmove', onTouchMove, {passive: false});
+            window.addEventListener('touchend', onTouchEnd);
+        }
+
+        // Initialize pull-to-cancel
+        window.addEventListener('load', () => {
+            initPullToCancel('date-modal', closeDateModal);
+            initPullToCancel('time-modal', closeTimeModal);
+        });
 
         function formatDate(date) {
             return date.toLocaleDateString('it-IT');

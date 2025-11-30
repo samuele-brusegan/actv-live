@@ -6,39 +6,7 @@
     <title>Seleziona Fermata - ACTV</title>
     <?php require COMMON_HTML_HEAD; ?>
 
-    <style>
-        /* Page specific overrides - matching stopList.php style */
-        .stop-ids-container {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            min-width: 60px;
-            align-items: center;
-        }
-        
-        .stop-id-badge {
-            background: #007bff;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            font-weight: bold;
-            text-align: center;
-            min-width: 50px;
-        }
-        
-        .stop-card-content {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex: 1;
-        }
-        
-        .stop-card-action {
-            display: flex;
-            align-items: center;
-        }
-    </style>
+    <link rel="stylesheet" href="/css/stationSelector.css">
 </head>
 <body>
 

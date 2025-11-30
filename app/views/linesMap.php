@@ -7,95 +7,7 @@
     <!-- CSS di Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <?php require COMMON_HTML_HEAD; ?>
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #F5F5F5;
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Header Verde */
-        .header-green {
-            background: #009E61;
-            padding: 1rem 1.5rem;
-            color: white;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .header-title {
-            font-family: 'Inter', sans-serif;
-            font-weight: 700;
-            font-size: 20px;
-        }
-
-        .back-button {
-            color: white;
-            text-decoration: none;
-            font-size: 24px;
-            display: flex;
-            align-items: center;
-        }
-
-        #map {
-            flex-grow: 1;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-        }
-
-        .loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.8);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-        }
-
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #009E61;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin-bottom: 1rem;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .line-popup {
-            text-align: center;
-        }
-        
-        .line-popup-title {
-            font-weight: bold;
-            font-size: 16px;
-            margin-bottom: 5px;
-            color: #009E61;
-        }
-        
-        .line-popup-desc {
-            font-size: 14px;
-            color: #666;
-        }
-    </style>
+    <link rel="stylesheet" href="/css/linesMap.css">
 </head>
 <body>
 
@@ -128,47 +40,65 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // Function to generate a random color
-        function getRandomColor() {
-            const letters = '0123456789ABCDEF';
-            let color = '#';
-            for (let i = 0; i < 6; i++) {
-                color += letters[Math.floor(Math.random() * 16)];
-            }
-            return color;
-        }
-        
-        // Function to get a color based on string (consistent hashing)
-        function stringToColor(str) {
+        // Bright, fixed palette
+        const LINE_COLORS = [
+            '#FF0000', // Red
+            '#0000FF', // Blue
+            '#008000', // Green
+            '#FFA500', // Orange
+            '#800080', // Purple
+            '#00FFFF', // Cyan
+            '#FF00FF', // Magenta
+            '#00FF00', // Lime
+            '#FF1493', // DeepPink
+            '#008080', // Teal
+            '#FFD700', // Gold
+            '#4B0082', // Indigo
+            '#DC143C', // Crimson
+            '#1E90FF'  // DodgerBlue
+        ];
+
+        function getLineColor(str) {
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
                 hash = str.charCodeAt(i) + ((hash << 5) - hash);
             }
-            let color = '#';
-            for (let i = 0; i < 3; i++) {
-                let value = (hash >> (i * 8)) & 0xFF;
-                color += ('00' + value.toString(16)).substr(-2);
-            }
-            return color;
+            // Ensure positive
+            hash = Math.abs(hash);
+            return LINE_COLORS[hash % LINE_COLORS.length];
         }
 
         async function loadLines() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetLine = urlParams.get('line');
+
             try {
                 const response = await fetch('/api/lines-shapes');
                 if (!response.ok) throw new Error('Network response was not ok');
                 
                 const shapes = await response.json();
+                let targetBounds = null;
                 
                 shapes.forEach(shape => {
                     if (shape.path && shape.path.length > 0) {
                         const latlngs = shape.path.map(p => [p.lat, p.lng]);
-                        const color = stringToColor(shape.route_short_name);
+                        const color = getLineColor(shape.route_short_name);
+                        
+                        const isTarget = targetLine && shape.route_short_name === targetLine;
+                        const weight = isTarget ? 8 : 4;
+                        const opacity = isTarget ? 1 : (targetLine ? 0.2 : 0.7);
+                        const zIndex = isTarget ? 1000 : 1;
                         
                         const polyline = L.polyline(latlngs, {
                             color: color,
-                            weight: 4,
-                            opacity: 0.7
+                            weight: weight,
+                            opacity: opacity
                         }).addTo(map);
+                        
+                        if (isTarget) {
+                            targetBounds = polyline.getBounds();
+                            polyline.bringToFront();
+                        }
                         
                         polyline.bindPopup(`
                             <div class="line-popup">
@@ -189,13 +119,22 @@
 
                         polyline.on('mouseout', function(e) {
                             var layer = e.target;
+                            // Reset to original style
+                            const isTarget = targetLine && shape.route_short_name === targetLine;
                             layer.setStyle({
-                                weight: 4,
-                                opacity: 0.7
+                                weight: isTarget ? 8 : 4,
+                                opacity: isTarget ? 1 : (targetLine ? 0.2 : 0.7)
                             });
+                            if (!isTarget && targetLine) {
+                                // Keep target on top
+                            }
                         });
                     }
                 });
+                
+                if (targetBounds) {
+                    map.fitBounds(targetBounds, {padding: [50, 50]});
+                }
                 
                 document.getElementById('loading').style.display = 'none';
                 

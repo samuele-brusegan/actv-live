@@ -149,4 +149,98 @@ class Controller {
         header('Content-Type: application/json');
         echo json_encode($shapes);
     }
+
+    function tripDetails() {
+        require_once BASE_PATH . '/app/views/tripDetails.php';
+    }
+
+    function tripStops() {
+        $line = $_GET['line'] ?? '';
+        $dest = $_GET['dest'] ?? '';
+        
+        if (!$line) {
+            header('HTTP/1.1 400 Bad Request');
+            echo json_encode(['error' => 'Missing line parameter']);
+            return;
+        }
+
+        $cacheDir = BASE_PATH . '/data/gtfs/cache';
+        $routesFile = $cacheDir . '/routes.json';
+        $stopsFile = $cacheDir . '/stops.json';
+
+        if (!file_exists($routesFile) || !file_exists($stopsFile)) {
+            header('HTTP/1.1 500 Internal Server Error');
+            echo json_encode(['error' => 'Cache files not found']);
+            return;
+        }
+
+        $routes = json_decode(file_get_contents($routesFile), true);
+        $stops = json_decode(file_get_contents($stopsFile), true);
+
+        // Find route ID by short name
+        $targetRouteId = null;
+        foreach ($routes as $id => $route) {
+            if ($route['short_name'] == $line) {
+                $targetRouteId = $id;
+                break;
+            }
+        }
+
+        if (!$targetRouteId) {
+            header('HTTP/1.1 404 Not Found');
+            echo json_encode(['error' => 'Route not found']);
+            return;
+        }
+
+        // Load trips for this route
+        $safeRouteId = preg_replace('/[^a-zA-Z0-9_-]/', '_', $targetRouteId);
+        $routeFile = $cacheDir . '/routes/route_' . $safeRouteId . '.json';
+
+        if (!file_exists($routeFile)) {
+            header('HTTP/1.1 404 Not Found');
+            echo json_encode(['error' => 'Trips not found']);
+            return;
+        }
+
+        $trips = json_decode(file_get_contents($routeFile), true);
+        
+        // Find a trip that goes to 'dest'
+        // If dest is not provided or not found, use the first trip
+        $selectedTrip = null;
+        
+        if ($dest) {
+            foreach ($trips as $tripId => $tripStops) {
+                $lastStop = end($tripStops);
+                $lastStopId = $lastStop['stop_id'];
+                $lastStopName = $stops[$lastStopId]['name'] ?? '';
+                
+                // Simple fuzzy match or exact match
+                if (stripos($lastStopName, $dest) !== false || stripos($dest, $lastStopName) !== false) {
+                    $selectedTrip = $tripStops;
+                    break;
+                }
+            }
+        }
+        
+        if (!$selectedTrip) {
+            $selectedTrip = reset($trips);
+        }
+
+        // Format response
+        $result = [];
+        foreach ($selectedTrip as $stop) {
+            $stopId = $stop['stop_id'];
+            if (isset($stops[$stopId])) {
+                $result[] = [
+                    'id' => $stopId,
+                    'name' => $stops[$stopId]['name'],
+                    'lat' => $stops[$stopId]['lat'],
+                    'lon' => $stops[$stopId]['lon']
+                ];
+            }
+        }
+
+        header('Content-Type: application/json');
+        echo json_encode($result);
+    }
 }

@@ -5,53 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dettagli Viaggio - ACTV</title>
     <?php require COMMON_HTML_HEAD; ?>
-    <style>
-        /* Page specific overrides */
-        .timeline-connector {
-            /* Override for routeDetails specific connector positioning if needed */
-            /* In style.css I used generic connector styles. 
-               routeDetails had: left: 12px; top: 24px; bottom: -10px; width: 0; border-left: 3px solid #009E61;
-               style.css has: margin-left: 7px; border-left: 2px solid... 
-               The structure in routeDetails seems slightly different or I merged them.
-               Let's check the HTML structure in routeDetails.
-            */
-             position: absolute;
-             left: 12px; 
-             top: 24px;
-             bottom: -10px;
-             width: 0;
-             border-left: 3px solid #009E61;
-             z-index: 1;
-             margin-left: 0; /* Reset style.css margin */
-             padding: 0; /* Reset style.css padding */
-             display: block; /* Reset flex */
-        }
-        
-        .timeline-connector.dashed {
-            border-left-style: dashed;
-            border-color: #999;
-        }
-
-        .timeline-item {
-            margin-bottom: 0;
-        }
-        
-        .timeline {
-            margin-top: 1rem;
-        }
-        
-        .header-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 10px;
-        }
-        
-        .header-date {
-            font-weight: 700;
-            font-size: 18px;
-        }
-    </style>
+    <link rel="stylesheet" href="/css/routeDetails.css">
 </head>
 <body>
 

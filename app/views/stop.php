@@ -8,37 +8,7 @@
     require COMMON_HTML_HEAD;
     ?>
     <link rel="stylesheet" href="/css/style.css" />
-    <style>
-        /* Page specific overrides */
-        .header-green {
-            position: relative;
-        }
-        
-        .favorite-button {
-            position: absolute;
-            top: 2rem;
-            right: 1.5rem;
-            background: none;
-            border: none;
-            font-size: 28px;
-            cursor: pointer;
-            padding: 0;
-            line-height: 1;
-            transition: transform 0.2s;
-        }
-        
-        .favorite-button:active {
-            transform: scale(0.9);
-        }
-        
-        .favorite-button.favorited {
-            color: #FFD700;
-        }
-        
-        .favorite-button:not(.favorited) {
-            color: rgba(255, 255, 255, 0.5);
-        }
-    </style>
+    <link rel="stylesheet" href="/css/stop.css">
 </head>
 <body>
 
@@ -228,15 +198,23 @@
 
                 
                 let timeHtml = isReal 
-                    ? 
-                    `<div class="d-flex align-items-center">
+                    ? /*html*/`
+                    <div class="d-flex align-items-center">
                         <div class="real-time-indicator"></div>
                         <span class="time-badge real-time">${time}</span>
                     </div>`
                     : `<span class="time-badge scheduled">${time}</span>`;
 
+                let timeStr = isReal ? time + " min" : time;
+                
+                // Escape strings for JS
+                const safeLineName = lineName.replace(/'/g, "\\'");
+                const safeDest = dest.replace(/'/g, "\\'");
+                const safeStationId = stationId.replace(/'/g, "\\'");
+                const safeTimeStr = timeStr.replace(/'/g, "\\'");
+
                 listContainer.innerHTML += /*html*/`
-                <div class="passage-card">
+                <div class="passage-card" onclick="window.location.href='/trip-details?line=' + encodeURIComponent('${safeLineName}') + '&dest=' + encodeURIComponent('${safeDest}') + '&stopId=' + encodeURIComponent('${safeStationId}') + '&time=' + encodeURIComponent('${safeTimeStr}')" style="cursor: pointer;">
                     <div class="d-flex align-items-center">
                         <div class="line-badge ${badgeColor}">${lineName}</div>
                         <div class="passage-info">
