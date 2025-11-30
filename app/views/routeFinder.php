@@ -63,6 +63,7 @@
                 <input type="checkbox" id="return-toggle" onchange="toggleReturn()">
                 <span class="toggle-slider"></span>
             </label>
+            <span style="font-size: 10px;">&nbsp;(non ancora implementato)</span>
         </div>
 
         <!-- Search Button -->
@@ -77,9 +78,9 @@
             
             <!-- Simple Calendar Header -->
             <div class="calendar-header">
-                <button onclick="changeMonth(-1)">‹</button>
+                <button class="btn" style="font-size: 24px;" onclick="changeMonth(-1)">‹</button>
                 <span id="calendar-month-year">September 2025</span>
-                <button onclick="changeMonth(1)">›</button>
+                <button class="btn" style="font-size: 24px;" onclick="changeMonth(1)">›</button>
             </div>
             
             <!-- Calendar Grid -->
