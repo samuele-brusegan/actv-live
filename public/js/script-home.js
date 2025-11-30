@@ -24,8 +24,8 @@ function renderFavorites() {
             `<div style="background: #007bff; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; text-align: center; min-width: 50px; line-height: 1.2;">${id}</div>`
         ).join('');
 
-        stopCard.innerHTML = `
-            <div class="d-flex align-items-center" style="width: 100%;">
+        stopCard.innerHTML = /*html*/`
+            <div class="d-flex align-items-center" style="width: 100%; position: relative;">
                 <div style="display: flex; flex-direction: column; gap: 4px; min-width: 60px; align-items: center;">
                     ${idBadgesHtml}
                 </div>
@@ -35,13 +35,69 @@ function renderFavorites() {
                 </div>
             </div>
             <div style="display: flex; align-items: center;">
-                <span style="font-size: 20px; color: #ccc;">›</span>
+                <span style="font-size: 20px; color: #ccc;">&rsaquo;</span>
             </div>
         `;
+        /*
+            <div class="favorite-btn favorited" style="position: absolute; top: 0; right: 0; padding: 5px; font-size: 20px; color: var(--color-gold);">
+                <span>★</span>
+            </div>
+        `; */
+
+        /*
+        stopCard.querySelector('.favorite-btn').addEventListener('click', () => {
+            let favorites = getFavorites();
+            const favoriteBtn = stopCard.querySelector('.favorite-btn');
+            let stationId = stop.id;
+            let stationName = stop.name;
+
+            if (favoriteBtn.classList.contains('favorited')) {
+                // Remove from favorites
+                favorites = favorites.filter(fav => {
+                    if (fav.ids && Array.isArray(fav.ids)) {
+                        return !fav.ids.some(id => stationId.includes(id) || id === stationId.split('-')[0]);
+                    }
+                    return fav.id !== stationId && !stationId.includes(fav.id);
+                });
+                favoriteBtn.classList.remove('favorited');
+                favoriteBtn.title = 'Aggiungi ai preferiti';
+            } else {
+                // Add to favorites
+                // Parse IDs from stationId (format: "4825" or "4825-4826")
+                const ids = stationId.split('-');
+                favorites.push({
+                    id: ids[0],
+                    ids: ids,
+                    name: stationName || `Fermata ${stationId}`
+                });
+                favoriteBtn.classList.add('favorited');
+                favoriteBtn.title = 'Rimuovi dai preferiti';
+            }
+
+            localStorage.setItem('favorite_stops', JSON.stringify(favorites));
+        });*/
 
         favoritesList.appendChild(stopCard);
     });
 }
+
+// Favorite management functions
+/*
+ function getFavorites() {
+    const favorites = localStorage.getItem('favorite_stops');
+    return favorites ? JSON.parse(favorites) : [];
+}
+
+function isFavorite() {
+    const favorites = getFavorites();
+    // Check if any favorite has this ID (could be in ids array)
+    return favorites.some(fav => {
+        if (fav.ids && Array.isArray(fav.ids)) {
+            return fav.ids.some(id => stationId.includes(id) || id === stationId.split('-')[0]);
+        }
+        return fav.id === stationId || stationId.includes(fav.id);
+    });
+} */
 
 // Funzione per recuperare le stazioni
 async function getStations() {
@@ -80,7 +136,7 @@ window.onload = async function () {
     const statusElement = document.getElementById('status');
 
     // Inizializza Mappa
-    var map = L.map('map', { attributionControl: false }).setView([45.4384, 12.3359], 12); // Venezia centro
+    var map = L.map('map', { attributionControl: false, fullscreenControl: { pseudoFullscreen: true } }).setView([45.4384, 12.3359], 12); // Venezia centro
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -93,7 +149,7 @@ window.onload = async function () {
     var userMarker = null;
 
     // Imposta il numero di stazioni più vicine da evidenziare
-    const N = 5;
+    const N = 3;
 
     // Stili per i marcatori
     const defaultCircleStyle = {
@@ -107,7 +163,7 @@ window.onload = async function () {
         color: '#E60000',    // Rosso Evidenziato
         fillColor: '#E60000',
         fillOpacity: 0.7,
-        radius: 10
+        radius: 6
     };
 
     // Funzione distanza
@@ -144,16 +200,19 @@ window.onload = async function () {
             <div>Posizione trovata. Ecco le stazioni più vicine.</div>`;
 
         setTimeout(() => {
-            statusElement.style.display = 'none';
-        }, 5000);
+            statusElement.style.position = 'absolute';
+            statusElement.style.visibility = 'hidden';
+            console.log("Status hidden???");
+
+        }, 2500);
 
         if (userMarker) map.removeLayer(userMarker);
 
         userMarker = L.circleMarker(e.latlng, {
-            color: '#3399FF',
-            fillColor: '#3399FF',
+            color: '#009E61',
+            fillColor: '#009E61',
             fillOpacity: 0.9,
-            radius: 12
+            radius: 10
         }).addTo(map).bindPopup("Sei Qui").openPopup();
 
         if (actvStations) {

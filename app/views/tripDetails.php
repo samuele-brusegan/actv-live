@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dettaglio Corsa - ACTV</title>
     <?php require COMMON_HTML_HEAD; ?>
+    <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/tripDetails.css">
 </head>
 <body>
@@ -17,7 +18,7 @@
         
         <div class="trip-header-info">
             <div style="display: flex; flex-direction: column; align-items: center; margin-right: 15px;">
-                <div class="line-box" id="line-number">--</div>
+                <div class="line-box line-badge" id="line-number">--</div>
                 <div id="delay-info" style="font-size: 11px; font-weight: bold; margin-top: 4px; background: white; color: #333; padding: 2px 6px; border-radius: 4px; display: none;"></div>
             </div>
             <div class="direction-info">
@@ -52,7 +53,10 @@
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        const line = urlParams.get('line');
+        const lineFull = urlParams.get('line');
+        const line = lineFull.split('_')[0];
+        const tag = lineFull.split('_')[1];
+        
         const dest = urlParams.get('dest');
         const stopId = urlParams.get('stopId');
         const time = urlParams.get('time');
@@ -103,7 +107,19 @@
             let currentStopIndex = -1;
             
             // Helper for badge color (same as stop.php)
-            const getBadgeColor = (lineName) => {
+
+
+            if (line.includes('N')) {
+                lineBadgeClass = 'badge-night';
+            } else if ( tag === "US" || tag === "UN" || tag === "EN" ) {
+                lineBadgeClass = 'badge-blue';
+            } else {
+                lineBadgeClass = 'badge-red';
+            }
+
+            document.getElementById('line-number').className += ' ' + lineBadgeClass;
+
+            /* const getBadgeColor = (lineName) => {
                 if (lineName.includes('N')) return 'bg-dark'; // Night
                 if (['2', '6', '6L', '7', '7L', '5E'].includes(lineName)) return 'bg-primary'; // Blue
                 return 'bg-danger'; // Default Red
@@ -116,7 +132,7 @@
             // Override styles based on class logic (since we don't have bootstrap loaded fully or want custom colors)
             if (line.includes('N')) lineBadge.style.backgroundColor = '#000';
             else if (['2', '6', '6L', '7', '7L', '5E'].includes(line)) lineBadge.style.backgroundColor = '#0056b3';
-            else lineBadge.style.backgroundColor = '#E30613';
+            else lineBadge.style.backgroundColor = '#E30613'; */
 
             
             stops.forEach((stop, index) => {

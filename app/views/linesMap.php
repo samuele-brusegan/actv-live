@@ -34,7 +34,7 @@
     
     <script>
         // Initialize Map
-        var map = L.map('map', {attributionControl: false}).setView([45.4384, 12.3359], 12); // Venezia centro
+        var map = L.map('map', {attributionControl: false, zoomControl: false}).setView([45.4384, 12.3359], 12); // Venezia centro
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

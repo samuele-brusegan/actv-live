@@ -209,12 +209,13 @@
                 
                 // Escape strings for JS
                 const safeLineName = lineName.replace(/'/g, "\\'");
+                const safeLineTag = lineTag.replace(/'/g, "\\'");
                 const safeDest = dest.replace(/'/g, "\\'");
                 const safeStationId = stationId.replace(/'/g, "\\'");
                 const safeTimeStr = timeStr.replace(/'/g, "\\'");
 
                 listContainer.innerHTML += /*html*/`
-                <div class="passage-card" onclick="window.location.href='/trip-details?line=' + encodeURIComponent('${safeLineName}') + '&dest=' + encodeURIComponent('${safeDest}') + '&stopId=' + encodeURIComponent('${safeStationId}') + '&time=' + encodeURIComponent('${safeTimeStr}')" style="cursor: pointer;">
+                <div class="passage-card" onclick="window.location.href='/trip-details?line=' + encodeURIComponent('${safeLineName}_${safeLineTag}') + '&dest=' + encodeURIComponent('${safeDest}') + '&stopId=' + encodeURIComponent('${safeStationId}') + '&time=' + encodeURIComponent('${safeTimeStr}')" style="cursor: pointer;">
                     <div class="d-flex align-items-center">
                         <div class="line-badge ${badgeColor}">${lineName}</div>
                         <div class="passage-info">

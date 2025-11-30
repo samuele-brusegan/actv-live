@@ -4,8 +4,8 @@ body {
 }
 
 .header-green {
-    padding-bottom: 4rem; /* Extra space for the card overlap */
-    clip-path: polygon(0 0, 100% 0, 100% 85%, 0 100%);
+    padding-bottom: 4rem;
+    /* clip-path: polygon(0 0, 100% 0, 100% 85%, 0 100%); */
     margin-bottom: -2rem;
 }
 
@@ -17,7 +17,8 @@ body {
 }
 
 .line-box {
-    background-color: #E30613; /* Standard ACTV red */
+    background-color: #E30613;
+    /* Standard ACTV red */
     color: white;
     font-weight: 800;
     font-size: 24px;
@@ -50,7 +51,8 @@ body {
     display: flex;
     align-items: center;
     margin-top: 10px;
-    color: #FFD700; /* Gold/Yellow for visibility */
+    color: #FFD700;
+    /* Gold/Yellow for visibility */
     font-weight: 600;
 }
 
@@ -59,7 +61,7 @@ body {
 }
 
 .main-card {
-    background: white;
+    background: #FFFA;
     border-radius: 20px 20px 0 0;
     margin-top: -20px;
     padding: 20px;
@@ -122,7 +124,8 @@ body {
 
 .stop-marker.current {
     background: white;
-    border-color: #0056b3; /* Blue for current */
+    border-color: #0056b3;
+    /* Blue for current */
     box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.2);
 }
 
@@ -161,7 +164,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
     border: none;
     cursor: pointer;
     z-index: 100;
