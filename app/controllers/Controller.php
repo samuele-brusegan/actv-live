@@ -59,7 +59,97 @@ class Controller {
         
         try {
             $planner = new RoutePlanner();
-            $routes = $planner->findRoutes($origin, $dest, $time);
+            
+            $startWalk = null;
+            $endWalk = null;
+            
+            $planningOrigin = $origin;
+            $planningDest = $dest;
+            $planningTime = $time;
+            
+            // Handle Origin Address
+            if (strpos($origin, ',') !== false) {
+                list($lat, $lon) = explode(',', $origin);
+                $nearest = $planner->findNearestStop((float)$lat, (float)$lon);
+                
+                if ($nearest) {
+                    $planningOrigin = $nearest['stop_id'];
+                    $startWalk = [
+                        'type' => 'walking',
+                        'distance' => $nearest['distance'],
+                        'duration' => $nearest['walking_time'],
+                        'from_name' => 'Indirizzo partenza', // Could be passed in query param for better name
+                        'to_name' => $nearest['name'],
+                        'departure_time' => $time,
+                        // Estimated arrival at stop
+                        'arrival_time' => date('H:i:s', strtotime($time) + ($nearest['walking_time'] * 60))
+                    ];
+                    
+                    // Adjust planning time to when we arrive at the stop
+                    $planningTime = $startWalk['arrival_time'];
+                }
+            }
+            
+            // Handle Destination Address
+            if (strpos($dest, ',') !== false) {
+                list($lat, $lon) = explode(',', $dest);
+                $nearest = $planner->findNearestStop((float)$lat, (float)$lon);
+                
+                if ($nearest) {
+                    $planningDest = $nearest['stop_id'];
+                    $endWalk = [
+                        'stop_info' => $nearest // Store to build leg later based on arrival
+                    ];
+                }
+            }
+            
+            $routes = $planner->findRoutes($planningOrigin, $planningDest, $planningTime);
+            
+            // Post-process routes to inject walking legs
+            foreach ($routes as &$route) {
+                // Prepend Start Walk
+                if ($startWalk) {
+                    // Update overall route stats
+                    $route['departure_time'] = $startWalk['departure_time']; // Route starts when we start walking
+                    $route['duration'] += $startWalk['duration'];
+                    
+                    // Add leg
+                    array_unshift($route['legs'], [
+                        'type' => 'walking',
+                        'distance' => $startWalk['distance'],
+                        'duration' => $startWalk['duration'],
+                        'departure_time' => $startWalk['departure_time'],
+                        'arrival_time' => $startWalk['arrival_time'],
+                        'route_short_name' => 'Cammina',
+                        'stops_count' => 0,
+                        'origin' => $startWalk['from_name'],
+                        'destination' => $startWalk['to_name']
+                    ]);
+                }
+                
+                // Append End Walk
+                if ($endWalk) {
+                    $arrivalAtStop = $route['arrival_time'];
+                    $walkDuration = $endWalk['stop_info']['walking_time'];
+                    $walkDistance = $endWalk['stop_info']['distance'];
+                    $arrivalAtDest = date('H:i:s', strtotime($arrivalAtStop) + ($walkDuration * 60));
+                    
+                    $route['arrival_time'] = $arrivalAtDest;
+                    $route['duration'] += $walkDuration;
+                    
+                    $route['legs'][] = [
+                        'type' => 'walking',
+                        'distance' => $walkDistance,
+                        'duration' => $walkDuration,
+                        'departure_time' => $arrivalAtStop,
+                        'arrival_time' => $arrivalAtDest,
+                        'route_short_name' => 'Cammina',
+                        'stops_count' => 0,
+                        'origin' => $endWalk['stop_info']['name'],
+                        'destination' => 'Indirizzo destinazione'
+                    ];
+                }
+            }
             
             header('Content-Type: application/json');
             echo json_encode(['success' => true, 'routes' => $routes]);
@@ -235,7 +325,8 @@ class Controller {
                     'id' => $stopId,
                     'name' => $stops[$stopId]['name'],
                     'lat' => $stops[$stopId]['lat'],
-                    'lon' => $stops[$stopId]['lon']
+                    'lon' => $stops[$stopId]['lon'],
+                    'time' => substr($stop['departure_time'], 0, 5) // HH:MM
                 ];
             }
         }

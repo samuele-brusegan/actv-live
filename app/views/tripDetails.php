@@ -173,7 +173,7 @@
                 // Time Logic
                 let timeDisplay = '';
                 if (isPassed) {
-                    timeDisplay = 'PASSATO';
+                    timeDisplay = stop.time ? stop.time : 'PASSATO';
                 } else if (isCurrent) {
                     // Show the time passed in URL if available
                     timeDisplay = time ? time : 'ORA';

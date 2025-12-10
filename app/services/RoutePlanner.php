@@ -338,4 +338,49 @@ class RoutePlanner {
         $parts = explode(':', $time);
         return intval($parts[0]) * 3600 + intval($parts[1]) * 60 + intval($parts[2]);
     }
+
+    /**
+     * Find the nearest stop to a set of coordinates
+     * @param float $lat
+     * @param float $lon
+     * @return array|null Returns stop array with 'distance' (meters) and 'walking_time' (minutes)
+     */
+    public function findNearestStop($lat, $lon) {
+        if (!$this->stops) return null;
+        
+        $nearestStop = null;
+        $minDist = PHP_FLOAT_MAX;
+        
+        foreach ($this->stops as $stop) {
+            $dist = $this->calculateGeoDistance($lat, $lon, $stop['lat'], $stop['lon']);
+            
+            if ($dist < $minDist) {
+                $minDist = $dist;
+                $nearestStop = $stop;
+            }
+        }
+        
+        if ($nearestStop) {
+            $nearestStop['distance'] = round($minDist); // meters
+            // Estimate walking time: 5km/h = 83 m/min 
+            $nearestStop['walking_time'] = ceil($minDist / 83); 
+        }
+        
+        return $nearestStop;
+    }
+
+    private function calculateGeoDistance($lat1, $lon1, $lat2, $lon2) {
+        $earthRadius = 6371000; // meters
+
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+
+        $a = sin($dLat / 2) * sin($dLat / 2) +
+             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+             sin($dLon / 2) * sin($dLon / 2);
+
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return $earthRadius * $c;
+    }
 }

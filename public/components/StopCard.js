@@ -34,6 +34,21 @@ class StopCard {
         // Generate stop IDs badges (multiple if merged)
         let stopIdsHtml = '';
         if (showIds) {
+            if (stop.id.includes("web")) {
+                stop.id = stop.id.replace("-web-aut", "");
+                stop.id = stop.id.replace("-web", "");
+            }
+
+            if (stop.id.includes("-")) {
+                let idSplitted = stop.id.split("-");
+                if (idSplitted[0] !== 'terminal') {
+                    stop.ids = idSplitted;
+                }
+                else {
+                    stop.id = "Terminal " + idSplitted[1];
+                }
+            }
+
             const ids = stop.ids && stop.ids.length > 0 ? stop.ids : [stop.id];
             stopIdsHtml = ids.map(id =>
                 `<div class="stop-id-badge">${id}</div>`

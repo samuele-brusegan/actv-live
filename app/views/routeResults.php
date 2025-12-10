@@ -133,8 +133,12 @@
 
         async function searchRoutes() {
             try {
+                // Determine params
+                const fromParam = (origin.type === 'address') ? `${origin.lat},${origin.lng}` : origin.id;
+                const toParam = (destination.type === 'address') ? `${destination.lat},${destination.lng}` : destination.id;
+
                 // Call our internal API
-                const url = `/api/plan-route?from=${origin.id}&to=${destination.id}&time=${departureTime}`;
+                const url = `/api/plan-route?from=${encodeURIComponent(fromParam)}&to=${encodeURIComponent(toParam)}&time=${departureTime}`;
                 const response = await fetch(url);
                 
                 if (!response.ok) {
@@ -156,6 +160,10 @@
 
         function getLineBadgeInfo(lineNameRaw) {
             if (!lineNameRaw) return { name: '?', class: 'badge-red' };
+            
+            if (lineNameRaw === 'Cammina') {
+                return { name: '🚶', class: 'badge-walking' }; // Custom class needed? Or just handle in render
+            }
 
             let lineNameParts = lineNameRaw.split("_");
             let lineName = lineNameParts[0];
@@ -182,75 +190,70 @@
 
             if (listEl) {
                 listEl.innerHTML = routes.map(route => {
-                    const isTransfer = route.type === 'transfer';
-                    
-                    // Prepare legs for display
+                    // Build legs HTML dynamically
                     let legsHtml = '';
                     
-                    if (isTransfer) {
-                        // Transfer Logic
-                        const leg1 = route.legs[0];
-                        const leg2 = route.legs[1];
-                        
-                        const badge1 = getLineBadgeInfo(leg1.route_short_name);
-                        const badge2 = getLineBadgeInfo(leg2.route_short_name);
+                    route.legs.forEach((leg, index) => {
+                        const isWalking = leg.type === 'walking';
+                        const badge = getLineBadgeInfo(leg.route_short_name);
+                        const isStart = index === 0;
+                        const isEnd = index === route.legs.length - 1;
 
-                        legsHtml = `
-                            <div class="timeline-item">
-                                <div class="timeline-marker start"></div>
-                                <div class="timeline-content">
-                                    <div class="stop-name">Partenza</div>
-                                    <div class="stop-time">${formatTime(leg1.departure_time)}</div>
-                                </div>
-                            </div>
-                            <div class="timeline-connector">
-                                <div class="line-badge ${badge1.class}">${badge1.name}</div>
-                                <div class="connector-info">per ${leg1.stops_count} fermate</div>
-                            </div>
-                            <div class="timeline-item">
-                                <div class="timeline-marker transfer"></div>
-                                <div class="timeline-content">
-                                    <div class="stop-name">Cambio a ${route.transfer_stop}</div>
-                                    <div class="stop-time">${formatTime(leg1.arrival_time)}</div>
-                                </div>
-                            </div>
-                             <div class="timeline-connector">
-                                <div class="line-badge ${badge2.class}">${badge2.name}</div>
-                                 <div class="connector-info">per ${leg2.stops_count} fermate</div>
-                            </div>
-                            <div class="timeline-item">
-                                <div class="timeline-marker end"></div>
-                                <div class="timeline-content">
-                                    <div class="stop-name">Arrivo</div>
-                                    <div class="stop-time">${formatTime(leg2.arrival_time)}</div>
-                                </div>
-                            </div>
-                        `;
-                    } else {
-                        // Direct Logic
-                        const badge = getLineBadgeInfo(route.route_short_name);
+                        // Start Marker (only for first leg)
+                        if (isStart) {
+                             legsHtml += `
+                                <div class="timeline-item">
+                                    <div class="timeline-marker start"></div>
+                                    <div class="timeline-content">
+                                        <div class="stop-name">${leg.origin || 'Partenza'}</div>
+                                        <div class="stop-time">${formatTime(leg.departure_time)}</div>
+                                    </div>
+                                </div>`;
+                        }
 
-                        legsHtml = `
-                            <div class="timeline-item">
-                                <div class="timeline-marker start"></div>
-                                <div class="timeline-content">
-                                    <div class="stop-name">${origin.name}</div>
-                                    <div class="stop-time">${formatTime(route.departure_time)}</div>
-                                </div>
-                            </div>
-                            <div class="timeline-connector">
+                        // Connector (The Trip/Walk itself)
+                        let connectorContent = '';
+                        if (isWalking) {
+                             connectorContent = `
+                                <div class="line-badge" style="background: #ccc; color: #333;">🚶</div>
+                                <div class="connector-info">cammina per ${Math.round(leg.duration)} min (${leg.distance}m)</div>
+                            `;
+                        } else {
+                            connectorContent = `
                                 <div class="line-badge ${badge.class}">${badge.name}</div>
-                                <div class="connector-info">viaggia per ${route.stops_count} fermate</div>
+                                <div class="connector-info">per ${leg.stops_count} fermate</div>
+                            `;
+                        }
+
+                        legsHtml += `
+                            <div class="timeline-connector">
+                                ${connectorContent}
                             </div>
+                        `;
+
+                        // End Node of this leg (Transfer or Arrival)
+                        let markerClass = isEnd ? 'end' : 'transfer';
+                        let stopName = isWalking ? leg.destination : (isEnd ? 'Arrivo' : `Cambio a ${route.transfer_stop || 'fermata'}`);
+                         // If it's a walking leg destination, show name
+                        if (!isWalking && isEnd) {
+                             // Logic to get destination name if avail
+                             stopName = destination.name; 
+                        }
+                        
+                        // Refinement: If next leg is walking, this node is where we start walking
+                        // Using rendered leg destination
+                        
+                        legsHtml += `
                             <div class="timeline-item">
-                                <div class="timeline-marker end"></div>
+                                <div class="timeline-marker ${markerClass}"></div>
                                 <div class="timeline-content">
-                                    <div class="stop-name">${destination.name}</div>
-                                    <div class="stop-time">${formatTime(route.arrival_time)}</div>
+                                    <!-- Using leg destination for intermediate stops is safer if available, but for now logic is ok -->
+                                    <div class="stop-name">${isWalking ? leg.destination : (isEnd ? destination.name : route.transfer_stop)}</div>
+                                    <div class="stop-time">${formatTime(leg.arrival_time)}</div>
                                 </div>
                             </div>
                         `;
-                    }
+                    });
 
                     return `
                     <div class="route-card" onclick='showRouteDetails(${JSON.stringify(route)})'>
