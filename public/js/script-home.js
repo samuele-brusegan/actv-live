@@ -129,7 +129,7 @@ async function getStations() {
     }
 }
 
-window.onload = async function () {
+async function renderMap() {
     // Render favorites first
     renderFavorites();
 
@@ -306,4 +306,60 @@ window.onload = async function () {
     map.locate({ setView: true, maxZoom: 16, maximumAge: 60000, timeout: 5000 });
     map.on('locationfound', onLocationFound);
     map.on('locationerror', onLocationError);
+}
+
+async function fetchImportantInfo() {
+    try {
+        let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/page/terminal-cialdini-web`);
+        if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+        }
+
+        let rs = await response.json();
+
+        return rs.text || "";
+
+    } catch (error) {
+        console.error(error.message);
+        document.getElementById('loading').innerText = "Errore nel caricamento dei passaggi.";
+        return [];
+    }
+}
+
+window.onload = async function () {
+    renderMap();
+
+    let text = await fetchImportantInfo();
+
+    if (text.length > 0) {
+
+        // console.log(text.split('\n'));
+
+        let splitText = text.split('\n');
+
+        let buttonUrl = splitText[0].split("\"")[1];
+        let title = splitText[1];
+        let content = splitText[2].split("u>")[1].substring(0, splitText[2].split("u>")[1].length - 2);
+        // console.log({ button, title, content });
+
+
+        //Foreground banner
+        document.getElementById('important-info-btn').classList.remove('hidden');
+        document.getElementById('important-info-btn').addEventListener('click', () => {
+            console.log("Click");
+            document.getElementById('important-info-toast').style.removeProperty('display');
+            document.getElementById('important-info-toast').innerHTML = /*html*/`
+
+                <div class="card" style="position: relative; padding: 10px; width: 95%;">
+                    <h5><b>${title}</b></h5>
+                    <p>
+                        ${content}: <a href="${buttonUrl}">qui</a> <br><br>
+                        <b>NOTA:</b> in caso di sciopero il servizio sarà, ahimè, sicuramente interrotto
+                    </p>
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('important-info-toast').style.display = 'none';"> Ho capito </button>
+                </div>
+            `;
+        });
+    }
+
 };

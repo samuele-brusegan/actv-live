@@ -334,4 +334,20 @@ class Controller {
         header('Content-Type: application/json');
         echo json_encode($result);
     }
+
+    function gtfsTest() {
+        
+        include_once BASE_PATH . '/app/models/gtfsReader.php';
+        
+        $gtfsFile = __DIR__ . '/../../data/gtfs/stops.txt'; // Cambia con il percorso reale
+    
+        $risultati = readGTFS($gtfsFile, "SELECT stop_id, stop_name FROM stops LIMIT 10");
+
+        if ($risultati !== false) {
+            header('Content-Type: application/json');
+            echo json_encode($risultati);
+        } else {
+            echo "Operazione fallita.\n";
+        }
+    }
 }

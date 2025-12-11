@@ -21,3 +21,4 @@ $router->add('/lines-map'      , 'Controller', 'linesMap');
 $router->add('/api/lines-shapes', 'Controller', 'linesShapes');
 $router->add('/trip-details'   , 'Controller', 'tripDetails');
 $router->add('/api/trip-stops' , 'Controller', 'tripStops');
+$router->add('/gtfs-test'      , 'Controller', 'gtfsTest');

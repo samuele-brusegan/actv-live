@@ -28,6 +28,8 @@
     <div class="main-content pb-5">
         
         <div class="section-title">Prossimi Passaggi</div>
+
+        <div id="noticeboard"></div>
         
         <div id="loading">Caricamento passaggi...</div>
 
@@ -143,6 +145,35 @@
         // Let's check if we can get the name from the first passage or if we need to fetch station info.
         // The docs/data.md example for passages has "stop": "4825" and "timingPoints" with "stop": "Spinea Centro Sportivo".
         // Maybe we can use that?
+
+        async function updateNoticeboard() {
+            if (!stationId) return;
+            
+            try {
+                let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/page/${stationId}-web-aut`);
+                if (!response.ok) {
+                    throw new Error(`Response status: ${response.status}`);
+                }
+
+                let rs = await response.json();
+                
+                let text = rs.text;
+
+                document.getElementById('noticeboard').innerHTML = `
+                <div class="card mb-2">
+                    <div class="sciopero">
+                        <h5 class="card-title">Attenzione</h5>
+                        <p class="card-text">${text}</p>
+                    </div>
+                </div>
+                ` || "";
+
+            } catch (error) {
+                console.error(error.message);
+                document.getElementById('loading').innerText = "Errore nel caricamento dei passaggi.";
+                return [];
+            }
+        }
         
         async function loadPassages() {
             if (!stationId) return;
@@ -241,6 +272,7 @@
             updateFavoriteButton();
             
             await loadPassages();
+            await updateNoticeboard();
 
             // Refresh every 15 seconds
             setInterval(loadPassages, 15000);

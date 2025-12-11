@@ -34,7 +34,7 @@ require BASE_PATH . '/public/routes.php';
 
 //Send globals to JS
 //Send globals to JS
-if (strpos($_SERVER['REQUEST_URI'], '/api/') === false) {
+if (strpos($_SERVER['REQUEST_URI'], '/api/') === false && strpos($_SERVER['REQUEST_URI'], '/gtfs-test') === false) {
     echo "
     <script>
         sessionStorage.setItem('url', '" . URL_PATH . "');

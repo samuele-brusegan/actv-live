@@ -72,6 +72,11 @@
                     Mappa linee (NON definitivo)
                 </button>
             </div> -->
+            <div id="important-info-btn" class="hidden">!</div>
+            <div id="important-info-toast" style="display: none;">
+                <h6>Attenzione!</h6>
+                
+            </div>
 
             <div class="mit-licence">
                 MIT License (2025)
