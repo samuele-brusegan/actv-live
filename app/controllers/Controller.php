@@ -1,34 +1,34 @@
 <?php
 
 class Controller {
-	function index() {
+    function index() {
         ini_set('display_errors', 1);
         ini_set('log_errors', 1);
         ini_set('error_log', BASE_PATH . '/php_error.log');
-		require_once BASE_PATH . '/app/views/home.php';
-	}
-	
-	function stops() {
+        require_once BASE_PATH . '/app/views/home.php';
+    }
+
+    function stops() {
         $stations = $this->fetchData('https://oraritemporeale.actv.it/aut/backend/page/stops');
         require_once BASE_PATH . '/app/views/stopList.php';
     }
-	
-	function stop() {
-		// $resp = file_get_contents(BASE_PATH."/app/views/4586-4587-web-aut.json");
-		require_once BASE_PATH . '/app/views/stop.php';
-	}
-	
-	function routeFinder() {
-		require_once BASE_PATH . '/app/views/routeFinder.php';
-	}
-	
-	function stationSelector() {
-		require_once BASE_PATH . '/app/views/stationSelector.php';
-	}
-	
-	function routeResults() {
-		require_once BASE_PATH . '/app/views/routeResults.php';
-	}
+
+    function stop() {
+        // $resp = file_get_contents(BASE_PATH."/app/views/4586-4587-web-aut.json");
+        require_once BASE_PATH . '/app/views/stop.php';
+    }
+
+    function routeFinder() {
+        require_once BASE_PATH . '/app/views/routeFinder.php';
+    }
+
+    function stationSelector() {
+        require_once BASE_PATH . '/app/views/stationSelector.php';
+    }
+
+    function routeResults() {
+        require_once BASE_PATH . '/app/views/routeResults.php';
+    }
 
     function routeDetails() {
         require_once BASE_PATH . '/app/views/routeDetails.php';
@@ -39,39 +39,39 @@ class Controller {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Often needed for dev/test
         $response = curl_exec($ch);
-        curl_close($ch);
+        //curl_close($ch);
         return json_decode($response, true) ?? [];
     }
-	
+
     function planRoute() {
         require_once BASE_PATH . '/app/services/RoutePlanner.php';
-        
+
         $origin = $_GET['from'] ?? '';
         $dest = $_GET['to'] ?? '';
         $time = $_GET['time'] ?? date('H:i:s');
-        
+
         file_put_contents(BASE_PATH . '/debug_log.txt', date('Y-m-d H:i:s') . " - Request: from=$origin, to=$dest, time=$time\n", FILE_APPEND);
-        
+
         // Ensure time is in HH:MM:SS format
         if (strlen($time) == 5) {
             $time .= ':00';
         }
-        
+
         try {
             $planner = new RoutePlanner();
-            
+
             $startWalk = null;
             $endWalk = null;
-            
+
             $planningOrigin = $origin;
             $planningDest = $dest;
             $planningTime = $time;
-            
+
             // Handle Origin Address
             if (strpos($origin, ',') !== false) {
                 list($lat, $lon) = explode(',', $origin);
                 $nearest = $planner->findNearestStop((float)$lat, (float)$lon);
-                
+
                 if ($nearest) {
                     $planningOrigin = $nearest['stop_id'];
                     $startWalk = [
@@ -84,17 +84,17 @@ class Controller {
                         // Estimated arrival at stop
                         'arrival_time' => date('H:i:s', strtotime($time) + ($nearest['walking_time'] * 60))
                     ];
-                    
+
                     // Adjust planning time to when we arrive at the stop
                     $planningTime = $startWalk['arrival_time'];
                 }
             }
-            
+
             // Handle Destination Address
             if (strpos($dest, ',') !== false) {
                 list($lat, $lon) = explode(',', $dest);
                 $nearest = $planner->findNearestStop((float)$lat, (float)$lon);
-                
+
                 if ($nearest) {
                     $planningDest = $nearest['stop_id'];
                     $endWalk = [
@@ -102,9 +102,9 @@ class Controller {
                     ];
                 }
             }
-            
+
             $routes = $planner->findRoutes($planningOrigin, $planningDest, $planningTime);
-            
+
             // Post-process routes to inject walking legs
             foreach ($routes as &$route) {
                 // Prepend Start Walk
@@ -112,7 +112,7 @@ class Controller {
                     // Update overall route stats
                     $route['departure_time'] = $startWalk['departure_time']; // Route starts when we start walking
                     $route['duration'] += $startWalk['duration'];
-                    
+
                     // Add leg
                     array_unshift($route['legs'], [
                         'type' => 'walking',
@@ -126,17 +126,17 @@ class Controller {
                         'destination' => $startWalk['to_name']
                     ]);
                 }
-                
+
                 // Append End Walk
                 if ($endWalk) {
                     $arrivalAtStop = $route['arrival_time'];
                     $walkDuration = $endWalk['stop_info']['walking_time'];
                     $walkDistance = $endWalk['stop_info']['distance'];
                     $arrivalAtDest = date('H:i:s', strtotime($arrivalAtStop) + ($walkDuration * 60));
-                    
+
                     $route['arrival_time'] = $arrivalAtDest;
                     $route['duration'] += $walkDuration;
-                    
+
                     $route['legs'][] = [
                         'type' => 'walking',
                         'distance' => $walkDistance,
@@ -150,7 +150,7 @@ class Controller {
                     ];
                 }
             }
-            
+
             header('Content-Type: application/json');
             echo json_encode(['success' => true, 'routes' => $routes]);
         } catch (Exception $e) {
@@ -170,9 +170,9 @@ class Controller {
         }
     }
 
-	function favorite(){
-		require_once BASE_PATH . '/app/models/addToFavorites.php';
-	}
+    function favorite() {
+        require_once BASE_PATH . '/app/models/addToFavorites.php';
+    }
 
     function linesMap() {
         require_once BASE_PATH . '/app/views/linesMap.php';
@@ -195,7 +195,7 @@ class Controller {
 
         $routes = json_decode(file_get_contents($routesFile), true);
         $stops = json_decode(file_get_contents($stopsFile), true);
-        
+
         $shapes = [];
 
         foreach ($routes as $routeId => $routeInfo) {
@@ -206,11 +206,11 @@ class Controller {
 
             if (file_exists($routeFile)) {
                 $trips = json_decode(file_get_contents($routeFile), true);
-                
+
                 // Take the first trip as representative
                 // Ideally we should find the "longest" trip or merge them, but first is a good start
                 $firstTrip = reset($trips);
-                
+
                 if ($firstTrip) {
                     $path = [];
                     foreach ($firstTrip as $stop) {
@@ -223,7 +223,7 @@ class Controller {
                             ];
                         }
                     }
-                    
+
                     if (!empty($path)) {
                         $shapes[] = [
                             'route_id' => $routeId,
@@ -247,7 +247,7 @@ class Controller {
     function tripStops() {
         $line = $_GET['line'] ?? '';
         $dest = $_GET['dest'] ?? '';
-        
+
         if (!$line) {
             header('HTTP/1.1 400 Bad Request');
             echo json_encode(['error' => 'Missing line parameter']);
@@ -293,17 +293,17 @@ class Controller {
         }
 
         $trips = json_decode(file_get_contents($routeFile), true);
-        
+
         // Find a trip that goes to 'dest'
         // If dest is not provided or not found, use the first trip
         $selectedTrip = null;
-        
+
         if ($dest) {
             foreach ($trips as $tripId => $tripStops) {
                 $lastStop = end($tripStops);
                 $lastStopId = $lastStop['stop_id'];
                 $lastStopName = $stops[$lastStopId]['name'] ?? '';
-                
+
                 // Simple fuzzy match or exact match
                 if (stripos($lastStopName, $dest) !== false || stripos($dest, $lastStopName) !== false) {
                     $selectedTrip = $tripStops;
@@ -311,7 +311,7 @@ class Controller {
                 }
             }
         }
-        
+
         if (!$selectedTrip) {
             $selectedTrip = reset($trips);
         }
@@ -335,19 +335,5 @@ class Controller {
         echo json_encode($result);
     }
 
-    function gtfsTest() {
-        
-        include_once BASE_PATH . '/app/models/gtfsReader.php';
-        
-        $gtfsFile = __DIR__ . '/../../data/gtfs/stops.txt'; // Cambia con il percorso reale
     
-        $risultati = readGTFS($gtfsFile, "SELECT stop_id, stop_name FROM stops LIMIT 10");
-
-        if ($risultati !== false) {
-            header('Content-Type: application/json');
-            echo json_encode($risultati);
-        } else {
-            echo "Operazione fallita.\n";
-        }
-    }
 }

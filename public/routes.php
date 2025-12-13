@@ -7,18 +7,20 @@
 global $router;
 
 // === Pagine ===
-$router->add('/'               , 'Controller', 'index');
-$router->add('/route-finder'   , 'Controller', 'routeFinder');
-$router->add('/station-selector', 'Controller', 'stationSelector');
-$router->add('/route-results'  , 'Controller', 'routeResults');
-$router->add('/route-details'  , 'Controller', 'routeDetails');
-$router->add('/stopList'       , 'Controller', 'stops');
-$router->add('/aut/stops/stop' , 'Controller', 'stop');
-$router->add('/api/addFavorite', 'Controller', 'favorite');
-$router->add('/api/plan-route' , 'Controller', 'planRoute');
-$router->add('/api/stops'      , 'Controller', 'stopsJson');
-$router->add('/lines-map'      , 'Controller', 'linesMap');
-$router->add('/api/lines-shapes', 'Controller', 'linesShapes');
-$router->add('/trip-details'   , 'Controller', 'tripDetails');
-$router->add('/api/trip-stops' , 'Controller', 'tripStops');
-$router->add('/gtfs-test'      , 'Controller', 'gtfsTest');
+$router->add('/'                        , 'Controller', 'index');
+$router->add('/route-finder'            , 'Controller', 'routeFinder');
+$router->add('/station-selector'        , 'Controller', 'stationSelector');
+$router->add('/route-results'           , 'Controller', 'routeResults');
+$router->add('/route-details'           , 'Controller', 'routeDetails');
+$router->add('/stopList'                , 'Controller', 'stops');
+$router->add('/aut/stops/stop'          , 'Controller', 'stop');
+$router->add('/api/addFavorite'         , 'Controller', 'favorite');
+$router->add('/api/plan-route'          , 'Controller', 'planRoute');
+$router->add('/api/stops'               , 'Controller', 'stopsJson');
+$router->add('/lines-map'               , 'Controller', 'linesMap');
+$router->add('/api/lines-shapes'        , 'Controller', 'linesShapes');
+$router->add('/trip-details'            , 'Controller', 'tripDetails');
+$router->add('/api/trip-stops'          , 'Controller', 'tripStops');
+$router->add('/api/gtfs-identify'       , 'dbControll', 'api_gtfsIdentify');
+$router->add('/api/gtfs-builder'        , 'dbControll', 'gtfsTripBuilder');
+$router->add('/api/gtfs-stop-translater', 'dbControll', 'gtfsStopTranslater');

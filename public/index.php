@@ -17,10 +17,10 @@ const COMMON_HTML_FOOT = BASE_PATH . '/public/commons/bottom_navigation.php';
 
 const THEME = (0) ? 'light' : 'dark';
 
+define('ENV', parse_ini_file(BASE_PATH . '/.env'));
+
 // Includi i file necessari, a mano o con l'autoloader di Composer
-require_once BASE_PATH . '/app/Router.php';
-require_once BASE_PATH . '/public/functions.php';
-require_once BASE_PATH . '/app/controllers/Controller.php';
+require_once BASE_PATH . '/public/imports.php';
 
 
 checkSessionExpiration();

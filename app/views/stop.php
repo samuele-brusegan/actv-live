@@ -138,14 +138,6 @@
             }
         }
         
-        // Helper to get station name (optional, if we want to display it nicely)
-        // Since the passages endpoint might not return the station name, we might need to fetch it or pass it.
-        // For now, let's try to infer it or just show the ID if name is missing.
-        // Actually, the passages endpoint usually returns a list of passages.
-        // Let's check if we can get the name from the first passage or if we need to fetch station info.
-        // The docs/data.md example for passages has "stop": "4825" and "timingPoints" with "stop": "Spinea Centro Sportivo".
-        // Maybe we can use that?
-
         async function updateNoticeboard() {
             if (!stationId) return;
             
@@ -159,6 +151,11 @@
                 
                 let text = rs.text;
 
+
+                if (text === null || text === undefined || text === "") {
+                    document.getElementById('noticeboard').innerHTML = "";
+                    return;
+                }
                 document.getElementById('noticeboard').innerHTML = `
                 <div class="card mb-2">
                     <div class="sciopero">
@@ -193,17 +190,6 @@
                 //document.getElementById('station-name').innerText = "Fermata " + stationId;
                 return;
             }
-            
-            // Try to extract station name from the first passage if available
-            // In the example: "timingPoints": [{"stop": "Spinea Centro Sportivo" ...}]
-            // But timingPoints are the schedule.
-            // Let's just use the ID for now or "Fermata" + ID.
-            // Ideally we would have passed the name in the URL or fetched the single station info.
-            // But there is no single station info endpoint documented, only "stops" (all).
-            // We could fetch all stops and find this one, but that's heavy.
-            // Let's check if the user passed 'name' in URL query params?
-            // I didn't add it in home.php link.
-            // document.getElementById('station-name').innerText = "Fermata " + stationId;
 
             passages.forEach(p => {
                 let lineNameRaw = p.line; // e.g. "GSB_US" or "7E" if lucky
@@ -232,7 +218,7 @@
                     ? /*html*/`
                     <div class="d-flex align-items-center">
                         <div class="real-time-indicator"></div>
-                        <span class="time-badge real-time">${time}</span>
+                        <span class="time-badge real-time">${time=="departure" ? "Ora" : time}</span>
                     </div>`
                     : `<span class="time-badge scheduled">${time}</span>`;
 
@@ -244,10 +230,40 @@
                 const safeDest = dest.replace(/'/g, "\\'");
                 const safeStationId = stationId.replace(/'/g, "\\'");
                 const safeTimeStr = timeStr.replace(/'/g, "\\'");
+                
+                console.log(safeDest);
+                
 
-                listContainer.innerHTML += /*html*/`
-                <div class="passage-card" onclick="window.location.href='/trip-details?line=' + encodeURIComponent('${safeLineName}_${safeLineTag}') + '&dest=' + encodeURIComponent('${safeDest}') + '&stopId=' + encodeURIComponent('${safeStationId}') + '&time=' + encodeURIComponent('${safeTimeStr}')" style="cursor: pointer;">
-                    <div class="d-flex align-items-center">
+                let url = '/trip-details?line=' + encodeURIComponent(safeLineName + "_" + safeLineTag) + 
+                '&dest=' + safeDest + 
+                '&stopId=' + encodeURIComponent(safeStationId) + 
+                '&time=' + safeTimeStr;
+
+
+                let array = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+                let today = array[new Date().getDay() % 7];
+                
+                let fermataTemporizzata = p.timingPoints[p.timingPoints.length - 1];
+                let stopTimed = fermataTemporizzata.stop;
+                let tempo = fermataTemporizzata.time;
+
+                
+                function sendToNewPage(stopTimed, busTrack, realTime, lastStop, url) {
+                    sessionStorage.setItem('timedStop',stopTimed);
+                    sessionStorage.setItem('busTrack', safeLineName);
+                    sessionStorage.setItem('realTime', tempo);
+                    sessionStorage.setItem('lastStop', dest);
+                    window.location.href=url;
+                }
+                
+                let div = document.createElement('div');
+                div.className = 'passage-card';
+                div.onclick = function() {
+                    sendToNewPage(stopTimed, safeLineName, tempo, dest, url)
+                };
+                div.style.cursor = 'pointer';
+                div.innerHTML = /*html*/`
+                <div class="d-flex align-items-center">
                         <div class="line-badge ${badgeColor}">${lineName}</div>
                         <div class="passage-info">
                             <span class="passage-dest"><b>${dest}</b></span><br/>
@@ -259,6 +275,7 @@
                     </div>
                 </div>
                 `;
+                listContainer.appendChild(div);
             });
         }
 

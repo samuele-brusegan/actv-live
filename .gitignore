@@ -2,3 +2,5 @@
 /.idea
 /bak1/
 /app/bak_views/
+.env
+data/
