@@ -62,13 +62,15 @@
         const stopId = urlParams.get('stopId');
         let   time = urlParams.get('time');
         const delay = urlParams.get('delay'); // New param
+        let today;
+        let tripId;
         
         window.onload = init();
 
         async function init() {
 
             //Get today day of week
-            let array = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]; let today = array[new Date().getDay() % 7];
+            let array = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]; today = array[new Date().getDay() % 7];
 
             //Retrieve info from sessionStorage
             let track_name = sessionStorage.getItem('busTrack');
@@ -77,7 +79,7 @@
             let time = sessionStorage.getItem('realTime');
 
             //Get tripId
-            let tripId = await getTripId(track_name, destination, today, time, stop);
+            tripId = await getTripId(track_name, destination, today, time, stop);
             console.log("tripId", tripId);
 
             // Init Header
@@ -137,8 +139,33 @@
                 let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stopId}-web-aut`);
                 if (!response.ok) throw new Error('Network error');
 
-                const stops = await response.json();
-                return stops;
+                const trips = await response.json();
+
+                console.log(trips);
+
+                //Calculate trip id of each trip
+                await Promise.all(trips.map(async trip => {
+                    let local_busTrack = trip.line.split('_')[0];
+                    let local_busDirection = trip.destination;
+                    
+                    let local_stopName = trip.timingPoints[trip.timingPoints.length - 1].stop;
+                    let local_stopTime = trip.timingPoints[trip.timingPoints.length - 1].time;
+
+                    try {
+                        let response = await fetch(`/api/gtfs-identify?return=true&time=${local_stopTime}&busTrack=${local_busTrack}&busDirection=${encodeURIComponent(local_busDirection)}&day=${today}&stop=${encodeURIComponent(local_stopName)}`);
+                        if (!response.ok) throw new Error('Network error');
+                        let data = await response.json();
+                        trip.tripId = data.trip_id;
+                        if (tripId === data.trip_id) {
+                            return trip;
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }));
+
+                // return trips;
+                return trips.filter(trip => trip.tripId === tripId);
                 //renderStops(stops);
 
             } catch (error) {
@@ -154,7 +181,7 @@
             // Debug logs
             console.log('Target stopId:', stopId);
 
-            console.log(stopsGTFS, stopId);
+            // console.log(stopsGTFS, stopId);
             
 
             // Try to find by ID first
@@ -185,11 +212,12 @@
             // 1.5. Merge GTFS and ACTV JSON
             let stops = stopsGTFS;
             stops.forEach((stop, index) => {
-                let stopJSON = stopsJSON.find(s => s.id == stop.stop_id);
+                let stopJSON = stopsJSON.find(s => s.name == stop.stop_name);
                 if (stopJSON) {
                     stop.time = stopJSON.time;
                 }
             });
+            console.log(stopsGTFS, stopsJSON);
 
             // 2. Render stops
             stops.forEach((stop, index) => {

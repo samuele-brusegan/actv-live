@@ -77,22 +77,28 @@
                     // GTFS stops.json format is object {stop_id: {id, name, lat, lon}}
                     // Convert to array and merge stops with same name
                     const stopsMap = new Map();
+
+                    //console.log(data);
+
                     Object.values(data).forEach(stop => {
-                        // Normalize name: lowercase, trim, remove extra spaces
-                        const normalizedName = stop.name.trim().toLowerCase().replace(/\s+/g, ' ');
-                        const cleanName = stop.name.trim(); // Keep original case for display
                         
+                        // Normalize name: lowercase, trim, remove extra spaces
+                        const normalizedName = stop.stop_name.trim().toLowerCase().replace(/\s+/g, ' ');
+                        const cleanName = stop.stop_name.trim(); // Keep original case for display
+                        
+
+
                         if (stopsMap.has(normalizedName)) {
                             // Add this stop ID to existing entry
-                            stopsMap.get(normalizedName).ids.push(stop.id);
+                            stopsMap.get(normalizedName).ids.push(stop.stop_id);
                         } else {
                             // Create new entry
                             stopsMap.set(normalizedName, {
-                                ids: [stop.id],
+                                ids: [stop.stop_id],
                                 name: cleanName,
                                 lines: [],
-                                lat: stop.lat,
-                                lng: stop.lon
+                                lat: stop.stop_lat,
+                                lng: stop.stop_lon
                             });
                         }
                     });
@@ -104,7 +110,7 @@
                         name: stop.name,
                         lines: stop.lines,
                         lat: stop.lat,
-                        lng: stop.lon
+                        lng: stop.lng
                     }));
                     
                     // Debug: Log merged stops
@@ -133,17 +139,17 @@
                 const recent = JSON.parse(localStorage.getItem('recent_stops') || '[]');
                 const container = document.getElementById('recent-list');
                 
-                if (recent.length === 0) {
+                if (recent.length === 0 || recent[0] == null) {
                     container.innerHTML = '<div class="no-results">Nessuna fermata recente</div>';
                     return;
                 }
-
-                container.innerHTML = recent.slice(0, 5).map(stop => createStopCard(stop, false)).join('');
+                console.log(recent);
+                container.innerHTML = recent.slice(0, Math.min(recent.length, 5)).map(stop => createStopCard(stop, false)).join('');
             }
 
             function createStopCard(stop, isFavorite) {
-                if (!stop) {
-                    console.error('createStopCard: Stop is undefined');
+                if (stop == undefined || stop == null) {
+                    console.warn('createStopCard: Stop is undefined', stop, isFavorite);
                     return '';
                 }
                 // Check if it's an address (custom type we just added)
@@ -207,12 +213,16 @@
 
             function addToRecent(stop) {
                 let recent = JSON.parse(localStorage.getItem('recent_stops') || '[]');
+                
                 // Remove duplicates
-                recent = recent.filter(s => {
-                    if (stop.type === 'address') return s.name !== stop.name;
-                    return s.id !== stop.id;
-                });
-                recent.unshift(stop);
+                if (!(recent.length === 0 || recent[0] === null)) {
+                    recent = recent.filter(s => {
+                        if (stop.type === 'address') return s.name !== stop.name;
+                        return s.stop_id !== stop.stop_id;
+                    });
+                }
+                if (recent.length === 0 && stop != null) recent = [stop];
+                if (stop != null && recent.length > 1) recent.unshift(stop);
                 recent = recent.slice(0, 10);
                 localStorage.setItem('recent_stops', JSON.stringify(recent));
             }
@@ -256,10 +266,15 @@
                 const favorites = JSON.parse(localStorage.getItem('favorite_stops') || '[]');
                 const recent = JSON.parse(localStorage.getItem('recent_stops') || '[]');
                 
-                const suggestions = [...favorites, ...recent].filter(item => 
-                    (item.name && item.name.toLowerCase().includes(query)) ||
-                    (item.type === 'address' && item.name.toLowerCase().includes(query))
-                );
+                let arr = [...favorites, ...recent];
+                let suggestions = [];
+                if (!(arr.length === 0 || arr[0] === null)) {
+                    suggestions = arr.filter(item => 
+                        item != null && (
+                        (item.name && item.name.toLowerCase().includes(query)) ||
+                        (item.type === 'address' && item.name.toLowerCase().includes(query)))
+                    );
+                }
                 
                 // Deduplicate suggestions based on ID or Name
                 const uniqueSuggestions = [];
@@ -319,10 +334,16 @@
                     
                     const favorites = JSON.parse(localStorage.getItem('favorite_stops') || '[]');
                     const recent = JSON.parse(localStorage.getItem('recent_stops') || '[]');
-                    const suggestions = [...favorites, ...recent].filter(item => 
-                        (item.name && item.name.toLowerCase().includes(currentQuery)) ||
-                        (item.type === 'address' && item.name.toLowerCase().includes(currentQuery))
-                    );
+
+                    let arr = [...favorites, ...recent];
+                    let suggestions = [];
+                    if (!(arr.length === 0 || arr[0] === null)) {
+                        suggestions = arr.filter(item => 
+                            (item.name && item.name.toLowerCase().includes(currentQuery)) ||
+                            (item.type === 'address' && item.name.toLowerCase().includes(currentQuery))
+                        );
+                    }
+
                     const uniqueSuggestions = [];
                     const seenIds = new Set();
                     suggestions.forEach(item => {

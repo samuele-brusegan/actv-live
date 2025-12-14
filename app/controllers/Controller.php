@@ -160,14 +160,29 @@ class Controller {
     }
 
     function stopsJson() {
-        $file = BASE_PATH . '/data/gtfs/cache/stops.json';
+
+        if (!isset($_GET) && !isset($_GET['return'])) die("No parameters");
+        
+        require_once BASE_PATH . '/app/models/databaseConnector.php';
+        
+        $db = new databaseConnector();
+        $db->connect(ENV['DB_USERNAME'], ENV['DB_PASSWORD'], ENV['DB_HOST'], ENV['DB_NAME']);
+
+        header("Content-Type: application/json");
+
+        $stops = $db->query("SELECT * FROM stops");
+        echo json_encode($stops);
+
+        //-----------------------------------
+
+        /* $file = BASE_PATH . '/data/gtfs/cache/stops.json';
         if (file_exists($file)) {
             header('Content-Type: application/json');
             readfile($file);
         } else {
             header('HTTP/1.1 404 Not Found');
             echo json_encode(['error' => 'Stops cache not found']);
-        }
+        } */
     }
 
     function favorite() {
