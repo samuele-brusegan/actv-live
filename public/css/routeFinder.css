@@ -351,6 +351,7 @@ input:checked+.toggle-slider:before {
     z-index: 1000;
     justify-content: center;
     align-items: flex-end;
+    backdrop-filter: blur(2px);
     /* Bottom sheet style */
 }
 

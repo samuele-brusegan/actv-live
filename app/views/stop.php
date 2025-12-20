@@ -23,6 +23,13 @@
             ★
         </button>
     </div>
+    <div class="parent-wrapper">
+        <div id="filter-container">
+            <div class="filter-box box-red selected">21</div>
+            <div class="filter-box box-blue">5E</div>
+            <div class="filter-box box-night">31H</div>
+        </div>
+    </div>
 
     <!-- Contenuto Principale -->
     <div class="main-content pb-5">
@@ -112,7 +119,8 @@
         if (!stationId) {
             document.getElementById('station-name').innerText = "Errore: ID mancante";
             document.getElementById('loading').style.display = 'none';
-        } else {
+        } 
+        else {
             console.log(urlParams.get('name'), urlParams.get('id'));
             console.log(stationName);
             document.getElementById('station-name').innerText = stationName ?? "Fermata " + stationId;
@@ -136,8 +144,7 @@
                 document.getElementById('loading').innerText = "Errore nel caricamento dei passaggi.";
                 return [];
             }
-        }
-        
+        }     
         async function updateNoticeboard() {
             if (!stationId) return;
             
@@ -170,9 +177,9 @@
                 document.getElementById('loading').innerText = "Errore nel caricamento dei passaggi.";
                 return [];
             }
-        }
-        
+        }  
         async function loadPassages() {
+
             if (!stationId) return;
             
             let passages = await getPassages();
@@ -231,9 +238,6 @@
                 const safeStationId = stationId.replace(/'/g, "\\'");
                 const safeTimeStr = timeStr.replace(/'/g, "\\'");
                 
-                console.log(safeDest);
-                
-
                 let url = '/trip-details?line=' + encodeURIComponent(safeLineName + "_" + safeLineTag) + 
                 '&dest=' + safeDest + 
                 '&stopId=' + encodeURIComponent(safeStationId) + 
@@ -277,8 +281,83 @@
                 `;
                 listContainer.appendChild(div);
             });
+            
+            // Set filter
+            updateFilter();
         }
+        
+        
+        function updateFilter() {
+            let filter = sessionStorage.getItem('filter');
+            
+            let filterPassesThere = false;
+            
+            // Get trips
+            let passageCards = document.querySelectorAll('.passage-card');
+            let trips = [];
+            passageCards.forEach(passageCard => {
 
+                let tripName = passageCard.querySelector('.line-badge').innerText;
+                let tripColor = passageCard.querySelector('.line-badge').classList[1].split('-')[1];
+
+                if (!trips.find(trip => trip.tripName === tripName)) {
+                    trips.push({
+                        "tripName":tripName,
+                        "color":tripColor,
+                    });
+                }
+            })
+            
+            // Remove old filters
+            let filterContainer = document.getElementById('filter-container');
+            filterContainer.innerHTML = '';
+            
+            // Add new filters
+            trips.forEach(trip => {
+                let filterBox = document.createElement('div');
+                filterBox.className = 'filter-box box-' + trip.color;
+                filterBox.id = trip.tripName;
+                filterBox.innerText = trip.tripName;
+
+                if (filter === trip.tripName) {
+                    filterBox.classList.add('selected');
+                    filterPassesThere = true;
+                }
+                filterBox.onclick = function() {
+                    if (filterBox.classList.contains('selected')) {
+                        sessionStorage.setItem('filter', null);
+                        updateFilter();
+                    } else {
+                        sessionStorage.setItem('filter', trip.tripName);
+                        updateFilter();
+                    }
+                };
+                if (filter === trip.tripName) {
+                    document.getElementById('filter-container').insertBefore(filterBox, document.getElementById('filter-container').firstChild);
+                } else {
+                    document.getElementById('filter-container').appendChild(filterBox);
+                }
+            });
+
+            if (filterPassesThere) {
+                passageCards.forEach(card => {
+                    let tripName = card.querySelector('.line-badge').innerText;
+                    
+                    if (tripName !== filter) {
+                        card.classList.add('hidden');
+                    }
+                    else {
+                        card.classList.remove('hidden');
+                    }
+                });
+            }
+            else {
+                passageCards.forEach(card => {
+                    card.classList.remove('hidden');
+                });
+            }
+        }
+        
         async function init() {
             if (!stationId) return;
             
@@ -293,6 +372,9 @@
 
             // Refresh every 15 seconds
             setInterval(loadPassages, 15000);
+
+            // Set filter
+            updateFilter();
         }
 
         window.onload = init;

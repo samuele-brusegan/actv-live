@@ -61,6 +61,99 @@
     animation: pulse 2s infinite;
 }
 
+.parent-wrapper {
+    padding: 0 var(--spacing-md) 0 var(--spacing-md);
+}
+#filter-container {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    justify-content: start;
+    margin: var(--spacing-md) 0;
+    /* padding: 0 var(--spacing-md) var(--spacing-md); */
+    
+    z-index: 99;
+    position: sticky;
+
+    /* Gestione Scorrimento */
+    width: 100%;
+    overflow-x: auto;                   /* Abilita lo scroll orizzontale */
+    overflow-y: hidden;                 /* Evita scroll verticale indesiderato */
+    /*white-space: nowrap;              /* Impedisce agli elementi di andare a capo */
+    flex-wrap: nowrap;
+    
+    /* Miglioramenti UX */
+    -webkit-overflow-scrolling: touch;  /* Scroll fluido su iOS */
+    scrollbar-width: none;              /* Nasconde la scrollbar su Firefox */
+    box-sizing: border-box;
+}
+
+/* Nasconde la scrollbar su Chrome/Safari/Edge */
+#filter-container::-webkit-scrollbar {
+    display: none;
+}
+/* Assicurati che i filtri (i bottoni) non si restringano */
+#filter-container > div, 
+#filter-container > button {
+    flex: 0 0 auto; 
+    margin-right: 10px;
+}
+/* 
+.parent-wrapper {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+}
+
+.parent-wrapper::after {
+    content: "";
+    position: absolute;
+    top: 0; right: 0;
+    width: 50px;
+    height: 100%;
+    background: linear-gradient(to right, transparent, white);
+    pointer-events: none;
+} */
+
+.filter-box {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-lg);
+    font-weight: 900;
+    background: var(--color-white);
+    box-shadow: var(--shadow-card-alt);
+    margin-right: var(--spacing-xs);
+    font-family: var(--font-primary);
+}
+
+.filter-box.box-red:not(.selected) {
+    border: 3px solid var(--color-primary-red);
+    color: var(--color-primary-red);
+}
+.filter-box.box-blue:not(.selected) {
+    border: 3px solid var(--color-primary-blue);
+    color: var(--color-primary-blue);
+}
+.filter-box.box-night:not(.selected) {
+    border: 3px solid var(--color-night-blue);
+    color: var(--color-night-blue);
+}
+
+.filter-box.selected.box-red {
+    border: 3px solid var(--color-primary-red);
+    background: var(--color-primary-red);
+    color: var(--color-white);
+}
+.filter-box.selected.box-blue {
+    border: 3px solid var(--color-primary-blue);
+    background: var(--color-primary-blue);
+    color: var(--color-white);
+}
+.filter-box.selected.box-night {
+    border: 3px solid var(--color-night-blue);
+    background: var(--color-night-blue);
+    color: var(--color-white);
+}
+
 @keyframes pulse {
     0% {
         transform: scale(0.95);

@@ -278,15 +278,6 @@
                     // Future stops
                     
                     return (stop.time) ? stop.time : "IN ARRIVO";
-                    
-                    /* if (stop.time) {
-                        timeDisplay = stop.time;
-
-                    } else {
-                        timeDisplay = 'IN ARRIVO';
-                    } */
-                        
-                    
                 }
                 
 

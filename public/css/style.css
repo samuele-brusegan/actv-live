@@ -172,11 +172,9 @@ body {
 .line-badge.badge-blue {
     background: var(--color-primary-blue);
 }
-
 .line-badge.badge-red {
     background: var(--color-primary-red);
 }
-
 .line-badge.badge-night {
     background: var(--color-night-blue);
 }
