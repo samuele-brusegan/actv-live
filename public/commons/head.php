@@ -8,4 +8,5 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=directions_bus" />
 
 <!--PWA-->
-<link rel="manifest" href="/pwa/app.webmanifest">
+<link rel="manifest" href="<?=URL_PATH?>/pwa/app.webmanifest">
+<link rel="shortcut icon" href="<?=URL_PATH?>/pwa/favicon.ico">

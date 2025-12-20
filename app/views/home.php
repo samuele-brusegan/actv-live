@@ -27,7 +27,7 @@
                 <div id="favorites-list"></div>
             </div>
             
-            <hr>
+            <hr id="hr_favorites">
             
             <!-- Sezione Fermate Vicine (Dinamica) -->
             <div id="nearby-section">
@@ -35,7 +35,7 @@
                 <div id="nearby-list"></div>
             </div>
 
-            <hr>
+            <hr id="hr_nearby">
             
             <div class="section-title">Mappa</div>
             <!-- Status Geolocation -->

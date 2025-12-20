@@ -90,13 +90,17 @@
             let stopsGTFS = await loadStops(tripId);
             refresh(stopsGTFS);
             //Update time
-            setInterval(refresh, 25000, stopsGTFS);            
+            // setInterval(refresh, 25000, stopsGTFS);            
         }
 
         async function refresh(stopsGTFS) {
             let stopsJSON = await getActvJson();
-            let stop = stopsJSON.find(stop => stop.id === stopId)
+            
+            //find name of stopId
+            let stopName = stopsGTFS.find(stop => stop.stop_id === stopId).stop_name;
 
+            let stop = stopsJSON.find(stop => stop.stop === stopName);
+            
             time = stop ? stop.time : -1;
             renderStops(stopsGTFS, stopsJSON);
         }
@@ -139,12 +143,10 @@
                 let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stopId}-web-aut`);
                 if (!response.ok) throw new Error('Network error');
 
-                const trips = await response.json();
-
-                console.log(trips);
+                const tripsJSON = await response.json();
 
                 //Calculate trip id of each trip
-                await Promise.all(trips.map(async trip => {
+                await Promise.all(tripsJSON.map(async trip => {
                     let local_busTrack = trip.line.split('_')[0];
                     let local_busDirection = trip.destination;
                     
@@ -165,8 +167,8 @@
                 }));
 
                 // return trips;
-                return trips.filter(trip => trip.tripId === tripId);
-                //renderStops(stops);
+                let theInterestingTrip = tripsJSON.filter(trip => trip.tripId === tripId);
+                return theInterestingTrip[0].timingPoints;
 
             } catch (error) {
                 console.error(error);
@@ -211,13 +213,16 @@
 
             // 1.5. Merge GTFS and ACTV JSON
             let stops = stopsGTFS;
+            console.log("GTFS", stopsGTFS);
+            console.log("JSON", stopsJSON);
+
             stops.forEach((stop, index) => {
-                let stopJSON = stopsJSON.find(s => s.name == stop.stop_name);
+                let stopJSON = stopsJSON.find(s => s.stop == stop.stop_name);
                 if (stopJSON) {
                     stop.time = stopJSON.time;
                 }
             });
-            console.log(stopsGTFS, stopsJSON);
+            console.log("Merged", stops);
 
             // 2. Render stops
             stops.forEach((stop, index) => {
@@ -248,36 +253,41 @@
                 }
 
                 // Time Logic
-                let timeDisplay = '';
-                if (isPassed) {
+                let timeDisplay = calculateTimeDisplay(stop, isCurrent, isPassed);
+                
+                function calculateTimeDisplay(stop, isCurrent, isPassed) {
+                    if (isPassed) {
+                        return (stop.time) ? "PASSATO - " + stop.time : "PASSATO - " + stop.arrival_time.split(":").splice(0, 2).join(":");
+                    }
+                    
+                    if (isCurrent) {
 
-                    timeDisplay = stop.time ? "PASSATO (" + stop.time + ")" : "PASSATO (" + stop.arrival_time + ")";
-
-                } else if (isCurrent) {
-
-                    // Show the time passed in URL if available
-                    timeDisplay = (time && time != undefined && time != null)  ? (time == 'departure' ? "ORA" : (time+"").replace(/\\\'/g, '')) : "ORA";
-
-                } else {
+                        // Show the time passed in URL if available
+                        if (!(time && time != undefined && time != null)) { return "Generic error"; }
+                        
+                        if(time == 'departure') {
+                            return "ORA";
+                        } else {
+                            // Remove backslashes
+                            return (time+"").replace(/\\\'/g, '');
+                        }
+                        
+                    } 
 
                     // Future stops
                     
-                    if (stop.time) {
-                        /* const currentMin = parseInt(time);
-                        // If we know current stop index, we can estimate. 
-                        // If we don't (currentStopIndex == -1), we assume we are at start (index 0 effectively for time calc?)
-                        // actually if currentStopIndex is -1, we can't estimate relative time easily.
-                        const baseIndex = currentStopIndex === -1 ? 0 : currentStopIndex;
-                        const diff = index - baseIndex;
-                        const estMin = currentMin + (diff * 2); // Rough estimate
-                        timeDisplay = `${estMin} min`; */
+                    return (stop.time) ? stop.time : "IN ARRIVO";
+                    
+                    /* if (stop.time) {
                         timeDisplay = stop.time;
 
                     } else {
                         timeDisplay = 'IN ARRIVO';
-                    }
+                    } */
+                        
                     
                 }
+                
 
                 let stopUrl = '/aut/stops/stop?id=' + stop.stop_id + '&name=' + encodeURIComponent(stop.stop_name);
                 html += /*html*/ `

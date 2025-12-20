@@ -208,6 +208,27 @@ body {
     background: #013d99;
 }
 
+.btn-outline-primary {
+    background: var(--color-bg-gray);
+    color: var(--color-primary-blue);
+    border: 2px solid var(--color-primary-blue);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm);
+    font-family: var(--font-secondary);
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+}
+
+.btn-outline-primary:active, .btn-check:checked+.btn, .btn.active, .btn.show, .btn:first-child:active, :not(.btn-check)+.btn:active, .btn-outline-primary:focus-visible{
+    transform: scale(0.98);
+    background: var(--color-primary-blue);
+    color: var(--color-white);
+    border: none;
+}
+
 .btn-secondary {
     background: var(--color-white);
     color: var(--color-primary-blue);

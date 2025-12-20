@@ -38,6 +38,11 @@ function renderFavorites() {
                 <span style="font-size: 20px; color: #ccc;">&rsaquo;</span>
             </div>
         `;
+
+        if (favorites.length > 0) {
+            favoritesSection.style.display = 'block';
+            document.getElementById('hr_favorites').style.display = 'block';
+        }
         /*
             <div class="favorite-btn favorited" style="position: absolute; top: 0; right: 0; padding: 5px; font-size: 20px; color: var(--color-gold);">
                 <span>★</span>
@@ -202,7 +207,7 @@ async function renderMap() {
         setTimeout(() => {
             statusElement.style.position = 'absolute';
             statusElement.style.visibility = 'hidden';
-            console.log("Status hidden???");
+            // console.log("Status hidden???");
 
         }, 2500);
 
@@ -267,6 +272,10 @@ async function renderMap() {
                     closestStationsList.appendChild(stopCard);
 
                 });
+                if (closestStations.length > 0) {
+                    document.getElementById('nearby-section').style.display = 'unset';
+                    document.getElementById('hr_nearby').style.display = 'block';
+                }
             }
 
             if (closestStations != null && closestStations.length <= 0) {
@@ -327,6 +336,14 @@ async function fetchImportantInfo() {
 }
 
 window.onload = async function () {
+
+    //Hide divs
+    document.getElementById('hr_favorites').style.display = 'none';
+    document.getElementById('hr_nearby').style.display = 'none';
+    document.getElementById('favorites-section').style.display = 'none';
+    document.getElementById('nearby-section').style.display = 'none';
+
+
     renderMap();
 
     let text = await fetchImportantInfo();

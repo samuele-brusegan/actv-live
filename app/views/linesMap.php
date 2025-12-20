@@ -58,14 +58,14 @@
             '#1E90FF'  // DodgerBlue
         ];
 
-        function getLineColor(str) {
+        function getLineColor(str, boolVal) {
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
                 hash = str.charCodeAt(i) + ((hash << 5) - hash);
             }
             // Ensure positive
             hash = Math.abs(hash);
-            return LINE_COLORS[hash % LINE_COLORS.length];
+            return boolVal ? LINE_COLORS[hash % LINE_COLORS.length] : '#AAA';
         }
 
         async function loadLines() {
@@ -82,17 +82,18 @@
                 shapes.forEach(shape => {
                     if (shape.path && shape.path.length > 0) {
                         const latlngs = shape.path.map(p => [p.lat, p.lng]);
-                        const color = getLineColor(shape.route_short_name);
-                        
                         const isTarget = targetLine && shape.route_short_name === targetLine;
+                        
+                        const color = getLineColor(shape.route_short_name, isTarget||!targetLine);
                         const weight = isTarget ? 8 : 4;
                         const opacity = isTarget ? 1 : (targetLine ? 0.2 : 0.7);
-                        const zIndex = isTarget ? 1000 : 1;
+                        const zIndex = isTarget ? 10000 : 1;
                         
                         const polyline = L.polyline(latlngs, {
                             color: color,
                             weight: weight,
-                            opacity: opacity
+                            opacity: opacity,
+                            zIndex: zIndex
                         }).addTo(map);
                         
                         if (isTarget) {
