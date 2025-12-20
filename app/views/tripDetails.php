@@ -97,7 +97,8 @@
             let stopsJSON = await getActvJson();
             
             //find name of stopId
-            let stopName = stopsGTFS.find(stop => stop.stop_id === stopId).stop_name;
+            
+            let stopName = stopsGTFS.find(stop => (stop.stop_id === stopId.split('-')[0] || stop.stop_id === stopId.split('-')[1])).stop_name;
 
             let stop = stopsJSON.find(stop => stop.stop === stopName);
             
@@ -167,7 +168,7 @@
                 }));
 
                 // return trips;
-                let theInterestingTrip = tripsJSON.filter(trip => trip.tripId === tripId);
+                let theInterestingTrip = tripsJSON.filter(trip => trip.tripId === tripId);                
                 return theInterestingTrip[0].timingPoints;
 
             } catch (error) {
