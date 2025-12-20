@@ -25,9 +25,9 @@
     </div>
     <div class="parent-wrapper">
         <div id="filter-container">
-            <div class="filter-box box-red selected">21</div>
+            <!-- <div class="filter-box box-red selected">21</div>
             <div class="filter-box box-blue">5E</div>
-            <div class="filter-box box-night">31H</div>
+            <div class="filter-box box-night">31H</div> -->
         </div>
     </div>
 
@@ -131,7 +131,7 @@
             if (!stationId) return;
 
             try {
-                let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stationId}-web-aut`);
+                let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stationId}-web-aut`, {cache: 'no-cache'});
                 if (!response.ok) {
                     throw new Error(`Response status: ${response.status}`);
                 }
@@ -311,6 +311,9 @@
             // Remove old filters
             let filterContainer = document.getElementById('filter-container');
             filterContainer.innerHTML = '';
+
+            if (trips.length <= 1) return;
+            
             
             // Add new filters
             trips.forEach(trip => {
@@ -333,7 +336,8 @@
                     }
                 };
                 if (filter === trip.tripName) {
-                    document.getElementById('filter-container').insertBefore(filterBox, document.getElementById('filter-container').firstChild);
+                    // document.getElementById('filter-container').insertBefore(filterBox, document.getElementById('filter-container').firstChild);
+                    document.getElementById('filter-container').appendChild(filterBox);
                 } else {
                     document.getElementById('filter-container').appendChild(filterBox);
                 }
@@ -368,7 +372,7 @@
             updateFavoriteButton();
             
             await loadPassages();
-            await updateNoticeboard();
+            // await updateNoticeboard();
 
             // Refresh every 15 seconds
             setInterval(loadPassages, 15000);

@@ -319,7 +319,7 @@ async function renderMap() {
 
 async function fetchImportantInfo() {
     try {
-        let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/page/terminal-cialdini-web`);
+        let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/page/terminal-cialdini-web`, {cache: 'no-cache'});
         if (!response.ok) {
             throw new Error(`Response status: ${response.status}`);
         }

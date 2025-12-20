@@ -141,7 +141,7 @@
 
             try {
                 // const response = await fetch(`/api/trip-stops?line=${encodeURIComponent(line)}&dest=${encodeURIComponent(dest)}`);
-                let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stopId}-web-aut`);
+                let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stopId}-web-aut`, {cache: 'no-cache'});
                 if (!response.ok) throw new Error('Network error');
 
                 const tripsJSON = await response.json();
@@ -155,7 +155,7 @@
                     let local_stopTime = trip.timingPoints[trip.timingPoints.length - 1].time;
 
                     try {
-                        let response = await fetch(`/api/gtfs-identify?return=true&time=${local_stopTime}&busTrack=${local_busTrack}&busDirection=${encodeURIComponent(local_busDirection)}&day=${today}&stop=${encodeURIComponent(local_stopName)}`);
+                        let response = await fetch(`/api/gtfs-identify?return=true&time=${local_stopTime}&busTrack=${local_busTrack}&busDirection=${encodeURIComponent(local_busDirection)}&day=${today}&stop=${encodeURIComponent(local_stopName)}`, {cache: 'no-cache'});
                         if (!response.ok) throw new Error('Network error');
                         let data = await response.json();
                         trip.tripId = data.trip_id;
