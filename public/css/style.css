@@ -117,7 +117,7 @@ body {
     font-weight: 600;
     font-size: 20px;
     color: var(--color-black);
-    margin: var(--spacing-md) 0 0.75rem;
+    /* margin: var(--spacing-md) 0 0.75rem; */
 }
 
 /* Cards - Base Styles */
