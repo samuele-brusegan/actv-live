@@ -21,6 +21,10 @@ define('ENV', parse_ini_file(BASE_PATH . '/.env'));
 
 // Includi i file necessari, a mano o con l'autoloader di Composer
 require_once BASE_PATH . '/public/imports.php';
+require_once BASE_PATH . '/app/services/Logger.php';
+
+set_error_handler(['Logger', 'phpErrorHandler']);
+set_exception_handler(['Logger', 'exceptionHandler']);
 
 
 checkSessionExpiration();

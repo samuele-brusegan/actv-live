@@ -245,7 +245,7 @@
 
 
                 let array = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-                let today = array[new Date().getDay() % 7];
+                let today = array[window.TimeMachine ? TimeMachine.now().getDay() % 7 : new Date().getDay() % 7];
                 
                 let fermataTemporizzata = p.timingPoints[p.timingPoints.length - 1];
                 let stopTimed = fermataTemporizzata.stop;

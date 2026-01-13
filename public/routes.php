@@ -16,6 +16,8 @@ $router->add('/stopList'                , 'Controller', 'stops');
 $router->add('/aut/stops/stop'          , 'Controller', 'stop');
 $router->add('/lines-map'               , 'Controller', 'linesMap');
 $router->add('/trip-details'            , 'Controller', 'tripDetails');
+$router->add('/admin/logs'              , 'Controller', 'logs');
+$router->add('/admin/time-machine'      , 'Controller', 'timeMachine');
 
 $router->add('/api/addFavorite'         , 'ApiController', 'favorite');
 $router->add('/api/plan-route'          , 'ApiController', 'planRoute');
@@ -25,3 +27,7 @@ $router->add('/api/trip-stops'          , 'ApiController', 'tripStops');
 $router->add('/api/gtfs-identify'       , 'ApiController', 'api_gtfsIdentify');
 $router->add('/api/gtfs-builder'        , 'ApiController', 'gtfsTripBuilder');
 $router->add('/api/gtfs-stop-translater', 'ApiController', 'gtfsStopTranslater');
+$router->add('/api/log-js-error'        , 'ApiController', 'logJsError');
+$router->add('/api/tm/sessions'         , 'ApiController', 'getTmSessions');
+$router->add('/api/tm/create-session'   , 'ApiController', 'createTmSession');
+$router->add('/api/tm/simulated-data'   , 'ApiController', 'getSimulatedData');

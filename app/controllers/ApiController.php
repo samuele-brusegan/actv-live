@@ -384,45 +384,17 @@ class ApiController {
             return;
         }
         
-        // There might be multiple route entries for same short name (directions?), usually route_id is unique per logical route but GTFS can have multiple.
-        // We'll take the first one or iterate? GTFS usually has 1 route object per short_name unless split.
-        // However, trips differentiate direction.
         $targetRouteId = $routes[0]['route_id'];
-        
-        // 2. Find a trip that ends at 'dest', or default to any trip
-        // We need to check the last stop of trips on this route.
-        // Only checking a subset of trips is more efficient.
-        // Let's get distinct trip_headsigns if available, or just check last stops.
         
         $selectedTripId = null;
         
         if ($dest) {
-            // Complex Query: Find a trip where the LAST stop matches $dest roughly
-            // Note: GTFS doesn't explicitly mark "last stop" easily without checking max sequence.
-            // Efficient approach: Join trips and stop_times, select max sequence stop, check name.
-            // Since we can't easily do "HAVING last_stop_name LIKE %dest%" efficiently in standard SQL mode without subqueries.
-            
-            // Strategy: Get all trips for route, and their headsign. If headsign matches DEST, pick it.
-            // If headsign doesn't match or isn't used, we might need to check stop times.
-            
-            // Try matching trip_headsign first?
             $safeDest = addslashes($dest);
             $tripByHeadsign = $db->query("SELECT trip_id FROM trips WHERE route_id = '$targetRouteId' AND trip_headsign LIKE '%$safeDest%' LIMIT 1");
             
             if (!empty($tripByHeadsign)) {
                 $selectedTripId = $tripByHeadsign[0]['trip_id'];
             } else {
-                // Fallback: Check last stops. This is expensive.
-                // Let's optimize: Get a few trips (e.g. one per direction/service) and check them.
-                // Or just get ANY trip if dest not found?
-                // The original code iterated ALL trips for the route.
-                
-                // Let's try to find a trip where any stop matches? No, logic was "last stop".
-                
-                // Query: trip_id where last stop name like dest.
-                // "SELECT t.trip_id FROM trips t WHERE t.route_id = ... AND (SELECT stop_name FROM stops s JOIN stop_times st ON s.stop_id = st.stop_id WHERE st.trip_id = t.trip_id ORDER BY st.stop_sequence DESC LIMIT 1) LIKE '%...%'"
-                // This is valid SQL.
-                
                 $deepQuery = "
                     SELECT t.trip_id 
                     FROM trips t
@@ -445,7 +417,6 @@ class ApiController {
         }
         
         if (!$selectedTripId) {
-            // Default: Any trip for this route
             $trips = $db->query("SELECT trip_id FROM trips WHERE route_id = '$targetRouteId' LIMIT 1");
             if (!empty($trips)) {
                 $selectedTripId = $trips[0]['trip_id'];
@@ -483,4 +454,76 @@ class ApiController {
         echo json_encode($stops);
     }
 
+    function logJsError() {
+        $data = json_decode(file_get_contents('php://input'), true);
+        if ($data) {
+            if (!class_exists('Logger')) {
+                require_once BASE_PATH . '/app/services/Logger.php';
+            }
+            Logger::log(
+                'JS_ERROR',
+                $data['message'] ?? 'Unknown JS error',
+                $data['url'] ?? null,
+                $data['line'] ?? null,
+                $data['stack'] ?? null,
+                ['userAgent' => $_SERVER['HTTP_USER_AGENT'] ?? null]
+            );
+            echo json_encode(['success' => true]);
+        } else {
+            header('HTTP/1.1 400 Bad Request');
+            echo json_encode(['error' => 'Invalid data']);
+        }
+    }
+
+    // Time Machine API endpoints
+    function getTmSessions() {
+        $db = $this->getDb();
+        $sessions = $db->query("SELECT * FROM tm_sessions ORDER BY created_at DESC");
+        header('Content-Type: application/json');
+        echo json_encode($sessions);
+    }
+
+    function createTmSession() {
+        $data = json_decode(file_get_contents('php://input'), true);
+        if ($data) {
+            $mysqli = Closure::bind(function($db) { return $db->db; }, null, 'databaseConnector')($this->getDb());
+            $stmt = $mysqli->prepare("INSERT INTO tm_sessions (name, start_time, end_time, stops) VALUES (?, ?, ?, ?)");
+            $stopsJson = json_encode($data['stops']);
+            $stmt->bind_param("ssss", $data['name'], $data['start_timer'], $data['end_timer'], $stopsJson);
+            $stmt->execute();
+            echo json_encode(['success' => true, 'id' => $mysqli->insert_id]);
+        }
+    }
+
+    function getSimulatedData() {
+        $stopId = $_GET['stopId'] ?? null;
+        $time = $_GET['time'] ?? null; // The simulated time from client
+
+        if (!$stopId || !$time) {
+            header('HTTP/1.1 400 Bad Request');
+            return;
+        }
+
+        $db = $this->getDb();
+        $query = "
+            SELECT data_json 
+            FROM tm_data 
+            WHERE stop_id = ? 
+            ORDER BY ABS(TIMESTAMPDIFF(SECOND, fetched_at, ?)) 
+            LIMIT 1
+        ";
+        $mysqli = Closure::bind(function($db) { return $db->db; }, null, 'databaseConnector')($db);
+        $stmt = $mysqli->prepare($query);
+        $stmt->bind_param("ss", $stopId, $time);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+
+        header('Content-Type: application/json');
+        if ($row) {
+            echo $row['data_json'];
+        } else {
+            echo json_encode([]);
+        }
+    }
 }

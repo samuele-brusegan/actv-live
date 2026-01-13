@@ -59,7 +59,25 @@ class Controller {
         require_once BASE_PATH . '/app/views/tripDetails.php';
     }
 
+    function logs() {
+        if (!class_exists('databaseConnector')) {
+            require_once BASE_PATH . '/app/models/databaseConnector.php';
+        }
+        $db = new databaseConnector();
+        $db->connect(ENV['DB_USERNAME'], ENV['DB_PASSWORD'], ENV['DB_HOST'], ENV['DB_NAME']);
+        
+        $type = $_GET['type'] ?? null;
+        $query = "SELECT * FROM logs";
+        if ($type) {
+            $query .= " WHERE type = '" . addslashes($type) . "'";
+        }
+        $query .= " ORDER BY created_at DESC LIMIT 100";
+        $logs = $db->query($query);
+        
+        require_once BASE_PATH . '/app/views/admin/logs.php';
+    }
 
-
-    
+    function timeMachine() {
+        require_once BASE_PATH . '/app/views/admin/time_machine.php';
+    }
 }
