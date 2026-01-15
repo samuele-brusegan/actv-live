@@ -1,0 +1,1 @@
+[15-Jan-2026 19:36:14 UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at D:\Developing\actv-live\public\index.php:41) in D:\Developing\actv-live\app\controllers\ApiController.php on line 532

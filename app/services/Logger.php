@@ -26,7 +26,7 @@ class Logger {
         
         $contextJson = $context ? json_encode($context) : null;
         
-        $stmt->bind_param("sssis s", $type, $message, $file, $line, $stackTrace, $contextJson);
+        $stmt->bind_param("sssiss", $type, $message, $file, $line, $stackTrace, $contextJson);
         $stmt->execute();
         $stmt->close();
     }

@@ -16,6 +16,9 @@
             <!-- Logo o Icona Menu (Placeholder basato su spazio vuoto nel design) -->
             <div style="height: 20px;"></div> 
             <div class="header-title">ACTV Live <br> Venezia</div>
+            <a href="/admin/time-machine" class="admin-link d-none" id="admin-secret-link" title="Gestione Time Machine">
+                <?= getIcon('settings', 24) ?>
+            </a>
         </div>
 
         <!-- Contenuto Principale -->
@@ -78,7 +81,7 @@
                 
             </div>
 
-            <div class="mit-licence">
+            <div class="mit-licence" id="footer-licence">
                 MIT License (2025)
                 <hr>
                 App sviluppata da <a href="https://github.com/samuele-brusegan">Samuele Brusegan</a> <br>
@@ -96,6 +99,28 @@
         <script src="/components/StopCard.js"></script>
         
         <script src="/js/script-home.js"></script>
+        <script>
+            // Hidden Admin Access: 5 clicks on footer
+            let footerClicks = 0;
+            let lastClickTime = 0;
+            document.getElementById('footer-licence').addEventListener('click', (e) => {
+                const currentTime = new Date().getTime();
+                if (currentTime - lastClickTime < 500) {
+                    footerClicks++;
+                } else {
+                    footerClicks = 1;
+                }
+                lastClickTime = currentTime;
+
+                if (footerClicks >= 5) {
+                    const adminLink = document.getElementById('admin-secret-link');
+                    adminLink.classList.remove('d-none');
+                    // Optional: automatic redirect
+                    // window.location.href = '/admin/time-machine';
+                    alert("Admin access unlocked!");
+                }
+            });
+        </script>
 
     </body>
 </html>

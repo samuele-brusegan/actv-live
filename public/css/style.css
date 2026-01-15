@@ -50,6 +50,12 @@ body {
     line-height: 1.2;
 }
 
+#tm-banner {
+    border-radius: var(--radius-md);
+    border-left: 5px solid var(--color-orange);
+    box-shadow: var(--shadow-card);
+}
+
 .hidden {
     display: none !important;
 }
@@ -66,6 +72,25 @@ body {
     margin-bottom: -4rem;
     position: relative;
     z-index: 1;
+}
+
+.admin-link {
+    position: absolute;
+    top: 30px;
+    right: 20px;
+    color: var(--color-white);
+    text-decoration: none;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.admin-link:hover {
+    opacity: 1;
+    color: var(--color-white);
+}
+
+.admin-link .material-symbols-outlined {
+    font-size: 28px;
 }
 
 .header-green.compact {

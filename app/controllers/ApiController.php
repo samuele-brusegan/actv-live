@@ -505,16 +505,26 @@ class ApiController {
         }
 
         $db = $this->getDb();
+        
+        // Handle combined stop IDs (e.g. "4825-4826")
+        $stopIds = explode('-', $stopId);
+        $placeholders = implode(',', array_fill(0, count($stopIds), '?'));
+        
         $query = "
             SELECT data_json 
             FROM tm_data 
-            WHERE stop_id = ? 
+            WHERE stop_id IN ($placeholders) 
             ORDER BY ABS(TIMESTAMPDIFF(SECOND, fetched_at, ?)) 
             LIMIT 1
         ";
         $mysqli = Closure::bind(function($db) { return $db->db; }, null, 'databaseConnector')($db);
         $stmt = $mysqli->prepare($query);
-        $stmt->bind_param("ss", $stopId, $time);
+        
+        // Bind parameters: stop IDs followed by the time
+        $types = str_repeat('s', count($stopIds) + 1);
+        $params = [...$stopIds, $time];
+        $stmt->bind_param($types, ...$params);
+        
         $stmt->execute();
         $result = $stmt->get_result();
         $row = $result->fetch_assoc();

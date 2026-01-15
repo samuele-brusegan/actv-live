@@ -14,7 +14,9 @@
     <!-- Header -->
     <div class="header-green">
         <div style="height: 20px;">
-             <a href="/" style="color: white; text-decoration: none; font-size: 24px;">&larr;</a>
+             <a href="/" style="color: white; text-decoration: none; font-size: 24px;">
+                 <?= getIcon('arrow_back', 24) ?>
+             </a>
         </div> 
         <div class="header-title">Tutte le<br>Stazioni</div>
     </div>

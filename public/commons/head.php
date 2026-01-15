@@ -4,9 +4,8 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.min.js" integrity="sha384-RuyvpeZCxMJCqVUGFI0Do1mQrods/hhxYlcVfGPOfQtPJh0JCw12tUAZ/Mv10S7D" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
+<?php require_once BASE_PATH . '/app/views/common/icons.php'; ?>
 <link rel="stylesheet" href="<?=URL_PATH?>/css/style.css">
-
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=directions_bus" />
 
 <!--PWA-->
 <link rel="manifest" href="<?=URL_PATH?>/pwa/app.webmanifest">

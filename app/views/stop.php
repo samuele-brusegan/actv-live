@@ -15,7 +15,9 @@
     <!-- Header -->
     <div class="header-green">
         <div style="height: 20px;">
-             <a href="javascript:history.back()" style="color: white; text-decoration: none; font-size: 24px;">&larr;</a>
+             <a href="javascript:history.back()" style="color: white; text-decoration: none; font-size: 24px;">
+                 <?= getIcon('arrow_back', 24) ?>
+             </a>
         </div> 
         <div class="header-title" id="station-name">Caricamento...</div>
         <div class="header-subtitle" id="station-id"></div>
@@ -39,6 +41,14 @@
         <div id="noticeboard"></div>
         
         <div id="loading">Caricamento passaggi...</div>
+
+        <!-- Time Machine Banner -->
+        <div id="tm-banner" class="alert alert-warning py-2 mb-3 small d-none">
+            <div class="d-flex justify-content-between align-items-center">
+                <span><?= getIcon('history', 18, 'align-middle') ?> <strong>Time Machine attiva</strong></span>
+                <span id="tm-current-time"></span>
+            </div>
+        </div>
 
         <div id="passages-list">
             <!-- Popolato via JS -->
@@ -362,6 +372,17 @@
             }
         }
         
+        function updateTimeMachineUI() {
+            const banner = document.getElementById('tm-banner');
+            const timeSpan = document.getElementById('tm-current-time');
+            if (window.TimeMachine && TimeMachine.isEnabled()) {
+                banner.classList.remove('d-none');
+                timeSpan.innerText = TimeMachine.getSimTime();
+            } else {
+                banner.classList.add('d-none');
+            }
+        }
+
         async function init() {
             if (!stationId) return;
             
@@ -370,6 +391,9 @@
             
             // Update favorite button state
             updateFavoriteButton();
+
+            // Update Time Machine UI
+            updateTimeMachineUI();
             
             await loadPassages();
             // await updateNoticeboard();

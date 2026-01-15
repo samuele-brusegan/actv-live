@@ -7,26 +7,9 @@
 
 // use cvv\Collegamenti;
 // use cvv\CvvIntegration;
-// Definisci il percorso base dell'applicazione
+require_once dirname(__DIR__) . '/app/bootstrap.php';
 
-define('BASE_PATH', dirname(__DIR__));
 session_start();
-const URL_PATH = "https://actv-live.test";
-const COMMON_HTML_HEAD = BASE_PATH . '/public/commons/head.php';
-const COMMON_HTML_FOOT = BASE_PATH . '/public/commons/bottom_navigation.php';
-
-const THEME = (0) ? 'light' : 'dark';
-
-define('ENV', parse_ini_file(BASE_PATH . '/.env'));
-
-// Includi i file necessari, a mano o con l'autoloader di Composer
-require_once BASE_PATH . '/public/imports.php';
-require_once BASE_PATH . '/app/services/Logger.php';
-
-set_error_handler(['Logger', 'phpErrorHandler']);
-set_exception_handler(['Logger', 'exceptionHandler']);
-
-
 checkSessionExpiration();
 
 
