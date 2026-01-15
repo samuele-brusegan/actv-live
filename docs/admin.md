@@ -52,12 +52,30 @@ La Time Machine permette di registrare i passaggi in tempo reale per determinate
 - `tm_data`: Memorizza il payload JSON grezzo ricevuto dall'API ACTV per ogni fermata durante la registrazione.
 
 ### Processo di Registrazione
-La registrazione è gestita da uno script PHP indipendente: `record_tm.php`.
+Esistono due modi per gestire la registrazione dei dati:
 
-Lo script controlla le sessioni `SCHEDULED` e le avvia se l'orario è giunto.
-Per ogni sessione `RECORDING`, effettua una chiamata cURL al backend ACTV per ogni fermata configurata.
-Salva la risposta JSON in `tm_data`.
-**Nota**: Lo script deve essere eseguito periodicamente tramite un **cron job** sul server.
+1.  **Metodo API Heartbeat (Consigliato)**: Uno speciale endpoint `/api/tm/heartbeat` che, se richiamato, esegue un ciclo di registrazione. Questo metodo è "disaccoppiato" dall'host e permette di innescare la registrazione dall'esterno.
+2.  **Script Locale**: Lo script PHP `record_tm.php` può essere eseguito via cron job direttamente sul server.
+
+### Setup della Registrazione (Heartbeat)
+Per configurare la registrazione senza accesso SSH o cron di sistema:
+
+1.  **Configurazione .env**: Aggiungi una chiave di sicurezza al tuo file `.env`:
+    ```ini
+    TM_HEARTBEAT_TOKEN=una_stringa_segreta_e_casuale
+    ```
+2.  **Servizio Esterno**: Utilizza un servizio di "Cron-job" esterno (come [Cron-job.org](https://cron-job.org/)) o un sistema di monitoraggio (UptimeRobot).
+3.  **Configurazione URL**: Imposta il servizio per richiamare ogni minuto il seguente URL:
+    ```
+    https://tuo-dominio.test/api/tm/heartbeat?token=IL_TUO_TOKEN_SEGRETO
+    ```
+4.  **Verifica**: L'endpoint restituirà un JSON con il riepilogo delle operazioni effettuate.
+
+### Setup Alternativo (Cron di Sistema)
+Se hai accesso SSH, puoi aggiungere questa riga al crontab (`crontab -e`):
+```cron
+* * * * * /usr/bin/php /percorso/assoluto/scripts/record_tm.php >> /percorso/assoluto/tm_cron.log 2>&1
+```
 
 ### Riproduzione (Playback)
 Quando la Time Machine è attiva nel client, le richieste di dati per le fermate vengono deviate a:

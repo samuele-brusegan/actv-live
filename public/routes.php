@@ -31,3 +31,4 @@ $router->add('/api/log-js-error'        , 'ApiController', 'logJsError');
 $router->add('/api/tm/sessions'         , 'ApiController', 'getTmSessions');
 $router->add('/api/tm/create-session'   , 'ApiController', 'createTmSession');
 $router->add('/api/tm/simulated-data'   , 'ApiController', 'getSimulatedData');
+$router->add('/api/tm/heartbeat'        , 'ApiController', 'runTmHeartbeat');

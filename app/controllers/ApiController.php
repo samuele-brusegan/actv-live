@@ -536,4 +536,71 @@ class ApiController {
             echo json_encode([]);
         }
     }
+    public function runTmHeartbeat() {
+        $token = $_GET['token'] ?? null;
+        $expectedToken = ENV['TM_HEARTBEAT_TOKEN'] ?? null;
+
+        if (!$expectedToken || $token !== $expectedToken) {
+            header('HTTP/1.1 401 Unauthorized');
+            echo json_encode(['error' => 'Invalid or missing heartbeat token']);
+            return;
+        }
+
+        $db = $this->getDb();
+        $mysqli = Closure::bind(function($db) { return $db->db; }, null, 'databaseConnector')($db);
+        
+        $now = date('Y-m-d H:i:s');
+        $reports = [];
+
+        // 1. Update session statuses
+        $mysqli->query("UPDATE tm_sessions SET status = 'RECORDING' WHERE status = 'SCHEDULED' AND start_time <= '$now' AND end_time > '$now'");
+        $mysqli->query("UPDATE tm_sessions SET status = 'COMPLETED' WHERE status = 'RECORDING' AND end_time <= '$now'");
+        $mysqli->query("UPDATE tm_sessions SET status = 'COMPLETED' WHERE status = 'SCHEDULED' AND end_time <= '$now'");
+
+        // 2. Fetch data for active sessions
+        $sessions = $db->query("SELECT * FROM tm_sessions WHERE status = 'RECORDING'");
+
+        foreach ($sessions as $s) {
+            $stopsRaw = json_decode($s['stops'], true);
+            if (!$stopsRaw) continue;
+
+            $stops = [];
+            foreach ($stopsRaw as $stopId) {
+                if (strpos($stopId, '-') !== false) {
+                    $parts = explode('-', $stopId);
+                    foreach ($parts as $p) {
+                        if (!empty($p)) $stops[] = $p;
+                    }
+                } else {
+                    $stops[] = $stopId;
+                }
+            }
+            $stops = array_unique($stops);
+
+            foreach ($stops as $stopId) {
+                $url = "https://oraritemporeale.actv.it/aut/backend/passages/{$stopId}-web-aut";
+                
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                $response = curl_exec($ch);
+                curl_close($ch);
+
+                if ($response) {
+                    $stmt = $mysqli->prepare("INSERT INTO tm_data (session_id, stop_id, fetched_at, data_json) VALUES (?, ?, ?, ?)");
+                    $stmt->bind_param("isss", $s['id'], $stopId, $now, $response);
+                    $stmt->execute();
+                    $stmt->close();
+                    $reports[] = "Recorded stop $stopId for session {$s['id']}";
+                }
+            }
+        }
+
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'timestamp' => $now,
+            'actions' => $reports
+        ]);
+    }
 }
