@@ -42,7 +42,30 @@ class ApiController {
         // We will trust internal usage or add basic sanitization.
         $safeTripId = $tripId; // In a real app we need usage of prepared statements
         
-        $stops = $db->query("SELECT stops.*, stop_times.* FROM stops INNER JOIN stop_times ON stops.stop_id = stop_times.stop_id WHERE trip_id = '$safeTripId' ORDER BY stop_times.arrival_time");
+        $stops = $db->query(
+            // "SELECT stops.*, stop_times.* FROM stops INNER JOIN stop_times ON stops.stop_id = stop_times.stop_id WHERE trip_id = '$safeTripId' ORDER BY stop_times.arrival_time"
+            "SELECT 
+                stops.*, 
+                stop_times.*,
+                opp.stop_id AS opposite_stop_id
+            FROM stops
+            INNER JOIN stop_times ON stops.stop_id = stop_times.stop_id
+            -- Join con la stessa tabella stops per trovare il nome identico
+            LEFT JOIN stops AS opp ON stops.stop_name = opp.stop_name AND stops.stop_id != opp.stop_id
+            WHERE stop_times.trip_id = '$safeTripId'
+            ORDER BY stop_times.arrival_time"
+        );
+
+        //Controllo se ci sono fermate duplicate una dopo l'altra
+        $uniqueStops = [];
+        foreach ($stops as $stop) {
+            //Se la fermata precedente è uguale a questa, la salto
+            if (!isset($uniqueStops[$stop['stop_id']]) || $uniqueStops[$stop['stop_id']]['stop_id'] != $stop['stop_id']) {
+                $uniqueStops[$stop['stop_id']] = $stop;
+            }
+        }
+        $stops = array_values($uniqueStops);
+
         echo json_encode($stops);
     }
 

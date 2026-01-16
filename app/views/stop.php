@@ -66,7 +66,8 @@
         // Get ID from URL
         const urlParams = new URLSearchParams(window.location.search);
         const stationId = urlParams.get('id');
-        const stationName = urlParams.get('name');
+        let stationName = urlParams.get('name');
+        stationName = unescape(stationName);
 
         // Favorite management functions
         function getFavorites() {
@@ -214,6 +215,7 @@
                 let time = p.time;
                 let isReal = p.real;
                 let stop = p.stop ?? stationId;
+                let lineId = p.lineId;
                 
                 
                 //Split line name
@@ -237,7 +239,7 @@
                         <div class="real-time-indicator"></div>
                         <span class="time-badge real-time">${time=="departure" ? "Ora" : time}</span>
                     </div>`
-                    : `<span class="time-badge scheduled">${time}</span>`;
+                    : `<span class="time-badge scheduled">${time=="departure" ? "Ora" : time}</span>`;
 
                 let timeStr = isReal ? time + " min" : time;
                 
@@ -262,18 +264,19 @@
                 let tempo = fermataTemporizzata.time;
 
                 
-                function sendToNewPage(stopTimed, busTrack, realTime, lastStop, url) {
+                function sendToNewPage(stopTimed, busTrack, realTime, lastStop, url, lineId) {
                     sessionStorage.setItem('timedStop',stopTimed);
                     sessionStorage.setItem('busTrack', safeLineName);
                     sessionStorage.setItem('realTime', tempo);
                     sessionStorage.setItem('lastStop', dest);
+                    sessionStorage.setItem('lineId', lineId);
                     window.location.href=url;
                 }
                 
                 let div = document.createElement('div');
                 div.className = 'passage-card';
                 div.onclick = function() {
-                    sendToNewPage(stopTimed, safeLineName, tempo, dest, url)
+                    sendToNewPage(stopTimed, safeLineName, tempo, dest, url, lineId)
                 };
                 div.style.cursor = 'pointer';
                 div.innerHTML = /*html*/`

@@ -187,7 +187,7 @@ async function renderMap() {
     if (actvStations) {
         actvStations.forEach(station => {
             station.marker = L.circleMarker([station.lat, station.lng], defaultCircleStyle)
-                .bindPopup(`<b>Stazione:</b> ${station.name}`)
+                .bindPopup(`<b>Stazione:</b> ${station.name}<br>Link: <a href="/aut/stops/stop?id=${station.id.split('-web-aut')[0]}&name=${encodeURIComponent(station.name)}">${station.id.split('-web-aut')[0]}</a>`)
                 .addTo(map);
         });
     }
