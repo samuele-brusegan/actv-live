@@ -53,8 +53,33 @@ class ApiController {
             -- Join con la stessa tabella stops per trovare il nome identico
             LEFT JOIN stops AS opp ON stops.stop_name = opp.stop_name AND stops.stop_id != opp.stop_id
             WHERE stop_times.trip_id = '$safeTripId'
-            ORDER BY stop_times.arrival_time"
+            -- ORDER BY stop_times.arrival_time
+            ORDER BY stop_times.stop_sequence
+            "
         );
+
+        // Fetch JSON from ACTV servers
+        /* try{
+            $actvStops = file_get_contents("https://oraritemporeale.actv.it/aut/backend/page/stops");
+            $actvStops = json_decode($actvStops, true);
+
+            foreach ($actvStops as $actvStop) {
+                // Set stopId1, set stopId2 if not null (split stop.name by " - ", remove last 2 values)
+                $stopName = array_slice(explode(" - ", $actvStop['stop_name']), 0, -2);
+
+                // Check if actv stop is in stops
+                // If true add to stop unic data url
+                foreach ($stops as $stop) {
+                    if (in_array($stop['stop_id'], $stopName)) {
+                        $stop['data_url'] = $actvStop['stop_name'];
+                        break;
+                    }
+                }
+
+            }
+        }catch(Exception $e){
+            echo json_encode($e->getMessage());
+        } */
 
         //Controllo se ci sono fermate duplicate una dopo l'altra
         $uniqueStops = [];

@@ -59,7 +59,7 @@
             const tag = lineFull.split('_')[1];
 
             const dest = urlParams.get('dest');
-            const stopId = urlParams.get('stopId');
+            let stopId = urlParams.get('stopId');
             let   time = urlParams.get('time');
             const delay = urlParams.get('delay'); // New param
             let today;
@@ -94,7 +94,7 @@
 
                 refresh(stopsGTFS);
                 //Update time
-                // setInterval(refresh, 25000, stopsGTFS);            
+                setInterval(refresh, 25000, stopsGTFS);            
             }
 
             async function refresh(stopsGTFS) {
@@ -110,10 +110,27 @@
                     time = stop ? stop.time : -1;
                     renderStops(stopsGTFS, stopsJSON);
                 } catch (error) {
-                    console.error("Wrong tripId: ",error);
-                    console.error("stopId", stopId);
-                    console.error("GTFS", stopsGTFS);
-                    console.error("JSON", stopsJSON);
+                    console.warn("Connecting to next stop: ",error);
+                    console.log("WARN: ", "stopId", stopId, "GTFS", stopsGTFS);
+
+                    let sessionStopId = sessionStorage.getItem('currentConnectedStop');
+                    if (!sessionStopId) {
+                        sessionStopId = stopId;
+                        sessionStorage.setItem('currentConnectedStop', sessionStopId);
+                    }
+
+                    stopId = buildStopId(stop);
+                    console.log("stopId", stopId);
+                    let nextStopIndex = findCurrentStopIndex(stopsGTFS, sessionStopId)+1;
+                    stopId = buildStopId(stopsGTFS[nextStopIndex]);
+                    console.log("nextStopIndex", nextStopIndex, "stopId", stopId, "sessionStopId", sessionStopId);
+                    sessionStorage.setItem('currentConnectedStop', stopId);
+                    
+                    setTimeout(() => refresh(stopsGTFS), 5000);
+                    // refresh(stopsGTFS);
+                    
+                    /* console.log("Recalculating tripId");
+                    tripId = await getTripId(track_name, destination, today, time, stop, lineId); */
                 }
             }
 
@@ -123,6 +140,9 @@
                 if (time) {
                     document.getElementById('time-container').style.display = 'flex';
                     document.getElementById('time-text').innerText = time.replace(/\\/g, '');
+                    if (time.includes("departure")) {
+                        document.getElementById('time-text').innerText = "Sta partendo";
+                    }
                 }
                 // Helper for badge color (same as stop.php)
                 if (line.includes('N')) lineBadgeClass = 'badge-night';
@@ -219,7 +239,8 @@
 
             function renderStops(stopsGTFS, stopsJSON) {
                 const container = document.getElementById('stops-container');
-                let html = '<div class="timeline">';
+                let innerContainer = document.createElement('div');
+                innerContainer.className = 'timeline';
 
                 // 1. Find current stop index
                 let currentStopIndex = findCurrentStopIndex(stopsGTFS, stopId);
@@ -239,20 +260,12 @@
 
                 // 2. Render stops
                 stops.forEach((stop, index) => {
+                    let stopElement = document.createElement('div');
+
                     let isCurrent = false;
                     let isPassed = false;
 
-                    let buildedStopId = "";
-                    if (stop.opposite_stop_id !== null && stop.opposite_stop_id !== undefined) {
-                        // Prima il minore poi il maggiore
-                        if (stop.stop_id < stop.opposite_stop_id) {
-                            buildedStopId = stop.stop_id + "-" + stop.opposite_stop_id;
-                        } else {
-                            buildedStopId = stop.opposite_stop_id + "-" + stop.stop_id;
-                        }
-                    } else {
-                        buildedStopId = stop.stop_id;
-                    }
+                    let buildedStopId = buildStopId(stop);
 
                     // Check if this stop is the current one
                     if (currentStopIndex !== -1) {
@@ -265,23 +278,71 @@
 
                             // Fetch stop data
                             // Todo: non controllare le fermate in cui è già passato il bus
-                            console.log("stopUrl:", stopUrl);
-                            async (stopUrl) => {
-                                fetch(stopUrl)
-                                    .then(response => response.json())
-                                    .then(data => {
-                                        console.log("data:", data);
-                                        // E' già passato?
-                                        // let sameLine
+
+                            async function howLongUntilOursTrip(stopUrl, stopElement, stop) {
+                                //returns the time until the next bus with the same tripId arrives at the stop
+                                //if the bus has already passed, return "-1"
+
+                                try {
+                                    let response = await fetch(stopUrl);                                    
+                                    let data = await response.json();   
+
+                                    if (data.length === 0) {
+                                        stopElement.classList.add('passed');
+                                        stopElement.querySelector('.stop-line').classList.add('passed');
+                                        stopElement.querySelector('.stop-marker').classList.add('passed');
+                                        stopElement.querySelector('.stop-time').innerHTML = "Error (Fetch failed)" + "<br><a href='" + stopUrl + "'>" + stopUrl + "</a>";
+                                        return -1;
+                                    }
+
+                                    // Remove all the trips that don't match the bus track
+                                    data = data.filter(trip => trip.line === lineFull);
+                                    console.log("data:", [data], "buildedStopId:", buildedStopId, "stopName:", stop.stop_name);
+
+                                    await Promise.all(data.map(async trip => {
+                                        let local_busTrack = trip.line.split('_')[0];
+                                        let local_busDirection = trip.destination;
                                         
-                                        // No? -> stop.time = tra quanto arriva
-                                        // Sì? -> isPassed = true
-                                    })
-                                    .catch(error => {
+                                        let local_stopName = trip.timingPoints[trip.timingPoints.length - 1].stop;
+                                        let local_stopTime = trip.timingPoints[trip.timingPoints.length - 1].time;
+                                        let local_lineId = trip.lineId;
+
+                                        try {
+                                            let response = await fetch(`/api/gtfs-identify?return=true&time=${local_stopTime}&busTrack=${local_busTrack}&busDirection=${encodeURIComponent(local_busDirection)}&day=${today}&stop=${encodeURIComponent(local_stopName)}&lineId=${local_lineId}`, {cache: 'no-cache'});
+                                            if (!response.ok) throw new Error('Network error');
+                                            let data1 = await response.json();
+                                            trip.tripId = data1.trip_id;
+                                        } catch (e) {
+                                            console.error(e);
+                                        }
+                                    }));
+
+                                    let sameLine = data.find(trip => trip.tripId === tripId);
+                                    // console.log("sameLine:", sameLine.destination, "stopName:", stop.stop_name);
+
+                                    if (sameLine === undefined) {
+                                        isPassed = true;
+                                        stopElement.classList.add('passed');
+                                        stopElement.querySelector('.stop-line').classList.add('passed');
+                                        stopElement.querySelector('.stop-marker').classList.add('passed');
+                                        stopElement.querySelector('.stop-time').textContent = "Passato";
+                                        return -1;
+                                    }
+
+                                    stop.time = sameLine.time;
+                                    stopElement.querySelector('.stop-time').textContent = (sameLine.time === "departure" ? "ora" : sameLine.time);
+                                    // E' già passato?
+                                    // let sameLine
+                                    
+                                    // No? -> stop.time = tra quanto arriva
+                                    // Sì? -> isPassed = true
+                                } catch (error) {
                                     console.error(error);
-                                });
+                                }
+
                             }
-                            // Tra i bus che stanno per arrivare, ce n'è uno con lo stesso tripId (controllare solo la stessa linea)?
+                            // Tra i bus che stanno per arrivare, ce n'è uno con lo stesso tripId? (controllare solo la stessa linea)
+                            howLongUntilOursTrip(stopUrl, stopElement, stop);
                             
 
                         } else if (index === currentStopIndex) {
@@ -326,26 +387,34 @@
                         } 
 
                         // Future stops
-                        
-                        return (stop.time) ? stop.time : "IN ARRIVO";
+                        if(stop.time) return stop.time;
+
+                        // If no time is available, mark as passed
+                        // markerClass += ' passed';
+                        // lineClass += ' passed';
+                        // itemClass += ' passed';
+                        return "Caricamento...";
                     }
                     
 
                     let stopUrl = '/aut/stops/stop?id=' + buildedStopId + '&name=' + encodeURIComponent(escape(stop.stop_name)); //Aggiungere escaping per le virgolette
-                    html += /*html*/ `
-                    <div class="${itemClass}" onclick='window.location.href="${stopUrl}"' style="cursor: pointer;">
-                        <div class="${lineClass}"></div>
-                        <div class="${markerClass}"></div>
-                        <div class="stop-content">
-                            <div class="stop-name">${stop.stop_name}</div>
-                            <div class="stop-time">${timeDisplay}</div>
-                        </div>
-                    </div>
-                    `;
-                });
 
-                html += '</div>';
-                container.innerHTML = html;
+                    stopElement.className = itemClass;
+                    stopElement.onclick = () => {
+                        window.location.href = stopUrl;
+                    };
+                    stopElement.style.cursor = 'pointer';
+                    stopElement.innerHTML = /*html*/ `
+                    <div class="${lineClass}"></div>
+                    <div class="${markerClass}"></div>
+                    <div class="stop-content">
+                        <div class="stop-name">${stop.stop_name}</div>
+                        <div class="stop-time">${timeDisplay}</div>
+                    </div>`;
+                    innerContainer.appendChild(stopElement);
+                });
+                container.innerHTML = '';
+                container.appendChild(innerContainer);
 
                 // Auto-scroll to current
                 setTimeout(() => {
@@ -368,6 +437,8 @@
                 try {
                     let url = `/api/gtfs-identify?return=true&time=${time}&busTrack=${busTrack}&busDirection=${encodeURIComponent(busDirection)}&day=${day}&stop=${encodeURIComponent(stop)}&lineId=${lineId}`;
                     console.log(url);
+                    let fullUrl = document.location.origin + `/api/gtfs-identify?rtable=true&time=${time}&busTrack=${busTrack}&busDirection=${encodeURIComponent(busDirection)}&day=${day}&stop=${encodeURIComponent(stop)}&lineId=${lineId}&limit=10`;
+                    console.log("DEBUG: " , fullUrl);
 
                     const response = await fetch(url);
 
@@ -381,6 +452,24 @@
                     console.error(error);
                     return null;
                 }
+            }
+
+            function buildStopId(stop) {
+                let buildedStopId = "";
+                if (stop.stop_id === "11380") return "380-1380";
+
+                if (stop.opposite_stop_id !== null && stop.opposite_stop_id !== undefined) {
+
+                    // Prima il minore poi il maggiore
+                    if (parseInt(stop.stop_id) < parseInt(stop.opposite_stop_id)) {
+                        buildedStopId = stop.stop_id + "-" + stop.opposite_stop_id;
+                    } else {
+                        buildedStopId = stop.opposite_stop_id + "-" + stop.stop_id;
+                    }
+                } else {
+                    buildedStopId = stop.stop_id;
+                }
+                return buildedStopId;
             }
         </script>
     </body>
