@@ -8,7 +8,7 @@
 }
 
 .stop-id-badge {
-    background: #007bff;
+    background: var(--color-accent-blue);
     color: var(--color-white);
     padding: 5px 10px;
     border-radius: 5px;
@@ -40,7 +40,7 @@
     padding: 1rem;
     border: none;
     border-radius: 12px;
-    background: #FFFFFF;
+    background: var(--color-white);
     font-family: 'Inter', sans-serif;
     font-size: 16px;
     box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.05);
@@ -55,7 +55,7 @@
 
 /* Stop Card Styles */
 .stop-card {
-    background: #FFFFFF;
+    background: var(--color-white);
     border-radius: 12px;
     padding: 1rem;
     margin-bottom: 0.75rem;
@@ -75,12 +75,12 @@
     font-family: 'SF Pro', sans-serif;
     font-weight: 600;
     font-size: 16px;
-    color: #333;
+    color: var(--color-text-dark);
 }
 
 .no-results {
     text-align: center;
-    color: #666;
+    color: var(--color-text-gray);
     padding: 2rem;
     font-style: italic;
 }

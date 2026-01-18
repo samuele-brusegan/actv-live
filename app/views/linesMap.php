@@ -71,22 +71,37 @@
         async function loadLines() {
             const urlParams = new URLSearchParams(window.location.search);
             const targetLine = urlParams.get('line');
+            const targetTripId = urlParams.get('tripId');
+            const isFiltered = targetLine || targetTripId;
 
             try {
-                const response = await fetch('/api/lines-shapes');
+                // Passa i parametri GET attuali (line, tripId) all'API
+                const response = await fetch('/api/lines-shapes' + window.location.search);
                 if (!response.ok) throw new Error('Network response was not ok');
                 
                 const shapes = await response.json();
                 let targetBounds = null;
                 
+                // Se c'è un filtro attivo, vogliamo che le linee restituite siano "evidenziate" (isTarget = true)
+                // Se NON c'è filtro, nessuno è target (isTarget = false), stile standard
+                
                 shapes.forEach(shape => {
                     if (shape.path && shape.path.length > 0) {
                         const latlngs = shape.path.map(p => [p.lat, p.lng]);
-                        const isTarget = targetLine && shape.route_short_name === targetLine;
                         
-                        const color = getLineColor(shape.route_short_name, isTarget||!targetLine);
+                        // Se abbiamo filtrato lato server, tutto ciò che arriva è il nostro target.
+                        // Altrimenti (visualizzazione completa), nessuno è target specifico.
+                        const isTarget = isFiltered ? true : false;
+                        
+                        const color = getLineColor(shape.route_short_name, isTarget || !isFiltered); 
+                        // Se !isFiltered (vista completa), passiamo true a getLineColor per avere i colori. 
+                        // Se isFiltered, isTarget è true, quindi passiamo true.
+                        // Quindi sempre true? No, nel vecchio codice: getLineColor(..., isTarget||!targetLine)
+                        // Se c'è un targetLine ma QUESTA non lo è, passava false (grigio).
+                        // Qui se c'è isFiltered, abbiamo SOLO le linee giuste, quindi sempre colorato.
+                        
                         const weight = isTarget ? 8 : 4;
-                        const opacity = isTarget ? 1 : (targetLine ? 0.2 : 0.7);
+                        const opacity = isTarget ? 1 : 0.7; // Se non filtrato, opacità standard 0.7
                         const zIndex = isTarget ? 10000 : 1;
                         
                         const polyline = L.polyline(latlngs, {
@@ -97,7 +112,12 @@
                         }).addTo(map);
                         
                         if (isTarget) {
-                            targetBounds = polyline.getBounds();
+                            // Espandi bounds per includere tutte le parti del target (es. se query ha più shape)
+                            if (!targetBounds) {
+                                targetBounds = polyline.getBounds();
+                            } else {
+                                targetBounds.extend(polyline.getBounds());
+                            }
                             polyline.bringToFront();
                         }
                         
@@ -120,14 +140,12 @@
 
                         polyline.on('mouseout', function(e) {
                             var layer = e.target;
-                            // Reset to original style
-                            const isTarget = targetLine && shape.route_short_name === targetLine;
                             layer.setStyle({
-                                weight: isTarget ? 8 : 4,
-                                opacity: isTarget ? 1 : (targetLine ? 0.2 : 0.7)
+                                weight: weight,
+                                opacity: opacity
                             });
-                            if (!isTarget && targetLine) {
-                                // Keep target on top
+                            if (!isTarget && isFiltered) {
+                                // Should not happen given logic, but safe keep
                             }
                         });
                     }

@@ -6,7 +6,6 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Dettaglio Corsa - ACTV</title>
         <?php require COMMON_HTML_HEAD; ?>
-        <link rel="stylesheet" href="/css/style.css">
         <link rel="stylesheet" href="/css/tripDetails.css">
     </head>
 
@@ -102,15 +101,25 @@
                     let stopsJSON = await getActvJson();
                     
                     //find name of stopId
-                    
-                    let stopName = stopsGTFS.find(stop => (stop.stop_id === stopId.split('-')[0] || stop.stop_id === stopId.split('-')[1])).stop_name;
+                    let currentStopNameFromGTFS = stopsGTFS.find(
+                        stop => (
+                            stop.stop_id === stopId.split('-')[0] || stop.stop_id === stopId.split('-')[1]
+                        )
+                    );
+                    if (!currentStopNameFromGTFS) {
+                        console.error("stopId", stopId);
+                        throw new Error("Stop not found");
+                    }
+                    let stopName = currentStopNameFromGTFS.stop_name;
 
                     let stop = stopsJSON.find(stop => stop.stop === stopName);
-                    
                     time = stop ? stop.time : -1;
+                    initHeader();
+                    
                     renderStops(stopsGTFS, stopsJSON);
                 } catch (error) {
-                    console.warn("Connecting to next stop: ",error);
+                    console.error("ERROR: ", error);
+                    console.warn("Connecting to next stop");
                     console.log("WARN: ", "stopId", stopId, "GTFS", stopsGTFS);
 
                     let sessionStopId = sessionStorage.getItem('currentConnectedStop');
@@ -121,30 +130,62 @@
 
                     stopId = buildStopId(stop);
                     console.log("stopId", stopId);
+
                     let nextStopIndex = findCurrentStopIndex(stopsGTFS, sessionStopId)+1;
+
                     stopId = buildStopId(stopsGTFS[nextStopIndex]);
                     console.log("nextStopIndex", nextStopIndex, "stopId", stopId, "sessionStopId", sessionStopId);
                     sessionStorage.setItem('currentConnectedStop', stopId);
                     
-                    setTimeout(() => refresh(stopsGTFS), 5000);
-                    // refresh(stopsGTFS);
-                    
-                    /* console.log("Recalculating tripId");
-                    tripId = await getTripId(track_name, destination, today, time, stop, lineId); */
+                    // setTimeout(() => refresh(stopsGTFS), 5000);
                 }
             }
 
             function initHeader() {
+                // Set line number
                 document.getElementById('line-number').innerText = line || '--';
                 document.getElementById('direction-name').innerText = dest.replace(/\\/g, '') || 'Sconosciuta';
+
+                // Set time
                 if (time) {
+                    
+
+                    const oraAttuale = new Date();
+    
+                    // 1. Splittiamo la stringa "21:30"
+                    const [oreTarget, minutiTarget] = time.split(':').map(Number);
+    
+                    // 2. Creiamo l'oggetto data per oggi con l'orario del JSON
+                    const dataTarget = new Date();
+                    dataTarget.setHours(oreTarget, minutiTarget, 0, 0);
+
+                    // 3. Calcoliamo la differenza (in millisecondi)
+                    const differenzaMs = dataTarget - oraAttuale;
+
+                    // 4. Convertiamo in un formato leggibile (es. minuti totali)
+                    const minutiTotali = Math.trunc(differenzaMs / (1000 * 60));
+
+                    let deltaTime = minutiTotali;
+
+                    console.log("deltaTime", deltaTime, "differenzaMs", differenzaMs);
+                    
+
+                    
                     document.getElementById('time-container').style.display = 'flex';
                     document.getElementById('time-text').innerText = time.replace(/\\/g, '');
-                    if (time.includes("departure")) {
-                        document.getElementById('time-text').innerText = "Sta partendo";
+                    
+                    if (deltaTime < 0) {
+                        document.getElementById('time-text').innerText = "E' passato";
+                    } else {
+                        document.getElementById('time-text').innerText = deltaTime + " min";
                     }
+                    /* if (time.includes("departure")) {
+                        document.getElementById('time-text').innerText = "Sta partendo";
+                    } */
                 }
-                // Helper for badge color (same as stop.php)
+
+                // Set badge color
+                //    Helper for badge color (same as stop.php)
                 if (line.includes('N')) lineBadgeClass = 'badge-night';
                 else if (tag === "US" || tag === "UN" || tag === "EN") lineBadgeClass = 'badge-blue';
                 else lineBadgeClass = 'badge-red';
@@ -200,7 +241,17 @@
                     }));
 
                     // return trips;
-                    let theInterestingTrip = tripsJSON.filter(trip => trip.tripId === tripId);                
+                    let theInterestingTrip = tripsJSON.filter(trip => trip.tripId === tripId);
+                    
+                    if (theInterestingTrip.length === 0) {
+                        throw new Error(`No trip found with ID: ${tripId}\n
+                        tripsJSON: ${JSON.stringify(tripsJSON.map(
+                            trip => [
+                                trip.tripId, trip.line, trip.destination
+                            ]
+                        ))}`);
+                    }
+                                    
                     return theInterestingTrip[0].timingPoints;
 
                 } catch (error) {
@@ -208,7 +259,6 @@
                     document.getElementById('stops-container').innerHTML = '<div class="text-center text-danger">Errore caricamento percorso</div>';
                 }
             }
-
 
             function findCurrentStopIndex(stopsGTFS, stopId) {
                 let currentStopIndex = -1;
@@ -297,7 +347,7 @@
 
                                     // Remove all the trips that don't match the bus track
                                     data = data.filter(trip => trip.line === lineFull);
-                                    console.log("data:", [data], "buildedStopId:", buildedStopId, "stopName:", stop.stop_name);
+                                    // console.log("data:", [data], "buildedStopId:", buildedStopId, "stopName:", stop.stop_name);
 
                                     await Promise.all(data.map(async trip => {
                                         let local_busTrack = trip.line.split('_')[0];
@@ -365,9 +415,9 @@
                     }
 
                     // Time Logic
-                    let timeDisplay = calculateTimeDisplay(stop, isCurrent, isPassed);
+                    let timeDisplay = calculateTimeDisplay(stop, isCurrent, isPassed, currentStopIndex, index);
                     
-                    function calculateTimeDisplay(stop, isCurrent, isPassed) {
+                    function calculateTimeDisplay(stop, isCurrent, isPassed, currentStopIndex, stopIndex) {
                         if (isPassed) {
                             return (stop.time) ? "PASSATO - " + stop.time : "PASSATO - " + stop.arrival_time.split(":").splice(0, 2).join(":");
                         }
@@ -393,6 +443,10 @@
                         // markerClass += ' passed';
                         // lineClass += ' passed';
                         // itemClass += ' passed';
+                        
+                        if (currentStopIndex < stopIndex) {
+                            return "Info non disponibile";
+                        }
                         return "Caricamento...";
                     }
                     
@@ -429,8 +483,12 @@
             }
 
             function openMap() {
-                // Open lines map, maybe passing the line to highlight
-                window.location.href = `/lines-map?line=${encodeURIComponent(line)}`;
+
+                if (tripId != undefined && tripId != null && tripId != "") {
+                    window.location.href = `/lines-map?tripId=${encodeURIComponent(tripId)}`;
+                } else {
+                    window.location.href = `/lines-map?line=${encodeURIComponent(line)}`;
+                }
             }
 
             async function getTripId(busTrack, busDirection, day, time, stop, lineId) {
@@ -455,20 +513,9 @@
             }
 
             function buildStopId(stop) {
-                let buildedStopId = "";
-                if (stop.stop_id === "11380") return "380-1380";
-
-                if (stop.opposite_stop_id !== null && stop.opposite_stop_id !== undefined) {
-
-                    // Prima il minore poi il maggiore
-                    if (parseInt(stop.stop_id) < parseInt(stop.opposite_stop_id)) {
-                        buildedStopId = stop.stop_id + "-" + stop.opposite_stop_id;
-                    } else {
-                        buildedStopId = stop.opposite_stop_id + "-" + stop.stop_id;
-                    }
-                } else {
-                    buildedStopId = stop.stop_id;
-                }
+                let dataUrlSplitted = stop.data_url.split("-");
+                let buildedStopId = dataUrlSplitted.slice(0, -2).join("-");
+                
                 return buildedStopId;
             }
         </script>

@@ -6,7 +6,7 @@ body {
 }
 
 /* Header Verde */
-.header-green {
+/* .header-green {
     background: var(--color-primary-green);
     padding: var(--spacing-lg) var(--spacing-md) 6rem;
     color: var(--color-white);
@@ -22,7 +22,7 @@ body {
     font-size: 28px;
     line-height: 1.2;
     margin-top: var(--spacing-sm);
-}
+} */
 
 /* Sezioni Titoli */
 .section-title {
@@ -104,8 +104,8 @@ body {
 }
 
 .stop-id-badge {
-    background: #007bff;
-    color: var(--color-white);
+    background: var(--color-accent-blue);
+    color: white;
     padding: 5px 10px;
     border-radius: 5px;
     font-size: 12px;
@@ -129,6 +129,12 @@ body {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     font-family: var(--font-primary);
     font-size: 16px;
+}
+
+[data-theme="dark"] .search-input {
+    background-color: var(--color-white);
+    color: var(--color-black);
+    filter: hue-rotate(180deg) brightness(95%) contrast(90%);
 }
 
 /* Quick Action */

@@ -46,40 +46,13 @@ class ApiController {
             // "SELECT stops.*, stop_times.* FROM stops INNER JOIN stop_times ON stops.stop_id = stop_times.stop_id WHERE trip_id = '$safeTripId' ORDER BY stop_times.arrival_time"
             "SELECT 
                 stops.*, 
-                stop_times.*,
-                opp.stop_id AS opposite_stop_id
+                stop_times.*
             FROM stops
             INNER JOIN stop_times ON stops.stop_id = stop_times.stop_id
-            -- Join con la stessa tabella stops per trovare il nome identico
-            LEFT JOIN stops AS opp ON stops.stop_name = opp.stop_name AND stops.stop_id != opp.stop_id
             WHERE stop_times.trip_id = '$safeTripId'
-            -- ORDER BY stop_times.arrival_time
             ORDER BY stop_times.stop_sequence
             "
         );
-
-        // Fetch JSON from ACTV servers
-        /* try{
-            $actvStops = file_get_contents("https://oraritemporeale.actv.it/aut/backend/page/stops");
-            $actvStops = json_decode($actvStops, true);
-
-            foreach ($actvStops as $actvStop) {
-                // Set stopId1, set stopId2 if not null (split stop.name by " - ", remove last 2 values)
-                $stopName = array_slice(explode(" - ", $actvStop['stop_name']), 0, -2);
-
-                // Check if actv stop is in stops
-                // If true add to stop unic data url
-                foreach ($stops as $stop) {
-                    if (in_array($stop['stop_id'], $stopName)) {
-                        $stop['data_url'] = $actvStop['stop_name'];
-                        break;
-                    }
-                }
-
-            }
-        }catch(Exception $e){
-            echo json_encode($e->getMessage());
-        } */
 
         //Controllo se ci sono fermate duplicate una dopo l'altra
         $uniqueStops = [];
@@ -248,27 +221,74 @@ class ApiController {
 
         $db = $this->getDb();
         
-        // 1. Esegui l'unica query ottimizzata
-        $sql = "
-            SELECT 
-                r.route_id, 
-                r.route_short_name, 
-                r.route_long_name,
-                s.stop_lat AS lat, 
-                s.stop_lon AS lng, 
-                s.stop_name AS name
-            FROM routes r
-            JOIN (
-                -- Subquery per ottenere UN solo trip_id per ogni route_id
-                -- Usiamo MIN(trip_id) o MAX(trip_id) per prenderne uno a caso valido
-                SELECT route_id, MIN(trip_id) as representative_trip_id
-                FROM trips
-                GROUP BY route_id
-            ) t_rep ON r.route_id = t_rep.route_id
-            JOIN stop_times st ON t_rep.representative_trip_id = st.trip_id
-            JOIN stops s ON st.stop_id = s.stop_id
-            ORDER BY r.route_id, st.stop_sequence ASC
-        ";
+        // 1. Definisci i parametri opzionali
+        $targetLine = $_GET['line'] ?? null;
+        $targetTripId = $_GET['tripId'] ?? $_GET['trip_id'] ?? null; // Supporta entrambi i naming
+
+        // Costruzione dinamica della query
+        // Caso A: Specifico Trip ID
+        if ($targetTripId) {
+            $safeTripId = addslashes($targetTripId);
+            $sql = "
+                SELECT 
+                    r.route_id, 
+                    r.route_short_name, 
+                    r.route_long_name,
+                    s.stop_lat AS lat, 
+                    s.stop_lon AS lng, 
+                    s.stop_name AS name
+                FROM trips t
+                JOIN routes r ON t.route_id = r.route_id
+                JOIN stop_times st ON t.trip_id = st.trip_id
+                JOIN stops s ON st.stop_id = s.stop_id
+                WHERE t.trip_id = '$safeTripId'
+                ORDER BY st.stop_sequence ASC
+            ";
+        }
+        // Caso B: Specifica Linea
+        elseif ($targetLine) {
+            $safeLine = addslashes($targetLine);
+            $sql = "
+                SELECT 
+                    r.route_id, 
+                    r.route_short_name, 
+                    r.route_long_name,
+                    s.stop_lat AS lat, 
+                    s.stop_lon AS lng, 
+                    s.stop_name AS name
+                FROM routes r
+                JOIN (
+                    SELECT route_id, MIN(trip_id) as representative_trip_id
+                    FROM trips
+                    GROUP BY route_id
+                ) t_rep ON r.route_id = t_rep.route_id
+                JOIN stop_times st ON t_rep.representative_trip_id = st.trip_id
+                JOIN stops s ON st.stop_id = s.stop_id
+                WHERE r.route_short_name = '$safeLine'
+                ORDER BY r.route_id, st.stop_sequence ASC
+            ";
+        }
+        // Caso C: Tutte le linee (Default)
+        else {
+            $sql = "
+                SELECT 
+                    r.route_id, 
+                    r.route_short_name, 
+                    r.route_long_name,
+                    s.stop_lat AS lat, 
+                    s.stop_lon AS lng, 
+                    s.stop_name AS name
+                FROM routes r
+                JOIN (
+                    SELECT route_id, MIN(trip_id) as representative_trip_id
+                    FROM trips
+                    GROUP BY route_id
+                ) t_rep ON r.route_id = t_rep.route_id
+                JOIN stop_times st ON t_rep.representative_trip_id = st.trip_id
+                JOIN stops s ON st.stop_id = s.stop_id
+                ORDER BY r.route_id, st.stop_sequence ASC
+            ";
+        }
 
         $results = $db->query($sql);
         //$results = $stmt->fetchAll(PDO::FETCH_ASSOC); // Assumo tu stia usando PDO o driver simile
@@ -276,7 +296,8 @@ class ApiController {
         $routesMap = [];
 
         // 2. Raggruppamento dei dati lato PHP
-        // La query restituisce righe 'piatte', noi le raggruppiamo per route_id
+        // La query restituisce righe 'piatte', noi le raggruppiamo per route_id (o per singolo risultato nel caso tripId)
+        // Nota: Nel caso di tripId singolo, route_id sarà unico.
         foreach ($results as $row) {
             $routeId = $row['route_id'];
 

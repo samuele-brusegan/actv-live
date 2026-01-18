@@ -10,3 +10,5 @@
 <!--PWA-->
 <link rel="manifest" href="<?=URL_PATH?>/pwa/app.webmanifest">
 <link rel="shortcut icon" href="<?=URL_PATH?>/pwa/favicon.ico">
+
+<script src="/js/theme.js"></script>

@@ -3,24 +3,76 @@
     /* Colors */
     --color-primary-green: #009E61;
     --color-primary-blue: #0152BB;
+    --color-primary-blue-dark: #013d99;
     --color-primary-red: #FA2020;
+    --color-actv-red: #E30613;
     --color-night-blue: #002B57;
     --color-gold: #FFD700;
     --color-orange: #FF9800;
+
+    /* Accent Colors */
+    --color-accent-blue: #007bff;
+    --color-accent-blue-dark: #0056b3;
 
     /* Neutral Colors */
     --color-white: #FFFFFF;
     --color-black: #000000;
     --color-bg-gray: #F5F5F5;
     --color-text-gray: #666;
+    --color-text-light: #888;
+    --color-text-muted: #999;
     --color-text-dark: #333;
     --color-border-gray: #e0e0e0;
     --color-light-gray: #ccc;
+    --color-lighter-gray: #eee;
     --color-bg-light: #f0f0f0;
+    --color-handle-gray: #D1D1D6;
+    --color-spinner-base: #f3f3f3;
+
 
     /* Shadows */
     --shadow-card: 0px 2px 8px rgba(0, 0, 0, 0.1);
     --shadow-card-alt: 2px 0px 9.7px -4px rgba(0, 0, 0, 0.24);
+
+    /* Border Radius */
+    --radius-sm: 7px;
+    --radius-md: 12px;
+    --radius-lg: 15px;
+    --radius-xl: 25px;
+    --radius-round: 50%;
+
+    /* Spacing */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+
+    /* Fonts */
+    --font-primary: 'Inter', sans-serif;
+    --font-secondary: 'SF Pro', sans-serif;
+}
+[data-theme="dark"] {
+    --color-primary-green: #00995e;
+    --color-primary-blue: #0085ff;
+    --color-primary-red: #FA2020;
+    --color-night-blue: #0095ff;
+    --color-gold: #FFD700;
+    --color-orange: #FF9800;
+
+    /* Neutral Colors */
+    --color-white: #2a2a2a;
+    --color-black: #FFF;
+    --color-bg-gray: #111;
+    --color-text-gray: #666;
+    --color-text-dark: #F5F5F5;
+    --color-border-gray: #333;
+    --color-light-gray: #555;
+    --color-bg-light: #333;
+    --bs-body-color: #F5F5F5;
+
+    /* Shadows */
+    --shadow-card: 0px 2px 8px rgba(255, 255, 255, 0.1);
+    --shadow-card-alt: 2px 0px 9.7px -4px rgba(255, 255, 255, 0.24);
 
     /* Border Radius */
     --radius-sm: 7px;
@@ -65,7 +117,7 @@ body {
 .header-green {
     background: var(--color-primary-green);
     padding: var(--spacing-lg) var(--spacing-md) 6rem;
-    color: var(--color-white);
+    color: white;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
     clip-path: polygon(0 0, 100% 0, 100% 75%, 0 100%);
@@ -183,7 +235,7 @@ body {
 .line-badge {
     background: var(--color-primary-blue);
     border-radius: var(--radius-sm);
-    color: var(--color-white);
+    color: white;
     font-family: var(--font-secondary);
     font-weight: 700;
     font-size: 14px;
@@ -214,7 +266,7 @@ body {
 /* Buttons */
 .btn-primary {
     background: var(--color-primary-blue);
-    color: var(--color-white);
+    color: white;
     border: none;
     border-radius: var(--radius-md);
     padding: var(--spacing-sm);
@@ -312,7 +364,7 @@ body {
 }
 
 #status {
-    margin: 0 var(--spacing-md) var(--spacing-sm);
+    margin: /*0*/ var(--spacing-md) var(--spacing-sm);
     border-radius: var(--radius-lg);
 }
 
@@ -331,4 +383,23 @@ body {
     text-decoration: none;
     border-radius: var(--radius-lg);
     border: none;
+}
+
+html[data-theme="dark"] .leaflet-layer,
+html[data-theme="dark"] .leaflet-control-zoom-in,
+html[data-theme="dark"] .leaflet-control-zoom-out,
+html[data-theme="dark"] .leaflet-control-attribution,
+html[data-theme="dark"] .leaflet-control-fullscreen-button {
+    filter: invert(1) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+html[data-theme="dark"] .leaflet-container {
+    background: #0000;
+}
+
+/* Dark theme inputs */
+html[data-theme="dark"] .form-control,
+html[data-theme="dark"] .form-select {
+    background-color: var(--color-white);
+    color: var(--color-black);
+    border: 1px solid var(--color-primary-blue);
 }

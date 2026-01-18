@@ -14,7 +14,7 @@
 
 .timeline-connector.dashed {
     border-left-style: dashed;
-    border-color: #999;
+    border-color: var(--color-text-muted);
 }
 
 .timeline-item {

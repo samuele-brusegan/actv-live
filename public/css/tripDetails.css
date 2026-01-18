@@ -1,6 +1,6 @@
 /* Page specific overrides */
 body {
-    background-color: #f0f0f0;
+    background-color: var(--color-bg-light);
 }
 
 .header-green {
@@ -24,7 +24,7 @@ body {
 }
 
 .line-box {
-    background-color: #E30613;
+    background-color: var(--color-actv-red);
     /* Standard ACTV red */
     color: white;
     font-weight: 800;
@@ -58,7 +58,7 @@ body {
     display: flex;
     align-items: center;
     margin-top: 10px;
-    color: #FFD700;
+    color: var(--color-gold);
     /* Gold/Yellow for visibility */
     font-weight: 600;
 }
@@ -68,7 +68,8 @@ body {
 }
 
 .main-card {
-    background: #FFFA;
+    /* background: #FFFA; */
+    background-color: var(--color-white);
     border-radius: 20px 20px 0 0;
     margin-top: -20px;
     padding: 20px;
@@ -100,7 +101,7 @@ body {
     top: 20px;
     bottom: -5px;
     width: 4px;
-    background-color: #009E61;
+    background-color: var(--color-primary-green);
     z-index: 1;
 }
 
@@ -112,8 +113,8 @@ body {
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: white;
-    border: 3px solid #009E61;
+    background: var(--color-white);
+    border: 3px solid var(--color-primary-green);
     z-index: 2;
     margin-right: 15px;
     margin-top: 2px;
@@ -121,17 +122,17 @@ body {
 }
 
 .stop-marker.passed {
-    background: #ccc;
-    border-color: #ccc;
+    background: var(--color-light-gray);
+    border-color: var(--color-light-gray);
 }
 
 .stop-line.passed {
-    background-color: #ccc;
+    background-color: var(--color-light-gray);
 }
 
 .stop-marker.current {
-    background: white;
-    border-color: #0056b3;
+    background: var(--color-white);
+    border-color: var(--color-accent-blue-dark);
     /* Blue for current */
     box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.2);
 }
@@ -143,19 +144,19 @@ body {
 .stop-name {
     font-weight: 700;
     font-size: 16px;
-    color: #333;
+    color: var(--color-text-dark);
     margin-bottom: 2px;
 }
 
 .stop-time {
     font-size: 12px;
-    color: #888;
+    color: var(--color-text-light);
     font-weight: 600;
     text-transform: uppercase;
 }
 
 .stop-item.passed .stop-name {
-    color: #999;
+    color: var(--color-text-muted);
 }
 
 /* Map Button */
@@ -163,8 +164,8 @@ body {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    background: #009E61;
-    color: white;
+    background: var(--color-primary-green);
+    color: var(--color-white);
     width: 56px;
     height: 56px;
     border-radius: 50%;
@@ -185,5 +186,5 @@ body {
 .loading-state {
     text-align: center;
     padding: 40px;
-    color: #666;
+    color: var(--color-text-gray);
 }

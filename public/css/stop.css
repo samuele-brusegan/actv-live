@@ -124,6 +124,10 @@
     margin-right: var(--spacing-xs);
     font-family: var(--font-primary);
 }
+[data-theme="dark"] .filter-box {
+    background: var(--color-white);
+    filter: brightness(95%) contrast(90%);
+}
 
 .filter-box.box-red:not(.selected) {
     border: 3px solid var(--color-primary-red);
@@ -152,6 +156,10 @@
     border: 3px solid var(--color-night-blue);
     background: var(--color-night-blue);
     color: var(--color-white);
+}
+
+[data-theme="dark"] .filter-box.selected {
+    color: var(--color-black);
 }
 
 @keyframes pulse {

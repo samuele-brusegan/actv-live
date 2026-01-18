@@ -1,13 +1,13 @@
 body {
     font-family: 'Inter', sans-serif;
-    background-color: #F5F5F5;
+    background-color: var(--color-bg-gray);
     margin: 0;
     padding: 0;
 }
 
 /* Header Verde */
 .header-green {
-    background: #009E61;
+    background: var(--color-primary-green);
     padding: 2rem 1.5rem 4rem;
     color: white;
     clip-path: polygon(0 0, 100% 0, 100% 75%, 0 100%);
@@ -40,7 +40,7 @@ body {
 
 /* Route Summary */
 .route-summary {
-    background: #FFFFFF;
+    background: var(--color-white);
     box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
     border-radius: 15px;
     padding: 1.25rem;
@@ -61,7 +61,7 @@ body {
 .route-stop-label {
     font-family: 'SF Pro', sans-serif;
     font-size: 12px;
-    color: #666;
+    color: var(--color-text-gray);
     margin-bottom: 0.25rem;
 }
 
@@ -69,12 +69,12 @@ body {
     font-family: 'SF Pro', sans-serif;
     font-weight: 700;
     font-size: 16px;
-    color: #000;
+    color: var(--color-black);
 }
 
 .route-arrow {
     font-size: 24px;
-    color: #009E61;
+    color: var(--color-primary-green);
 }
 
 .route-datetime {
@@ -89,13 +89,13 @@ body {
     font-family: 'SF Pro', sans-serif;
     font-weight: 600;
     font-size: 18px;
-    color: #000000;
+    color: var(--color-black);
     margin: 1.5rem 0 0.75rem;
 }
 
 /* Route Card */
 .route-card {
-    background: #FFFFFF;
+    background: var(--color-white);
     box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
     border-radius: 15px;
     padding: 1.25rem 1.25rem 0 1.25rem;
@@ -123,7 +123,7 @@ body {
     font-family: 'SF Pro', sans-serif;
     font-weight: 700;
     font-size: 20px;
-    color: #000;
+    color: var(--color-black);
 }
 
 .route-duration {
@@ -139,9 +139,9 @@ body {
 }
 
 .line-badge {
-    background: #0152BB;
+    background: var(--color-primary-blue);
     border-radius: 7px;
-    color: #FFFFFF;
+    color: var(--color-white);
     font-family: 'SF Pro', sans-serif;
     font-weight: 700;
     font-size: 14px;
@@ -152,7 +152,7 @@ body {
 .route-info {
     font-family: 'SF Pro', sans-serif;
     font-size: 14px;
-    color: #666;
+    color: var(--color-text-gray);
 }
 
 .no-routes {
@@ -175,7 +175,7 @@ body {
 .no-routes-subtext {
     font-family: 'Inter', sans-serif;
     font-size: 14px;
-    color: #999;
+    color: var(--color-text-muted);
 }
 
 .loading {
@@ -184,8 +184,8 @@ body {
 }
 
 .spinner {
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #009E61;
+    border: 3px solid var(--color-spinner-base);
+    border-top: 3px solid var(--color-primary-green);
     border-radius: 50%;
     width: 40px;
     height: 40px;
@@ -204,7 +204,7 @@ body {
 }
 
 .btn-back {
-    background: #0152BB;
+    background: var(--color-primary-blue);
     color: white;
     border: none;
     border-radius: 12px;
@@ -220,7 +220,7 @@ body {
 
 .btn-back:active {
     transform: scale(0.98);
-    background: #013d99;
+    background: var(--color-primary-blue-dark);
 }
 
 /* New Timeline Styles */
@@ -230,7 +230,7 @@ body {
     margin-bottom: 1rem;
     font-family: 'SF Pro', sans-serif;
     font-size: 14px;
-    color: #000;
+    color: var(--color-black);
     font-weight: 600;
 }
 
@@ -250,25 +250,25 @@ body {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    border: 3px solid #009E61;
+    border: 3px solid var(--color-primary-green);
     /* Green */
-    background: #fff;
+    background: var(--color-white);
     margin-right: 15px;
     flex-shrink: 0;
 }
 
 .timeline-marker.start {
-    border-color: #0152BB;
+    border-color: var(--color-primary-blue);
 }
 
 /* Blue */
 .timeline-marker.transfer {
-    border-color: #FF9800;
+    border-color: var(--color-orange);
 }
 
 /* Orange */
 .timeline-marker.end {
-    border-color: #009E61;
+    border-color: var(--color-primary-green);
 }
 
 /* Green */
@@ -280,18 +280,18 @@ body {
 .stop-name {
     font-weight: 700;
     font-size: 16px;
-    color: #000;
+    color: var(--color-black);
 }
 
 .stop-time {
     font-size: 14px;
-    color: #666;
+    color: var(--color-text-gray);
 }
 
 .timeline-connector {
     margin-left: 7px;
     /* Center with marker (16px width -> center at 8px) */
-    border-left: 2px solid #009E61;
+    border-left: 2px solid var(--color-primary-green);
     padding-left: 22px;
     /* 15px margin + 7px offset */
     padding-top: 10px;
@@ -303,7 +303,7 @@ body {
 
 .connector-info {
     font-size: 13px;
-    color: #666;
+    color: var(--color-text-gray);
 }
 
 .route-footer {
@@ -316,12 +316,12 @@ body {
 
 .walk-info {
     font-size: 14px;
-    color: #000;
+    color: var(--color-black);
     font-weight: 500;
 }
 
 .btn-select {
-    background: #009E61;
+    background: var(--color-primary-green);
     color: white;
     border: none;
     border-radius: 0;
@@ -366,7 +366,7 @@ body {
 }
 
 .modal-content {
-    background: white;
+    background: var(--color-white);
     width: 100%;
     max-width: 600px;
     border-radius: 20px 20px 0 0;
@@ -407,7 +407,7 @@ body {
 }
 
 .modal-close {
-    background: #f0f0f0;
+    background: var(--color-bg-light);
     border: none;
     width: 32px;
     height: 32px;
@@ -417,7 +417,7 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: #333;
+    color: var(--color-text-dark);
 }
 
 .detail-row {
@@ -430,14 +430,14 @@ body {
     width: 60px;
     font-weight: 600;
     font-size: 14px;
-    color: #333;
+    color: var(--color-text-dark);
     flex-shrink: 0;
 }
 
 .detail-content {
     flex: 1;
     padding-left: 15px;
-    border-left: 2px solid #eee;
+    border-left: 2px solid var(--color-lighter-gray);
     padding-bottom: 15px;
 }
 
@@ -453,16 +453,16 @@ body {
 
 .detail-subtitle {
     font-size: 14px;
-    color: #666;
+    color: var(--color-text-gray);
 }
 
 .badge-line {
     display: inline-block;
     padding: 2px 6px;
     border-radius: 4px;
-    color: white;
+    color: var(--color-white);
     font-weight: 700;
     font-size: 12px;
     margin-right: 5px;
-    background: #0152BB;
+    background: var(--color-primary-blue);
 }

@@ -19,6 +19,11 @@
             <a href="/admin/time-machine" class="admin-link d-none" id="admin-secret-link" title="Gestione Time Machine">
                 <?= getIcon('settings', 24) ?>
             </a>
+            <div class="theme-toggle" style="position: absolute; top: 20px; right: 20px;">
+                <button class="btn btn-primary rounded-pill px-4 py-2" onclick="toggleTheme()">
+                    <img src="/svg/light_mode.svg" alt="Toggle Theme" id="theme-icon"> (Demo)
+                </button>
+            </div>
         </div>
 
         <!-- Contenuto Principale -->
@@ -65,7 +70,7 @@
             <!-- Pulsante Trova Percorso -->
             <div class="text-center mt-4 mb-3">
                 <button class="btn btn-primary rounded-pill px-4 py-2" onclick="window.location.href='/route-finder'">
-                    Trova percorso
+                    Trova percorso (Ancora in sviluppo!)
                 </button>
             </div>
 
