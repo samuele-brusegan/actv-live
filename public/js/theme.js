@@ -14,11 +14,17 @@ function updateTheme() {
     if (localStorage.getItem("theme") === "dark") {
         document.documentElement.setAttribute("data-theme", "dark");
         document.documentElement.setAttribute("data-bs-theme", "dark");
-        document.getElementById("theme-icon").src = "/svg/dark_mode.svg";
+        let icon = document.getElementById("theme-icon");
+        if (icon) {
+            icon.src = "/svg/dark_mode.svg";
+        }
     }
     else {
         document.documentElement.setAttribute("data-theme", "light");
         document.documentElement.setAttribute("data-bs-theme", "light");
-        document.getElementById("theme-icon").src = "/svg/light_mode.svg";
+        let icon = document.getElementById("theme-icon");
+        if (icon) {
+            icon.src = "/svg/light_mode.svg";
+        }
     }
 }
