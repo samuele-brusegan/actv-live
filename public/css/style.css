@@ -112,6 +112,53 @@ body {
     display: none !important;
 }
 
+/* Common Stop Card Components (used by refactored JS) */
+.id-badges-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 60px;
+    align-items: center;
+}
+
+.id-badge-small {
+    background: var(--color-primary-blue);
+    color: white;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: bold;
+    text-align: center;
+    min-width: 45px;
+    line-height: 1.2;
+}
+
+.id-badge-small.secondary {
+    background: var(--color-accent-blue);
+}
+
+.chevron {
+    font-size: 20px;
+    color: var(--color-light-gray);
+    margin-left: var(--spacing-sm);
+}
+
+.subsection-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: var(--spacing-md) 0 var(--spacing-xs);
+    border-bottom: 1px solid var(--color-border-gray);
+    padding-bottom: 4px;
+}
+
+.stop-card.selected {
+    background: #E8F5E9 !important;
+    border-left: 4px solid var(--color-primary-green);
+}
+
 
 /* Header Styles */
 .header-green {

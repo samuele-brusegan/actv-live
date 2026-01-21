@@ -1,382 +1,233 @@
-// Render favorites
+/**
+ * Logica principale della Home Page.
+ * Gestisce i preferiti, la mappa delle fermate vicine e gli avvisi di servizio.
+ */
+
+/**
+ * Gestione UI Preferiti
+ */
+
 function renderFavorites() {
     const favorites = JSON.parse(localStorage.getItem('favorite_stops') || '[]');
-    const favoritesSection = document.getElementById('favorites-section');
-    const favoritesList = document.getElementById('favorites-list');
+    const section = document.getElementById('favorites-section');
+    const list = document.getElementById('favorites-list');
+    const hr = document.getElementById('hr_favorites');
+
+    if (!section || !list) return;
 
     if (favorites.length === 0) {
-        favoritesSection.style.display = 'none';
+        section.style.display = 'none';
+        if (hr) hr.style.display = 'none';
         return;
     }
 
-    favoritesSection.style.display = 'block';
-    favoritesList.innerHTML = '';
+    section.style.display = 'block';
+    if (hr) hr.style.display = 'block';
+    
+    list.innerHTML = favorites.map(stop => createFavoriteCardHTML(stop)).join('');
+}
 
-    favorites.forEach(stop => {
-        const stopCard = document.createElement('a');
-        stopCard.href = `/aut/stops/stop?id=${stop.ids.join('-')}&name=${encodeURIComponent(stop.name)}`;
-        stopCard.className = 'stop-card';
-        stopCard.style.textDecoration = 'none';
-        stopCard.style.color = 'inherit';
+function createFavoriteCardHTML(stop) {
+    const ids = stop.ids || [stop.id];
+    const encodedName = encodeURIComponent(stop.name);
+    const idBadges = ids.map(id => 
+        `<div class="id-badge-small">${id}</div>`
+    ).join('');
 
-        // Create ID badges HTML
-        const idBadgesHtml = stop.ids.map(id =>
-            `<div style="background: #007bff; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; text-align: center; min-width: 50px; line-height: 1.2;">${id}</div>`
-        ).join('');
-
-        stopCard.innerHTML = /*html*/`
-            <div class="d-flex align-items-center" style="width: 100%; position: relative;">
-                <div style="display: flex; flex-direction: column; gap: 4px; min-width: 60px; align-items: center;">
-                    ${idBadgesHtml}
+    return `
+        <a href="/aut/stops/stop?id=${ids.join('-')}&name=${encodedName}" class="stop-card">
+            <div class="d-flex align-items-center w-100">
+                <div class="id-badges-container">
+                    ${idBadges}
                 </div>
-                <div class="stop-info ms-3" style="flex-grow: 1;">
+                <div class="stop-info ms-3">
                     <span class="stop-name d-block">${stop.name}</span>
                     <span class="stop-desc">★ Preferita</span>
                 </div>
             </div>
-            <div style="display: flex; align-items: center;">
-                <span style="font-size: 20px; color: #ccc;">&rsaquo;</span>
-            </div>
-        `;
-
-        if (favorites.length > 0) {
-            favoritesSection.style.display = 'block';
-            document.getElementById('hr_favorites').style.display = 'block';
-        }
-        /*
-            <div class="favorite-btn favorited" style="position: absolute; top: 0; right: 0; padding: 5px; font-size: 20px; color: var(--color-gold);">
-                <span>★</span>
-            </div>
-        `; */
-
-        /*
-        stopCard.querySelector('.favorite-btn').addEventListener('click', () => {
-            let favorites = getFavorites();
-            const favoriteBtn = stopCard.querySelector('.favorite-btn');
-            let stationId = stop.id;
-            let stationName = stop.name;
-
-            if (favoriteBtn.classList.contains('favorited')) {
-                // Remove from favorites
-                favorites = favorites.filter(fav => {
-                    if (fav.ids && Array.isArray(fav.ids)) {
-                        return !fav.ids.some(id => stationId.includes(id) || id === stationId.split('-')[0]);
-                    }
-                    return fav.id !== stationId && !stationId.includes(fav.id);
-                });
-                favoriteBtn.classList.remove('favorited');
-                favoriteBtn.title = 'Aggiungi ai preferiti';
-            } else {
-                // Add to favorites
-                // Parse IDs from stationId (format: "4825" or "4825-4826")
-                const ids = stationId.split('-');
-                favorites.push({
-                    id: ids[0],
-                    ids: ids,
-                    name: stationName || `Fermata ${stationId}`
-                });
-                favoriteBtn.classList.add('favorited');
-                favoriteBtn.title = 'Rimuovi dai preferiti';
-            }
-
-            localStorage.setItem('favorite_stops', JSON.stringify(favorites));
-        });*/
-
-        favoritesList.appendChild(stopCard);
-    });
+            <div class="chevron">›</div>
+        </a>
+    `;
 }
 
-// Favorite management functions
-/*
- function getFavorites() {
-    const favorites = localStorage.getItem('favorite_stops');
-    return favorites ? JSON.parse(favorites) : [];
-}
+/**
+ * Gestione Mappa e Geolocalizzazione
+ */
 
-function isFavorite() {
-    const favorites = getFavorites();
-    // Check if any favorite has this ID (could be in ids array)
-    return favorites.some(fav => {
-        if (fav.ids && Array.isArray(fav.ids)) {
-            return fav.ids.some(id => stationId.includes(id) || id === stationId.split('-')[0]);
-        }
-        return fav.id === stationId || stationId.includes(fav.id);
-    });
-} */
-
-// Funzione per recuperare le stazioni
-async function getStations() {
-    try {
-        let response = await fetch('https://oraritemporeale.actv.it/aut/backend/page/stops');
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
-        let rs = await response.json();
-        if (rs === null) return [];
-
-        let returnArray = [];
-        rs.forEach(element => {
-            let id = element.name; // ID is in 'name' field
-            let name = element.description; // Name is in 'description' field
-            let lat = element.latitude;
-            let lng = element.longitude;
-            let lines = element.lines || [];
-            //Remove ids from name
-            name = name.replace(/\[\d+\]/g, '').trim();
-
-            returnArray.push({ id: id, name: name, lat: lat, lng: lng, lines: lines });
-        });
-        return returnArray;
-
-    } catch (error) {
-        console.error(error.message);
-        return [];
-    }
-}
-
-async function renderMap() {
-    // Render favorites first
+async function initHomeMap() {
     renderFavorites();
 
-    const statusElement = document.getElementById('status');
-
-    // Inizializza Mappa
-    var map = L.map('map', { attributionControl: false, fullscreenControl: { pseudoFullscreen: true } }).setView([45.4384, 12.3359], 12); // Venezia centro
+    const map = L.map('map', { 
+        attributionControl: false, 
+        fullscreenControl: { pseudoFullscreen: true } 
+    }).setView([45.4384, 12.3359], 12);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    // Recupera stazioni
-    let actvStations = await getStations();
+    const stations = await fetchAllStations();
+    let userMarker = null;
 
-    // Variabile per il marcatore della posizione utente
-    var userMarker = null;
+    // Stili icone mappa
+    const stopStyle = { color: '#0078A8', fillColor: '#0078A8', fillOpacity: 0.3, radius: 6 };
+    const nearStopStyle = { color: '#E60000', fillColor: '#E60000', fillOpacity: 0.7, radius: 6 };
 
-    // Imposta il numero di stazioni più vicine da evidenziare
-    const N = 3;
+    // Disegna tutte le stazioni
+    stations.forEach(s => {
+        s.marker = L.circleMarker([s.lat, s.lng], stopStyle)
+            .bindPopup(createPopupContent(s))
+            .addTo(map);
+    });
 
-    // Stili per i marcatori
-    const defaultCircleStyle = {
-        color: '#0078A8',    // Blu ACTV
-        fillColor: '#0078A8',
-        fillOpacity: 0.3,
-        radius: 6
-    };
+    // Localizzazione utente
+    map.locate({ setView: true, maxZoom: 15 });
 
-    const highlightedCircleStyle = {
-        color: '#E60000',    // Rosso Evidenziato
-        fillColor: '#E60000',
-        fillOpacity: 0.7,
-        radius: 6
-    };
-
-    // Funzione distanza
-    function getDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
-
-    // Aggiungi tutte le stazioni
-    if (actvStations) {
-        actvStations.forEach(station => {
-            station.marker = L.circleMarker([station.lat, station.lng], defaultCircleStyle)
-                .bindPopup(`<b>Stazione:</b> ${station.name}<br>Link: <a href="/aut/stops/stop?id=${station.id.split('-web-aut')[0]}&name=${encodeURIComponent(station.name)}">${station.id.split('-web-aut')[0]}</a>`)
-                .addTo(map);
-        });
-    }
-
-    // Gestione Posizione Trovata
-    function onLocationFound(e) {
-        const userLat = e.latlng.lat;
-        const userLng = e.latlng.lng;
-
-        statusElement.className = "alert alert-success d-flex align-items-center mx-3 mb-3";
-        statusElement.innerHTML = /*html*/`
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-geo-alt-fill me-2" viewBox="0 0 16 16">
-                <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/>
-            </svg>
-            <div>Posizione trovata. Ecco le stazioni più vicine.</div>`;
-
-        setTimeout(() => {
-            statusElement.style.position = 'absolute';
-            statusElement.style.visibility = 'hidden';
-            // console.log("Status hidden???");
-
-        }, 2500);
-
+    map.on('locationfound', (e) => {
         if (userMarker) map.removeLayer(userMarker);
-
+        
         userMarker = L.circleMarker(e.latlng, {
-            color: '#009E61',
-            fillColor: '#009E61',
-            fillOpacity: 0.9,
-            radius: 10
-        }).addTo(map).bindPopup("Sei Qui").openPopup();
+            color: '#009E61', fillColor: '#009E61', fillOpacity: 0.9, radius: 8
+        }).addTo(map).bindPopup("La tua posizione").openPopup();
 
-        if (actvStations) {
-            // Calcola distanze
-            actvStations.forEach(station => {
-                station.distance = getDistance(userLat, userLng, station.lat, station.lng);
-                if (station.marker) map.removeLayer(station.marker);
-            });
+        // Trova le 3 più vicine
+        const near = stations.map(s => ({
+            ...s,
+            distance: calculateDistance(e.latlng.lat, e.latlng.lng, s.lat, s.lng)
+        })).sort((a, b) => a.distance - b.distance).slice(0, 3);
 
-            // Trova le più vicine
-            const closestStations = actvStations
-                .sort((a, b) => a.distance - b.distance)
-                .slice(0, N);
+        updateNearbyUI(near, map, e.latlng);
+        
+        // Evidenzia sulla mappa
+        near.forEach(s => s.marker.setStyle(nearStopStyle).setPopupContent(createPopupContent(s, true)));
 
-            // Aggiorna lista visuale con StopListItem
-            const closestStationsList = document.getElementById('nearby-list');
-            if (closestStationsList) {
-                console.log(closestStations);
+        // Mostra banner successo temporaneo
+        showStatusBanner("Posizione trovata. Ecco le stazioni più vicine.");
+    });
 
-                closestStationsList.innerHTML = '';
-                closestStations.forEach(stop => {
-                    console.log(stop);
-
-                    let stopIds = stop.id.split('-web-aut')[0].split('-');
-
-                    const stopCard = document.createElement('a');
-                    stopCard.href = `/aut/stops/stop?id=${stopIds.join('-')}&name=${encodeURIComponent(stop.name)}`;
-                    stopCard.className = 'stop-card';
-                    stopCard.style.textDecoration = 'none';
-                    stopCard.style.color = 'inherit';
-
-                    // Create ID badges HTML
-                    const idBadgesHtml = stopIds.map(id =>
-                        `<div style="background: #007bff; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; text-align: center; min-width: 50px; line-height: 1.2;">${id}</div>`
-                    ).join('');
-
-                    stopCard.innerHTML = `
-                        <div class="d-flex align-items-center" style="width: 100%;">
-                            <div style="display: flex; flex-direction: column; gap: 4px; min-width: 60px; align-items: center;">
-                                ${idBadgesHtml}
-                            </div>
-                            <div class="stop-info ms-3" style="flex-grow: 1;">
-                                <span class="stop-name d-block">${stop.name}</span>
-                                <span class="stop-desc">${stop.distance.toFixed(2)} km</span>
-                            </div>
-                        </div>
-                        <div style="display: flex; align-items: center;">
-                            <span style="font-size: 20px; color: #ccc;">›</span>
-                        </div>
-                    `;
-
-                    closestStationsList.appendChild(stopCard);
-
-                });
-                if (closestStations.length > 0) {
-                    document.getElementById('nearby-section').style.display = 'unset';
-                    document.getElementById('hr_nearby').style.display = 'block';
-                }
-            }
-
-            if (closestStations != null && closestStations.length <= 0) {
-                document.getElementById('nearby-section').style.display = 'none';
-            }
-
-            // Ridisegna stazioni
-            actvStations.forEach(station => {
-                const isClosest = closestStations.includes(station);
-                const style = isClosest ? highlightedCircleStyle : defaultCircleStyle;
-                const popupText = isClosest
-                    ? `<b>Stazione:</b> ${station.name}<br>Distanza: ${station.distance.toFixed(2)} km<br>Link: <a href="/aut/stops/stop?id=${station.id.split('-web-aut')[0]}&name=${encodeURIComponent(station.name)}">${station.id.split('-web-aut')[0]}</a>`
-                    : `<b>Stazione:</b> ${station.name}<br>Link: <a href="/aut/stops/stop?id=${station.id.split('-web-aut')[0]}&name=${encodeURIComponent(station.name)}">${station.id.split('-web-aut')[0]}</a>`;
-
-                station.marker = L.circleMarker([station.lat, station.lng], style)
-                    .bindPopup(popupText)
-                    .addTo(map);
-            });
-
-            // Aggiorna lista visuale
-            if (typeof renderClosestStationsList === 'function') {
-                renderClosestStationsList(closestStations);
-            }
-
-            // Centra mappa
-            const bounds = L.latLngBounds([e.latlng]);
-            closestStations.forEach(s => bounds.extend([s.lat, s.lng]));
-            map.fitBounds(bounds, { padding: [50, 50] });
-        }
-    }
-
-    function onLocationError(e) {
-        console.error("Errore geolocalizzazione:", e.message);
-    }
-
-    // Request location
-    map.locate({ setView: true, maxZoom: 16, maximumAge: 60000, timeout: 5000 });
-    map.on('locationfound', onLocationFound);
-    map.on('locationerror', onLocationError);
+    map.on('locationerror', (e) => console.warn("Errore localizzazione:", e.message));
 }
 
-async function fetchImportantInfo() {
+/** Carica l'elenco fermate dal backend ACTV */
+async function fetchAllStations() {
     try {
-        let response = await fetch(`https://oraritemporeale.actv.it/aut/backend/page/terminal-cialdini-web`, {cache: 'no-cache'});
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
-
-        let rs = await response.json();
-
-        return rs.text || "";
-
-    } catch (error) {
-        console.error(error.message);
-        document.getElementById('loading').innerText = "Errore nel caricamento dei passaggi.";
+        const response = await fetch('https://oraritemporeale.actv.it/aut/backend/page/stops');
+        if (!response.ok) return [];
+        const data = await response.json();
+        return (data || []).map(s => ({
+            id: s.name,
+            name: s.description.replace(/\[\d+\]/g, '').trim(),
+            lat: s.latitude,
+            lng: s.longitude
+        }));
+    } catch (e) {
         return [];
     }
 }
 
-window.onload = async function () {
+/** Aggiorna la lista testuale delle fermate vicine */
+function updateNearbyUI(near, map, userPos) {
+    const list = document.getElementById('nearby-list');
+    const section = document.getElementById('nearby-section');
+    const hr = document.getElementById('hr_nearby');
 
-    //Hide divs
-    document.getElementById('hr_favorites').style.display = 'none';
-    document.getElementById('hr_nearby').style.display = 'none';
-    document.getElementById('favorites-section').style.display = 'none';
-    document.getElementById('nearby-section').style.display = 'none';
+    if (!list || near.length === 0) return;
 
+    section.style.display = 'block';
+    if (hr) hr.style.display = 'block';
 
-    renderMap();
-
-    let text = await fetchImportantInfo();
-
-    if (text.length > 0) {
-
-        // console.log(text.split('\n'));
-
-        let splitText = text.split('\n');
-
-        let buttonUrl = splitText[0].split("\"")[1];
-        let title = splitText[1];
-        let content = splitText[2].split("u>")[1].substring(0, splitText[2].split("u>")[1].length - 2);
-        // console.log({ button, title, content });
-
-
-        //Foreground banner
-        document.getElementById('important-info-btn').classList.remove('hidden');
-        document.getElementById('important-info-btn').addEventListener('click', () => {
-            console.log("Click");
-            document.getElementById('important-info-toast').style.removeProperty('display');
-            document.getElementById('important-info-toast').innerHTML = /*html*/`
-
-                <div class="card" style="position: relative; padding: 10px; width: 95%;">
-                    <h5><b>${title}</b></h5>
-                    <p>
-                        ${content}: <a href="${buttonUrl}">qui</a> <br><br>
-                        <b>NOTA:</b> in caso di sciopero il servizio sarà, ahimè, sicuramente interrotto
-                    </p>
-                    <button type="button" class="btn btn-primary" onclick="document.getElementById('important-info-toast').style.display = 'none';"> Ho capito </button>
+    list.innerHTML = near.map(stop => {
+        const ids = stop.id.split('-web-aut')[0].split('-');
+        const idBadges = ids.map(id => `<div class="id-badge-small">${id}</div>`).join('');
+        
+        return `
+            <a href="/aut/stops/stop?id=${ids.join('-')}&name=${encodeURIComponent(stop.name)}" class="stop-card">
+                <div class="d-flex align-items-center w-100">
+                    <div class="id-badges-container">${idBadges}</div>
+                    <div class="stop-info ms-3">
+                        <span class="stop-name d-block">${stop.name}</span>
+                        <span class="stop-desc">${stop.distance.toFixed(2)} km</span>
+                    </div>
                 </div>
-            `;
-        });
-    }
+                <div class="chevron">›</div>
+            </a>
+        `;
+    }).join('');
 
+    // Adatta mappa per mostrare utente e fermate vicine
+    const bounds = L.latLngBounds([userPos]);
+    near.forEach(s => bounds.extend([s.lat, s.lng]));
+    map.fitBounds(bounds, { padding: [40, 40] });
+}
+
+function createPopupContent(station, includeDist = false) {
+    const cleanId = station.id.split('-web-aut')[0];
+    return `
+        <b>Stazione:</b> ${station.name}<br>
+        ${includeDist ? `Distanza: ${station.distance.toFixed(2)} km<br>` : ''}
+        <a href="/aut/stops/stop?id=${cleanId}&name=${encodeURIComponent(station.name)}">Vedi passaggi</a>
+    `;
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function showStatusBanner(text) {
+    const el = document.getElementById('status');
+    if (!el) return;
+    el.className = "alert alert-success d-flex align-items-center animate__animated animate__fadeIn m-3";
+    el.innerHTML = `<div>${text}</div>`;
+    setTimeout(() => el.classList.replace('animate__fadeIn', 'animate__fadeOut'), 3000);
+    setTimeout(() => el.style.display = 'none', 3500);
+}
+
+/**
+ * Gestione Avvisi Importanti
+ */
+
+async function checkImportantNotices() {
+    try {
+        const response = await fetch(`https://oraritemporeale.actv.it/aut/backend/page/terminal-cialdini-web`, { cache: 'no-cache' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data.text) return;
+
+        const lines = data.text.split('\n');
+        const link = lines[0]?.match(/href="([^"]*)"/)?.[1] || "";
+        const title = lines[1] || "Avviso di servizio";
+        const content = lines[2]?.split("u>")?.[1]?.slice(0, -2) || lines[2] || "";
+
+        const btn = document.getElementById('important-info-btn');
+        if (btn) {
+            btn.classList.remove('hidden');
+            btn.onclick = () => showNoticeModal(title, content, link);
+        }
+    } catch (e) {
+        console.error("Errore fetch avvisi:", e);
+    }
+}
+
+function showNoticeModal(title, content, link) {
+    const toast = document.getElementById('important-info-toast');
+    if (!toast) return;
+    toast.style.display = 'flex';
+    toast.innerHTML = `
+        <div class="card p-3 shadow-lg" style="max-width: 90%;">
+            <h5 class="fw-bold">${title}</h5>
+            <p>${content} ${link ? `<a href="${link}" target="_blank">clicca qui</a>` : ''}</p>
+            <p class="small text-muted">Nota: Servizio soggetto a variazioni.</p>
+            <button class="btn btn-primary" onclick="document.getElementById('important-info-toast').style.display='none'">Ho capito</button>
+        </div>
+    `;
+}
+
+// Inizializzazione Completa
+window.onload = () => {
+    initHomeMap();
+    checkImportantNotices();
 };

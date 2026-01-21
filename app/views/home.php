@@ -8,6 +8,14 @@
         <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
         <?php require COMMON_HTML_HEAD; ?>
         <link rel="stylesheet" href="/css/home.css">
+
+        <!-- JavaScript di Leaflet -->
+        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
+        <link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css' rel='stylesheet' />
+        <script src="/components/StopCard.js"></script>
+        
+        <script src="/js/script-home.js"></script>
     </head>
     <body>
 
@@ -16,9 +24,6 @@
             <!-- Logo o Icona Menu (Placeholder basato su spazio vuoto nel design) -->
             <div style="height: 20px;"></div> 
             <div class="header-title">ACTV Live <br> Venezia</div>
-            <a href="/admin/time-machine" class="admin-link d-none" id="admin-secret-link" title="Gestione Time Machine">
-                <?= getIcon('settings', 24) ?>
-            </a>
             <div class="theme-toggle" style="position: absolute; top: 20px; right: 20px;">
                 <button class="btn btn-primary rounded-pill px-4 py-2" onclick="toggleTheme()">
                     <img src="/svg/light_mode.svg" alt="Toggle Theme" id="theme-icon"> (Demo)
@@ -96,36 +101,5 @@
             </div>
 
         </div>
-
-        <!-- JavaScript di Leaflet -->
-        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-        <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
-        <link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css' rel='stylesheet' />
-        <script src="/components/StopCard.js"></script>
-        
-        <script src="/js/script-home.js"></script>
-        <script>
-            // Hidden Admin Access: 5 clicks on footer
-            let footerClicks = 0;
-            let lastClickTime = 0;
-            document.getElementById('footer-licence').addEventListener('click', (e) => {
-                const currentTime = new Date().getTime();
-                if (currentTime - lastClickTime < 500) {
-                    footerClicks++;
-                } else {
-                    footerClicks = 1;
-                }
-                lastClickTime = currentTime;
-
-                if (footerClicks >= 5) {
-                    const adminLink = document.getElementById('admin-secret-link');
-                    adminLink.classList.remove('d-none');
-                    // Optional: automatic redirect
-                    // window.location.href = '/admin/time-machine';
-                    alert("Admin access unlocked!");
-                }
-            });
-        </script>
-
     </body>
 </html>
