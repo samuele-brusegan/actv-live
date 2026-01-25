@@ -96,8 +96,6 @@
 body {
     font-family: var(--font-primary);
     background-color: var(--color-bg-gray);
-    margin: 0;
-    padding: 0;
     font-size: 16px;
     line-height: 1.2;
 }
@@ -113,13 +111,7 @@ body {
 }
 
 /* Common Stop Card Components (used by refactored JS) */
-.id-badges-container {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 60px;
-    align-items: center;
-}
+
 
 .id-badge-small {
     background: var(--color-primary-blue);
@@ -140,7 +132,6 @@ body {
 .chevron {
     font-size: 20px;
     color: var(--color-light-gray);
-    margin-left: var(--spacing-sm);
 }
 
 .subsection-title {
@@ -149,9 +140,7 @@ body {
     color: var(--color-text-light);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin: var(--spacing-md) 0 var(--spacing-xs);
     border-bottom: 1px solid var(--color-border-gray);
-    padding-bottom: 4px;
 }
 
 .stop-card.selected {
@@ -174,9 +163,6 @@ body {
 }
 
 .admin-link {
-    position: absolute;
-    top: 30px;
-    right: 20px;
     color: var(--color-white);
     text-decoration: none;
     opacity: 0.8;
@@ -202,7 +188,6 @@ body {
     font-weight: 800;
     font-size: 28px;
     line-height: 1.2;
-    margin-top: var(--spacing-sm);
 }
 
 .header-subtitle {
@@ -210,7 +195,6 @@ body {
     font-weight: 500;
     font-size: 16px;
     opacity: 0.9;
-    margin-top: var(--spacing-xs);
 }
 
 .back-button {
@@ -223,18 +207,11 @@ body {
 .back-button.circle {
     border: 2px solid var(--color-white);
     border-radius: var(--radius-round);
-    width: 32px;
-    height: 32px;
-    text-align: center;
     line-height: 28px;
 }
 
 /* Layout */
-.main-content {
-    padding: 0 var(--spacing-md) var(--spacing-md);
-    position: relative;
-    z-index: 2;
-}
+
 
 .section-title {
     font-family: var(--font-secondary);
@@ -249,22 +226,15 @@ body {
     background: var(--color-white);
     box-shadow: var(--shadow-card);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-sm);
-    margin-bottom: var(--spacing-sm);
 }
 
-.stop-info {
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1;
-}
+
 
 .stop-name {
     font-family: var(--font-secondary);
     font-weight: 700;
     font-size: 20px;
     color: var(--color-black);
-    margin-bottom: 0.2rem;
 }
 
 .stop-name.small {
@@ -286,11 +256,6 @@ body {
     font-family: var(--font-secondary);
     font-weight: 700;
     font-size: 14px;
-    padding: 2px 8px;
-    min-width: 36px;
-    text-align: center;
-    display: inline-block;
-    margin-right: 5px;
 }
 
 .line-badge.badge-blue {
@@ -305,9 +270,6 @@ body {
 
 .line-badge.large {
     font-size: 18px;
-    padding: 4px 10px;
-    min-width: 45px;
-    margin-right: 15px;
 }
 
 /* Buttons */
@@ -316,13 +278,10 @@ body {
     color: white;
     border: none;
     border-radius: var(--radius-md);
-    padding: var(--spacing-sm);
     font-family: var(--font-secondary);
     font-weight: 700;
     font-size: 16px;
-    cursor: pointer;
     transition: all 0.2s ease;
-    width: 100%;
 }
 
 .btn-primary:active {
@@ -335,13 +294,10 @@ body {
     color: var(--color-primary-blue);
     border: 2px solid var(--color-primary-blue);
     border-radius: var(--radius-md);
-    padding: var(--spacing-sm);
     font-family: var(--font-secondary);
     font-weight: 700;
     font-size: 16px;
-    cursor: pointer;
     transition: all 0.2s ease;
-    width: 100%;
 }
 
 .btn-outline-primary:active, .btn-check:checked+.btn, .btn.active, .btn.show, .btn:first-child:active, :not(.btn-check)+.btn:active, .btn-outline-primary:focus-visible{
@@ -356,13 +312,10 @@ body {
     color: var(--color-primary-blue);
     border: 2px solid var(--color-primary-blue);
     border-radius: var(--radius-md);
-    padding: var(--spacing-sm);
     font-family: var(--font-secondary);
     font-weight: 700;
     font-size: 16px;
-    cursor: pointer;
     transition: all 0.2s ease;
-    width: 100%;
 }
 
 .btn-secondary:active {
@@ -372,14 +325,9 @@ body {
 
 /* Map */
 #map-container {
-    padding: var(--spacing-md);
-    position: relative;
-    z-index: 1;
 }
 
 #map {
-    height: 300px;
-    width: 100%;
     border-radius: var(--radius-lg);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
@@ -387,17 +335,13 @@ body {
 /* Loading & Status */
 .loading {
     text-align: center;
-    padding: 3rem var(--spacing-sm);
 }
 
 .spinner {
     border: 3px solid #f3f3f3;
     border-top: 3px solid var(--color-primary-green);
     border-radius: var(--radius-round);
-    width: 40px;
-    height: 40px;
     animation: spin 1s linear infinite;
-    margin: 0 auto var(--spacing-sm);
 }
 
 @keyframes spin {
@@ -411,13 +355,11 @@ body {
 }
 
 #status {
-    margin: /*0*/ var(--spacing-md) var(--spacing-sm);
     border-radius: var(--radius-lg);
 }
 
 .mit-licence {
     text-align: center;
-    margin: var(--spacing-sm) var(--spacing-md);
     font-size: 12px;
     color: var(--color-text-gray);
 }

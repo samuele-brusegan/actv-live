@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Risultati Percorso - ACTV</title>
         <?php require COMMON_HTML_HEAD; ?>
+        <link rel="stylesheet" href="/css/structure/structure-routeResults.css">
         <link rel="stylesheet" href="/css/routeResults.css">
         <script src="/js/routeResults.js"></script>
     </head>

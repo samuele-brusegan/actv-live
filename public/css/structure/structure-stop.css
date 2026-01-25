@@ -1,0 +1,58 @@
+/* Structural Styles - Stop Page */
+
+.header-green {
+    position: relative;
+}
+
+.favorite-button {
+    position: absolute;
+    top: var(--spacing-lg);
+    right: var(--spacing-md);
+    padding: 0;
+}
+
+.passage-card {
+    padding: var(--spacing-sm);
+    margin: var(--spacing-xs) 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+}
+
+.real-time-indicator {
+    width: 8px;
+    height: 8px;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.parent-wrapper {
+    padding: 0 var(--spacing-md) 0 var(--spacing-md);
+}
+
+#filter-container {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    justify-content: start;
+    margin: var(--spacing-md) 0;
+    z-index: 99;
+    position: sticky;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    box-sizing: border-box;
+}
+
+#filter-container > div, 
+#filter-container > button {
+    flex: 0 0 auto; 
+    margin-right: 10px;
+}
+
+.filter-box {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    margin-right: var(--spacing-xs);
+}

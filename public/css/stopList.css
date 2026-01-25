@@ -1,8 +1,6 @@
 body {
     font-family: var(--font-primary);
     background-color: var(--color-bg-gray);
-    margin: 0;
-    padding: 0;
 }
 
 /* Header Verde */
@@ -30,7 +28,6 @@ body {
     font-weight: 590;
     font-size: 20px;
     color: var(--color-black);
-    margin: var(--spacing-md) var(--spacing-md) var(--spacing-xs);
 }
 
 /* Card Fermata */
@@ -38,14 +35,8 @@ body {
     background: var(--color-white);
     box-shadow: var(--shadow-card-alt);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-sm);
-    margin: var(--spacing-xs) var(--spacing-md);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     text-decoration: none;
     color: inherit;
-    position: relative;
     transition: transform 0.1s;
 }
 
@@ -54,21 +45,16 @@ body {
 }
 
 .stop-card.list-item {
-    margin: var(--spacing-xs) 0;
     box-shadow: var(--shadow-card);
 }
 
-.stop-info {
-    display: flex;
-    flex-direction: column;
-}
+
 
 .stop-name {
     font-family: var(--font-secondary);
     font-weight: 700;
     font-size: 20px;
     color: var(--color-black);
-    margin-bottom: 0.2rem;
 }
 
 .stop-desc {
@@ -86,43 +72,26 @@ body {
     font-family: var(--font-secondary);
     font-weight: 700;
     font-size: 14px;
-    padding: 2px 8px;
-    min-width: 36px;
     text-align: center;
-    display: inline-block;
-    margin-right: 5px;
-    margin-bottom: 2px;
 }
 
 /* Stop IDs Container */
-.stop-ids-container {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 60px;
-    align-items: center;
-}
+
 
 .stop-id-badge {
     background: var(--color-accent-blue);
     color: white;
-    padding: 5px 10px;
     border-radius: 5px;
     font-size: 12px;
     font-weight: bold;
     text-align: center;
-    min-width: 50px;
     line-height: 1.2;
 }
 
 /* Search Input */
-.search-container {
-    padding: 0 var(--spacing-md);
-    margin-bottom: var(--spacing-sm);
-}
+
 
 .search-input {
-    width: 100%;
     padding: var(--spacing-sm);
     border-radius: var(--radius-lg);
     border: none;
@@ -139,24 +108,17 @@ body {
 
 /* Quick Action */
 .quick-action {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
     color: var(--color-text-dark);
 }
 
 /* Loading */
 #loading {
     text-align: center;
-    padding: var(--spacing-lg);
     color: var(--color-text-gray);
 }
 
 .no-results {
     text-align: center;
-    padding: var(--spacing-lg);
     color: var(--color-text-gray);
     font-family: var(--font-primary);
 }

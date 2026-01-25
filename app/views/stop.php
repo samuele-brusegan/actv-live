@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Dettaglio Fermata - ACTV</title>
         <?php require COMMON_HTML_HEAD; ?>
+        <link rel="stylesheet" href="/css/structure/structure-stop.css">
         <link rel="stylesheet" href="/css/stop.css">
         <script src="/js/stop.js"></script>
     </head>

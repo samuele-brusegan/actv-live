@@ -1,17 +1,12 @@
 /* Page specific overrides */
 .header-green {
-    position: relative;
 }
 
 .favorite-button {
-    position: absolute;
-    top: var(--spacing-lg);
-    right: var(--spacing-md);
     background: none;
     border: none;
     font-size: 28px;
     cursor: pointer;
-    padding: 0;
     line-height: 1;
     transition: transform 0.2s;
 }
@@ -32,12 +27,6 @@
     background: var(--color-white);
     box-shadow: var(--shadow-card-alt);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-sm);
-    margin: var(--spacing-xs) 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: relative;
 }
 
 .time-badge {
@@ -52,40 +41,25 @@
 }
 
 .real-time-indicator {
-    width: 8px;
-    height: 8px;
     background-color: var(--color-primary-green);
     border-radius: var(--radius-round);
-    display: inline-block;
-    margin-right: 5px;
     animation: pulse 2s infinite;
 }
 
 .parent-wrapper {
-    padding: 0 var(--spacing-md) 0 var(--spacing-md);
 }
 #filter-container {
-    position: relative;
-    display: flex;
-    flex-direction: row;
-    justify-content: start;
-    margin: var(--spacing-md) 0;
-    /* padding: 0 var(--spacing-md) var(--spacing-md); */
-    
-    z-index: 99;
-    position: sticky;
+    /* z-index: 99; */
+    /* position: sticky; */
 
     /* Gestione Scorrimento */
-    width: 100%;
     overflow-x: auto;                   /* Abilita lo scroll orizzontale */
     overflow-y: hidden;                 /* Evita scroll verticale indesiderato */
     /*white-space: nowrap;              /* Impedisce agli elementi di andare a capo */
-    flex-wrap: nowrap;
     
     /* Miglioramenti UX */
     -webkit-overflow-scrolling: touch;  /* Scroll fluido su iOS */
     scrollbar-width: none;              /* Nasconde la scrollbar su Firefox */
-    box-sizing: border-box;
 }
 
 /* Nasconde la scrollbar su Chrome/Safari/Edge */
@@ -95,8 +69,6 @@
 /* Assicurati che i filtri (i bottoni) non si restringano */
 #filter-container > div, 
 #filter-container > button {
-    flex: 0 0 auto; 
-    margin-right: 10px;
 }
 /* 
 .parent-wrapper {
@@ -116,12 +88,10 @@
 } */
 
 .filter-box {
-    padding: var(--spacing-xs) var(--spacing-sm);
     border-radius: var(--radius-lg);
     font-weight: 900;
     background: var(--color-white);
     box-shadow: var(--shadow-card-alt);
-    margin-right: var(--spacing-xs);
     font-family: var(--font-primary);
 }
 [data-theme="dark"] .filter-box {

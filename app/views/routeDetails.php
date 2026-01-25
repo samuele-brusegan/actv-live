@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Dettagli Viaggio - ACTV</title>
         <?php require COMMON_HTML_HEAD; ?>
+        <link rel="stylesheet" href="/css/structure/structure-routeDetails.css">
         <link rel="stylesheet" href="/css/routeDetails.css">
         <script src="/js/routeDetails.js"></script>
     </head>

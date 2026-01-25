@@ -1,0 +1,50 @@
+/* Structural Styles - Station Selector Page */
+
+.stop-ids-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 60px;
+    align-items: center;
+}
+
+.stop-id-badge {
+    padding: 5px 10px;
+    min-width: 50px;
+}
+
+.stop-card-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.stop-card-action {
+    display: flex;
+    align-items: center;
+}
+
+/* Search Bar Styles */
+.search-container {
+    margin-bottom: 1.5rem;
+}
+
+.search-input {
+    width: 100%;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+/* Stop Card Styles */
+.stop-card {
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+#loading, .no-results {
+    padding: 2rem;
+}

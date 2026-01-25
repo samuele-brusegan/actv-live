@@ -116,7 +116,7 @@ function updateHeader() {
         let badgeClass = 'badge-red';
         if (state.line?.includes('N')) badgeClass = 'badge-night';
         else if (["US", "UN", "EN"].includes(state.tag)) badgeClass = 'badge-blue';
-        lineEl.className = `line-badge ${badgeClass}`;
+        lineEl.className = `line-box line-badge ${badgeClass}`;
     }
 
     if (destEl) {

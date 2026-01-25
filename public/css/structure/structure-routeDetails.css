@@ -1,0 +1,60 @@
+/* Structural Styles - Route Details Page */
+
+.timeline-connector {
+    position: absolute;
+    left: 12px;
+    top: 24px;
+    bottom: -10px;
+    width: 0;
+    z-index: 1;
+    margin-left: 0;
+    padding: 0;
+}
+
+.timeline {
+    margin-top: var(--spacing-sm);
+}
+
+.header-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+}
+
+/* Route Details Timeline Specifics */
+.timeline-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    flex-shrink: 0;
+    z-index: 2;
+}
+
+.icon-circle {
+    width: 16px;
+    height: 16px;
+}
+
+.icon-location {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.details-card {
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    min-height: 400px;
+}
+
+.btn-map {
+    padding: 15px;
+    width: 100%;
+    margin-top: var(--spacing-lg);
+}

@@ -7,6 +7,7 @@
         <?php
         require COMMON_HTML_HEAD;
         ?>
+        <link rel="stylesheet" href="/css/structure/structure-stopList.css">
         <link rel="stylesheet" href="/css/stopList.css">
     </head>
     <body>

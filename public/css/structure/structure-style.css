@@ -1,0 +1,143 @@
+/* Structural Styles - Global */
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Common Stop Card Components */
+.id-badges-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 60px;
+    align-items: center;
+}
+
+.id-badge-small {
+    padding: 3px 8px;
+    border-radius: 5px;
+    min-width: 45px;
+}
+
+.chevron {
+    margin-left: var(--spacing-sm);
+}
+
+.subsection-title {
+    margin: var(--spacing-md) 0 var(--spacing-xs);
+    padding-bottom: 4px;
+}
+
+/* Header Styles */
+.header-green {
+    padding: var(--spacing-lg) var(--spacing-md) 6rem;
+    margin-bottom: -4rem;
+    position: relative;
+    z-index: 1;
+}
+
+.admin-link {
+    position: absolute;
+    top: 30px;
+    right: 20px;
+}
+
+.header-green.compact {
+    padding-bottom: 4rem;
+    margin-bottom: -2rem;
+}
+
+.header-title {
+    margin-top: var(--spacing-sm);
+}
+
+.header-subtitle {
+    margin-top: var(--spacing-xs);
+}
+
+.back-button.circle {
+    width: 32px;
+    height: 32px;
+    text-align: center;
+}
+
+/* Layout */
+.main-content {
+    padding: 0 var(--spacing-md) var(--spacing-md);
+    position: relative;
+    z-index: 2;
+}
+
+/* Cards - Base Styles */
+.card-base {
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.stop-info {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.stop-name {
+    margin-bottom: 0.2rem;
+}
+
+/* Badges */
+.line-badge {
+    padding: 2px 8px;
+    min-width: 36px;
+    text-align: center;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.line-badge.large {
+    padding: 4px 10px;
+    min-width: 45px;
+    margin-right: 15px;
+}
+
+/* Buttons */
+.btn-primary, .btn-outline-primary, .btn-secondary {
+    padding: var(--spacing-sm);
+    cursor: pointer;
+    width: 100%;
+}
+
+/* Map */
+#map-container {
+    padding: var(--spacing-md);
+    position: relative;
+    z-index: 1;
+}
+
+#map {
+    height: 300px;
+    width: 100%;
+}
+
+/* Loading & Status */
+.loading {
+    padding: 3rem var(--spacing-sm);
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto var(--spacing-sm);
+}
+
+#status {
+    margin: var(--spacing-md) var(--spacing-sm);
+}
+
+.mit-licence {
+    margin: var(--spacing-sm) var(--spacing-md);
+}

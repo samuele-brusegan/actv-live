@@ -1,0 +1,219 @@
+/* Structural Styles - Route Results Page */
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+.header-green {
+    padding: 2rem 1.5rem 4rem;
+    margin-bottom: -2rem;
+    position: relative;
+    z-index: 1;
+}
+
+.header-title {
+    margin-top: 1rem;
+}
+
+.main-content {
+    padding: 0 1.5rem 1.5rem;
+    position: relative;
+    z-index: 2;
+}
+
+.route-summary {
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.route-stops {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.route-stop {
+    flex: 1;
+}
+
+.route-stop-label {
+    margin-bottom: 0.25rem;
+}
+
+.route-datetime {
+    margin-top: 0.5rem;
+}
+
+.section-title {
+    margin: 1.5rem 0 0.75rem;
+}
+
+.route-card {
+    padding: 1.25rem 1.25rem 0 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.route-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.route-details {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.line-badge {
+    padding: 6px 12px;
+    display: inline-block;
+}
+
+.no-routes {
+    padding: 3rem 1rem;
+}
+
+.no-routes-icon {
+    margin-bottom: 1rem;
+}
+
+.no-routes-text {
+    margin-bottom: 0.5rem;
+}
+
+.loading {
+    padding: 3rem 1rem;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 1rem;
+}
+
+.btn-back {
+    padding: 1rem;
+    width: 100%;
+    margin-top: 1.5rem;
+}
+
+/* Timeline Styles */
+.route-header-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.route-timeline {
+    padding-left: 10px;
+    position: relative;
+}
+
+.timeline-item {
+    display: flex;
+    align-items: flex-start;
+    position: relative;
+    z-index: 2;
+}
+
+.timeline-marker {
+    width: 16px;
+    height: 16px;
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+.timeline-connector {
+    margin-left: 7px;
+    padding-left: 22px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.route-footer {
+    padding: 0;
+    margin-top: 1rem;
+    margin-left: -1.25rem;
+    margin-right: -1.25rem;
+}
+
+.btn-select {
+    padding: 15px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.modal-content {
+    width: 100%;
+    max-width: 600px;
+    padding: 1.5rem;
+}
+
+@media (min-width: 600px) {
+    .modal-overlay {
+        align-items: center;
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.modal-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.detail-row {
+    display: flex;
+    margin-bottom: 1rem;
+    position: relative;
+}
+
+.detail-time {
+    width: 60px;
+    flex-shrink: 0;
+}
+
+.detail-content {
+    padding-left: 15px;
+    padding-bottom: 15px;
+}
+
+.detail-title {
+    margin-bottom: 4px;
+}
+
+.badge-line {
+    display: inline-block;
+    padding: 2px 6px;
+    margin-right: 5px;
+}

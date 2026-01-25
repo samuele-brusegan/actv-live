@@ -1,0 +1,75 @@
+/* Structural Styles - Stop List Page */
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+.section-title {
+    margin: var(--spacing-md) var(--spacing-md) var(--spacing-xs);
+}
+
+.stop-card {
+    padding: var(--spacing-sm);
+    margin: var(--spacing-xs) var(--spacing-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+}
+
+.stop-card.list-item {
+    margin: var(--spacing-xs) 0;
+}
+
+.stop-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.stop-name {
+    margin-bottom: 0.2rem;
+}
+
+.line-badge {
+    padding: 2px 8px;
+    min-width: 36px;
+    display: inline-block;
+    margin-right: 5px;
+    margin-bottom: 2px;
+}
+
+.stop-ids-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 60px;
+    align-items: center;
+}
+
+.stop-id-badge {
+    padding: 5px 10px;
+    min-width: 50px;
+}
+
+.search-container {
+    padding: 0 var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+.search-input {
+    width: 100%;
+    padding: var(--spacing-sm);
+}
+
+.quick-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+}
+
+#loading, .no-results {
+    padding: var(--spacing-lg);
+}

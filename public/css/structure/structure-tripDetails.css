@@ -1,0 +1,100 @@
+/* Structural Styles - Trip Details Page */
+
+.header-green {
+    padding-bottom: 4rem;
+    margin-bottom: -2rem;
+}
+
+.trip-header-info {
+    display: flex;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.trip-header-info .line-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-right: 15px;
+}
+
+.line-box {
+    padding: 5px 10px;
+    margin-right: 15px;
+    min-width: 50px;
+    text-align: center;
+}
+
+.direction-info {
+    flex-grow: 1;
+}
+
+.time-remaining {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.time-remaining svg {
+    margin-right: 5px;
+}
+
+.main-card {
+    margin-top: -20px;
+    padding: 20px;
+    min-height: calc(100vh - 150px);
+    position: relative;
+    z-index: 10;
+}
+
+/* Timeline Styles */
+.timeline {
+    position: relative;
+    padding-left: 10px;
+}
+
+.stop-item {
+    display: flex;
+    position: relative;
+    padding-bottom: 25px;
+}
+
+/* Vertical Line */
+.stop-line {
+    position: absolute;
+    left: 7px;
+    top: 20px;
+    bottom: -5px;
+    width: 4px;
+    z-index: 1;
+}
+
+.stop-marker {
+    width: 18px;
+    height: 18px;
+    z-index: 2;
+    margin-right: 15px;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.stop-content {
+    flex-grow: 1;
+}
+
+/* Map Button */
+.map-fab {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.loading-state {
+    padding: 40px;
+}

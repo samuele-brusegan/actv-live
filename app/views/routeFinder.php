@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Trova Percorso - ACTV</title>
         <?php require COMMON_HTML_HEAD; ?>
+        <link rel="stylesheet" href="/css/structure/structure-routeFinder.css">
         <link rel="stylesheet" href="/css/routeFinder.css">
         <script src="/js/routeFinder.js"></script>
     </head>

@@ -7,6 +7,7 @@
         <!-- CSS di Leaflet -->
         <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
         <?php require COMMON_HTML_HEAD; ?>
+        <link rel="stylesheet" href="/css/structure/structure-home.css">
         <link rel="stylesheet" href="/css/home.css">
 
         <!-- JavaScript di Leaflet -->

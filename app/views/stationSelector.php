@@ -6,7 +6,8 @@
         <title>Seleziona Fermata - ACTV</title>
         <?php require COMMON_HTML_HEAD; ?>
 
-        <link rel="stylesheet" href="/css/stopList.css">
+        <link rel="stylesheet" href="/css/structure/structure-stopList.css">
+        <link rel="stylesheet" href="/css/structure/structure-stationSelector.css">
         <link rel="stylesheet" href="/css/stationSelector.css">
         
         <!-- StopCard Component -->
@@ -57,7 +58,7 @@
         </div>
 
         <!-- Action Buttons -->
-        <div class="action-buttons" style="position: fixed; bottom: 0; left: 0; right: 0; background: #F5F5F5; border-top: 1px solid #e0e0e0; z-index: 2; padding: 10px;">
+        <div class="action-buttons">
             <button class="mb-1 btn-secondary" onclick="cancelSelection()">annulla</button>
             <button class="mt-1 btn-primary" onclick="confirmSelection()">fatto</button>
         </div>
