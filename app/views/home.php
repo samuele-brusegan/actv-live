@@ -25,6 +25,7 @@
             <!-- Logo o Icona Menu (Placeholder basato su spazio vuoto nel design) -->
             <div style="height: 20px;"></div> 
             <div class="header-title">ACTV Live <br> Venezia</div>
+            <div class="header-subtitle">Orari in Tempo Reale</div>
             <div class="theme-toggle" style="position: absolute; top: 20px; right: 20px;">
                 <button class="btn btn-primary rounded-pill px-4 py-2" onclick="toggleTheme()">
                     <img src="/svg/light_mode.svg" alt="Toggle Theme" id="theme-icon"> (Demo)
