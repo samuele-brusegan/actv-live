@@ -3,14 +3,8 @@ body {
     background-color: var(--color-bg-light);
 }
 
-.header-green {
-}
-
 .trip-header-info {
     color: white;
-
-    & .line-info {
-    }
 }
 
 .line-box {
@@ -21,9 +15,6 @@ body {
     font-size: 24px;
     border-radius: 4px;
     border: 2px solid white;
-}
-
-.direction-info {
 }
 
 .direction-label {
@@ -56,12 +47,6 @@ body {
 }
 
 /* Timeline Styles */
-.timeline {
-}
-
-.stop-item {
-}
-
 .stop-item:last-child {
     padding-bottom: 0;
 }
@@ -95,9 +80,6 @@ body {
     border-color: var(--color-accent-blue-dark);
     /* Blue for current */
     box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.2);
-}
-
-.stop-content {
 }
 
 .stop-name {

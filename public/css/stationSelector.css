@@ -1,7 +1,4 @@
 /*Page specific overrides - matching stopList.php style */
-.stop-ids-container {
-}
-
 .stop-id-badge {
     background: var(--color-accent-blue);
     color: white;
@@ -9,16 +6,6 @@
     font-size: 12px;
     font-weight: bold;
     text-align: center;
-}
-
-.stop-card-content {
-}
-
-.stop-card-action {
-}
-
-/* Search Bar Styles */
-.search-container {
 }
 
 .search-input {

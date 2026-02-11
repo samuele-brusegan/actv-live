@@ -65,10 +65,7 @@ async function init() {
     // 3. Primo rendering e avvio loop di aggiornamento
     if (state.stopsGTFS) {
         await refreshData();
-        // setInterval(refreshData, 25000);
-        console.error("DEBUG!!! very slow refresh");
-        
-        setInterval(refreshData, 25000000);
+        setInterval(refreshData, 25000);
     }
 }
 
@@ -258,7 +255,7 @@ function renderTimeline() {
         const isSelected = (index === selectedStopIdx);
         // Calcoliamo se la fermata è graficamente precedente
         const isGraphicallyPrevious = (selectedStopIdx !== -1 && index < selectedStopIdx);
-        const isPrevious = isGraphicallyPrevious;
+        const isPrevious = !stop.hasRealTime;
         
         let statusClass = '';
         if      (isPrevious) statusClass = 'passed';
@@ -266,18 +263,27 @@ function renderTimeline() {
 
         // --- GESTIONE VISUALIZZAZIONE ORARIO ---
         let timeDisplay = "--:--";
+        
+        if (stop.arrival_time && stop.arrival_time.includes('\'')) {
+            stop.arrival_time = stop.arrival_time.replace('\'', ' min');
+        }
 
         if (stop.hasRealTime) {
             timeDisplay = formatMinutesRemaining(stop.arrival_time);
         } else {
-            timeDisplay = ("Passato ~ @ " + stop.arrival_time?.substring(0, 5)) || "Info N.D.";
+            timeDisplay = ("Passato (" + stop.arrival_time?.substring(0, 5) + ")*") || "Info N.D.";
+        }
+        
+        if (stop.arrival_time === 'departure') {
+            timeDisplay = '< 1 min';
         }
 
-        // Se timeDisplay è "Passato", aggiungiamo la classe passed graficamente anche se non lo era
-        if (timeDisplay === "Passato") {
-            statusClass = 'passed';
+        if (!stop.hasGTFS) {
+            console.warn("Stop without GTFS:", stop);
+            console.error("Ergo: tripID sbagliato", state);
+            return;
         }
-
+        
         const stopIdShort = stop.data_url.split("-").slice(0, -2).join("-");
         const stopNameEscaped = encodeURIComponent(stop.stop_name);
 
@@ -384,6 +390,59 @@ function mergeStops() {
     return merged;
 }
 
+async function getPreviousStopsRealTime_block() {
+    // 1. Trova l'indice (corretto con .some per sicurezza)
+    let currentStopIdSplitted = state.currentStopId.split("-");
+    const currentStopIndex = state.mergedStops.findIndex(stop => 
+        currentStopIdSplitted.some(id => stop.stop_id == id)
+    );
+    
+    let previousStops = state.mergedStops.slice(0, currentStopIndex);
+
+    // 2. Trasformiamo il forEach in una lista di Promesse usando .map()
+    const stopPromises = previousStops.map(async (stop) => {
+        const dataUrl = stop.data_url;
+        let tripList = await returnTripList(dataUrl);
+        
+        // 3. Anche qui usiamo .map per gestire i trip interni
+        const tripPromises = tripList.map(async (trip) => {
+            let guard = (state.lineFull === trip.line && state.destination === trip.destination);
+            
+            if (guard) {
+                let offset = Math.min(2, trip.timingPoints.length);
+                let penumtimoTP = trip.timingPoints[trip.timingPoints.length - offset];
+                if (!penumtimoTP) return;
+
+                let tid = await fetchTripId(
+                    trip.line.split('_')[0], 
+                    trip.destination, 
+                    state.today, 
+                    penumtimoTP.time, 
+                    penumtimoTP.stop, 
+                    trip.lineId
+                );
+
+                if (tid == state.tripId) {
+                    stop.arrival_time = trip.time;
+                    stop.departure_time = trip.time;
+                    stop.hasRealTime = true;
+                }
+            }
+        });
+
+        // Aspettiamo che tutti i trip di questa fermata siano processati
+        await Promise.all(tripPromises);
+    });
+
+    // 4. Aspettiamo che TUTTE le fermate siano state elaborate
+    await Promise.all(stopPromises);
+    
+    console.log("Ho finito");
+
+    // 5. Ora puoi renderizzare in sicurezza
+    renderTimeline();
+}
+
 function getPreviousStopsRealTime() {
     // Find the index of the current stop
     let currentStopIdSplitted = state.currentStopId.split("-");
@@ -442,6 +501,7 @@ function getPreviousStopsRealTime() {
                     stop.arrival_time = trip.time;
                     stop.departure_time = trip.time;
                     stop.hasRealTime = true;
+                    renderTimeline();
                 }
                 
             }
@@ -449,8 +509,6 @@ function getPreviousStopsRealTime() {
         });
         
     });
-    
-    renderTimeline();
 }
 
 async function returnTripList(dataUrl) {

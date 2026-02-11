@@ -324,9 +324,6 @@ body {
 }
 
 /* Map */
-#map-container {
-}
-
 #map {
     border-radius: var(--radius-lg);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -391,4 +388,20 @@ html[data-theme="dark"] .form-select {
     background-color: var(--color-white);
     color: var(--color-black);
     border: 1px solid var(--color-primary-blue);
+}
+
+.error-popup {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    background-color: #ef4444;
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    font-size: 12px;
+    max-width: calc(100vw - 40px);
+    max-height: calc(100vh - 40px);
+    overflow: auto;
 }

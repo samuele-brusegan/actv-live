@@ -3,18 +3,18 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
     
     try{
         
-        $time = $_GET['time'];
-        $busTrack = addslashes($_GET['busTrack']);
-        $busDirection = addslashes($_GET['busDirection']);
-        $day = $_GET['day'];
-        $stop = addslashes($_GET['stop']);
-        $lineId = $_GET['lineId'];
+        $time = $_GET['time']; //07:07
+        $busTrack = addslashes($_GET['busTrack']); //21
+        $busDirection = addslashes($_GET['busDirection']); //Camporese Gritti
+        $day = $_GET['day']; //monday
+        $stop = addslashes($_GET['stop']); //Martellago delle Motte
+        $lineId = $_GET['lineId']; //29387
         $limit = $_GET['limit'] ?? 1;
         
         $trips = dbquery($db, $time, $busTrack, $busDirection, $day, $lineId, $stop);
 
         if (count($trips) == 0) {
-            echo json_encode(["error" => "No trips found", "query" => $query]);
+            echo json_encode(["error" => "No trips found", "query" => queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop),"params" => [$time, $busTrack, $busDirection, $day, $lineId, $stop]]);
             exit;
         }
         $trips = array_slice($trips, 0, $limit);
@@ -36,17 +36,13 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         }
 
     } catch (Exception $e) {
-        echo json_encode(["error" => $e->getMessage(), "params" => [$time, $busTrack, $busDirection, $day, $lineId, $stop]]);
+        echo json_encode(["error" => $e->getMessage(), "query" => queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop),"params" => [$time, $busTrack, $busDirection, $day, $lineId, $stop]]);
         exit;
     }
 }
 
-function dbquery(DatabaseConnector $db, $time, $busTrack, $busDirection, $day, $lineId, $stop) {
-    $busTrack = addslashes($busTrack);
-    $busDirection = addslashes($busDirection);
-    
-    $trips = $db->query(
-        /* "SELECT trips.*, stop_times.arrival_time,
+function queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop) {
+    /* "SELECT trips.*, stop_times.arrival_time,
         TIMEDIFF(STR_TO_DATE('{$time}', '%H:%i:%s'), stop_times.arrival_time) AS delay
         FROM routes 
         {$db->getJoins()}
@@ -58,7 +54,7 @@ function dbquery(DatabaseConnector $db, $time, $busTrack, $busDirection, $day, $
         {$db->getJoins()}
         WHERE trips.shape_id LIKE '{$lineId}\_%' AND routes.route_short_name = '{$busTrack}' AND calendar.{$day} = 1 AND stop_times.pickup_type = 1 
         order by abs(delay) asc" */
-        "SELECT t.*, st.arrival_time, st.departure_time, r.route_short_name,
+    $q = "SELECT t.*, st.arrival_time, st.departure_time, r.route_short_name,
             -- Calcoliamo la differenza normalizzata in secondi
             SEC_TO_TIME(ABS((TIME_TO_SEC(st.arrival_time) % 86400) - (TIME_TO_SEC('{$time}') % 86400))) AS delay
         FROM trips t
@@ -73,9 +69,17 @@ function dbquery(DatabaseConnector $db, $time, $busTrack, $busDirection, $day, $
             AND st.pickup_type IN (0, 1)
         -- Ordiniamo per la differenza assoluta minima, considerando il ciclo delle 24 ore
         ORDER BY ABS(delay) ASC
+        LIMIT 30";
+    return $q;
+}
 
-        LIMIT 30"
-    );
+function dbquery(DatabaseConnector $db, $time, $busTrack, $busDirection, $day, $lineId, $stop) {
+    $busTrack = addslashes($busTrack);
+    $busDirection = addslashes($busDirection);
+
+    $query = queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop);
+
+    $trips = $db->query($query);
 
     //Per ogni trip, calcola la distanza di jaro_winkler tra busDirection e trip_headsign
     foreach ($trips as $i => $trip) {
