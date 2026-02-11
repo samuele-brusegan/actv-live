@@ -19,7 +19,8 @@ let state = {
     tripId: null,        // ID univoco della corsa nel GTFS
     today: null,         // Giorno della settimana (es. "monday")
     stopsGTFS: [],       // Lista fermate da GTFS (statico)
-    stopsJSON: []        // Lista fermate da Real-Time
+    stopsJSON: [],       // Lista fermate da Real-Time
+    mergedStops: []      // Lista fermate merge
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -64,7 +65,10 @@ async function init() {
     // 3. Primo rendering e avvio loop di aggiornamento
     if (state.stopsGTFS) {
         await refreshData();
-        setInterval(refreshData, 25000);
+        // setInterval(refreshData, 25000);
+        console.error("DEBUG!!! very slow refresh");
+        
+        setInterval(refreshData, 25000000);
     }
 }
 
@@ -87,7 +91,7 @@ function formatMinutesRemaining(timeString) {
 
 /** Recupera il Trip ID univoco */
 async function fetchTripId(busTrack, busDirection, day, time, stop, lineId) {
-    // console.log(busTrack, busDirection, day, time, stop, lineId);
+    let text = '';
     try {
         const params = new URLSearchParams({
             return: 'true',
@@ -98,14 +102,23 @@ async function fetchTripId(busTrack, busDirection, day, time, stop, lineId) {
             stop: stop,
             lineId: lineId
         });
-        const response = await fetch(`/api/gtfs-identify?${params.toString()}`);
+        let url = `/api/gtfs-identify?${params.toString()}`;
+        // console.log("https://actv-live.test"+url);
+        
+        const response = await fetch(url);
+        text = await response.text();
 
         if (!response.ok) return null;
-        const data = await response.json();
+        const data = JSON.parse(text);
+        if (data.error) {
+            console.warn("Errore fetchTripId:", data);
+            // errorPopup(data.error);
+        }
         return data.trip_id;
 
     } catch (e) {
         console.error("Errore fetchTripId:", e);
+        errorPopup(text);
         return null;
     }
 }
@@ -128,6 +141,15 @@ async function refreshData() {
         }
 
         updateHeader();
+
+        state.mergedStops = mergeStops();
+
+        // Try to get real time for previous stops
+        getPreviousStopsRealTime();
+
+        console.log(state.mergedStops);
+        
+
         renderTimeline();
     } catch (error) {
         console.error("Refresh fallito:", error);
@@ -179,7 +201,7 @@ async function fetchGTFSStops(tripId) {
     }
 }
 
-/** Recupera informazioni real-time per tutte le fermate */
+/** Recupera informazioni real-time per la fermata selezionata */
 async function fetchRealTimeInfo() {
     try {
         const response = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${state.currentStopId}-web-aut`, {
@@ -208,9 +230,9 @@ async function fetchRealTimeInfo() {
         });
 
         const results = await Promise.all(matchPromises);
-        const myTrip = results.find(t => t.calculatedTripId === state.tripId);
+        const interestingTrip = results.find(t => t.calculatedTripId === state.tripId);
 
-        return myTrip ? myTrip.timingPoints : [];
+        return interestingTrip ? interestingTrip.timingPoints : [];
     } catch (e) {
         console.error("fetchRealTimeInfo:", e);
         return [];
@@ -225,37 +247,30 @@ function renderTimeline() {
     const timeline = document.createElement('div');
     timeline.className = 'timeline';
 
-    const selectedStopIdx = state.stopsGTFS.findIndex(s =>
+    const selectedStopIdx = state.mergedStops.findIndex(s =>
         state.currentStopId.split('-').includes(s.stop_id.toString())
     );
 
-    state.stopsGTFS.forEach((stop, index) => {
+    state.mergedStops.forEach((stop, index) => {
         const stopEl = document.createElement('div');
-        const rtInfo = state.stopsJSON.find(s => s.stop === stop.stop_name);
+        // const rtInfo = state.stopsJSON.find(s => s.stop === stop.stop_name);
 
         const isSelected = (index === selectedStopIdx);
         // Calcoliamo se la fermata è graficamente precedente
         const isGraphicallyPrevious = (selectedStopIdx !== -1 && index < selectedStopIdx);
-
+        const isPrevious = isGraphicallyPrevious;
+        
         let statusClass = '';
-        if (isGraphicallyPrevious) statusClass = 'passed';
+        if      (isPrevious) statusClass = 'passed';
         else if (isSelected) statusClass = 'current current-stop-item';
 
         // --- GESTIONE VISUALIZZAZIONE ORARIO ---
         let timeDisplay = "--:--";
-        console.log(stop);
 
-
-        if (isSelected) {
-            // Usa l'orario header che è già real-time o fallback
-            timeDisplay = state.arrivalTime === 'departure' ? 'ORA' : formatMinutesRemaining(state.arrivalTime);
-        } else if (rtInfo) {
-            // Usa l'orario real-time convertito in quanti minuti mancano
-            timeDisplay = formatMinutesRemaining(rtInfo.time);
+        if (stop.hasRealTime) {
+            timeDisplay = formatMinutesRemaining(stop.arrival_time);
         } else {
-            // Fallback GTFS (statico) - Visualizziamo l'ora assoluta o "Passato" se è molto vecchio?
-            // Per ora mostriamo l'ora assoluta per chiarezza se non c'è real-time
-            timeDisplay = stop.arrival_time?.substring(0, 5) || "Info N.D.";
+            timeDisplay = ("Passato ~ @ " + stop.arrival_time?.substring(0, 5)) || "Info N.D.";
         }
 
         // Se timeDisplay è "Passato", aggiungiamo la classe passed graficamente anche se non lo era
@@ -273,7 +288,7 @@ function renderTimeline() {
         };
 
         stopEl.innerHTML = `
-            <div class="stop-line ${isGraphicallyPrevious ? 'passed' : ''}"></div>
+            <div class="stop-line ${isPrevious ? 'passed' : ''}"></div>
             <div class="stop-marker ${statusClass}"></div>
             <div class="stop-content">
                 <div class="stop-name">${stop.stop_name}</div>
@@ -299,4 +314,149 @@ function openMap() {
         ? `/lines-map?tripId=${encodeURIComponent(state.tripId)}`
         : `/lines-map?line=${encodeURIComponent(state.line)}`;
     window.location.href = url;
+}
+
+function errorPopup(message) {
+    const popup = document.createElement('div');
+    popup.className = 'error-popup';
+    popup.innerHTML = `
+    <div class="error-popup">
+        <div class="error-popup-content">
+            <div class="error-popup-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z" fill="#EF4444"/>
+                </svg>
+            </div>
+            <div class="error-popup-message">
+                ${message}
+            </div>
+            <button class="error-popup-close" onclick="errorPopupClose()">Chiudi</button>
+        </div>
+    </div>
+    `;
+    document.body.appendChild(popup);
+}
+
+function errorPopupClose() {
+    const popup = document.querySelector('.error-popup');
+    popup.remove();
+}
+
+function mergeStops() {
+    const merged = [];
+    const jsonMap = new Map();
+
+    // 1. Popola la mappa con i dati JSON (Real-Time)
+    state.stopsJSON.forEach(item => {
+        jsonMap.set(item.stop, item);
+    });
+
+    // 2. Itera sulle fermate GTFS e fonde i dati
+    state.stopsGTFS.forEach(gtfsStop => {
+        const stopName = gtfsStop.stop_name;
+        const jsonItem = jsonMap.get(stopName);
+
+        const mergedItem = {
+            ...gtfsStop,
+            // Se esiste JSON, prendi i dati da lì, altrimenti usa GTFS
+            arrival_time: jsonItem ? jsonItem.time : gtfsStop.arrival_time,
+            departure_time: jsonItem ? jsonItem.time : gtfsStop.departure_time,
+            // Aggiungi flag per sapere da dove provengono i dati
+            hasRealTime: !!jsonItem,
+            hasGTFS: true
+        };
+
+        merged.push(mergedItem);
+
+        // Rimuovi l'elemento dalla mappa per marcare come "usato"
+        jsonMap.delete(stopName);
+    });
+
+    // 3. Aggiungi eventuali fermate JSON che non erano nel GTFS (raro ma possibile)
+    jsonMap.forEach((jsonItem, stopName) => {
+        merged.push({
+            ...jsonItem,
+            hasRealTime: true,
+            hasGTFS: false
+        });
+    });
+
+    return merged;
+}
+
+function getPreviousStopsRealTime() {
+    // Find the index of the current stop
+    let currentStopIdSplitted = state.currentStopId.split("-");
+    const currentStopIndex = state.mergedStops.findIndex( stop => currentStopIdSplitted.find(id => stop.stop_id == id));
+    
+    
+    // Get all stops before the current stop
+    let previousStops = state.mergedStops.slice(0, currentStopIndex);
+    
+    // For Each previous stop, fetch data url
+    //     For Each SIMILAR trip in tripList, find trip Id
+    //         Per quei che metcha setta il time alla fermata
+
+    previousStops.forEach(async stop => {
+        const dataUrl = stop.data_url;
+        const stopName = stop.stop_name;
+        const stopId = stop.stop_id;
+       
+        // console.log(stopName, stopId, dataUrl);
+        
+        let tripList = await returnTripList(dataUrl);
+        
+        tripList.forEach(async trip => {
+            // console.log(state, trip);
+            
+            /*def Similar: 
+                - Same line
+                - Same direction
+            */
+            let guard = true;
+            if (state.lineFull != trip.line)           guard = false;
+            if (state.destination != trip.destination) guard = false;
+            
+            if (guard) {
+                // Calcolo il trip ID
+                let offset = 2;
+                if (trip.timingPoints.length < offset) offset = trip.timingPoints.length;
+                let penumtimoTP = trip.timingPoints[trip.timingPoints.length - offset];
+                if (!penumtimoTP) return;
+
+                let tid = await fetchTripId(
+                    trip.line.split('_')[0], 
+                    trip.destination, 
+                    state.today, 
+                    penumtimoTP.time, 
+                    penumtimoTP.stop, 
+                    trip.lineId
+                );
+
+                
+                
+                // Se c'è il MATCH
+                if (tid == state.tripId) {
+                    console.log(stopName, tid, state.tripId, trip.time);
+                    
+                    stop.arrival_time = trip.time;
+                    stop.departure_time = trip.time;
+                    stop.hasRealTime = true;
+                }
+                
+            }
+            
+        });
+        
+    });
+    
+    renderTimeline();
+}
+
+async function returnTripList(dataUrl) {
+    
+    let apiBase = "https://oraritemporeale.actv.it/aut/backend/passages/"
+    let response = await fetch(apiBase + dataUrl);
+    let data = await response.json();
+    return data;
 }
