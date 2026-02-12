@@ -19,15 +19,8 @@ $router = new Router();
 // Definisci le rotte
 require BASE_PATH . '/public/routes.php';
 
-//Send globals to JS
-//Send globals to JS
-if (strpos($_SERVER['REQUEST_URI'], '/api/') === false && strpos($_SERVER['REQUEST_URI'], '/gtfs-test') === false) {
-    echo "
-    <script>
-        sessionStorage.setItem('url', '" . URL_PATH . "');
-        sessionStorage.setItem('theme', '" . THEME . "');
-    </script>";
-}
+//Send globals to JS: moved inside head.php
+
 
 // Ottieni l'URL richiesto e fai partire il router
 $url = $_SERVER['REQUEST_URI'];

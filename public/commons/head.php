@@ -28,3 +28,14 @@
 <link rel="stylesheet" href="<?=URL_PATH?>/css/cookie-notice.css">
 <script src="/js/cookie-notice.js"></script>
 <script src="/js/theme.js"></script>
+
+<?php 
+//Send globals to JS
+if (strpos($_SERVER['REQUEST_URI'], '/api/') === false && strpos($_SERVER['REQUEST_URI'], '/gtfs-test') === false) {
+    echo "
+    <script>
+        sessionStorage.setItem('url', '" . URL_PATH . "');
+        sessionStorage.setItem('theme', '" . THEME . "');
+    </script>";
+}
+?>

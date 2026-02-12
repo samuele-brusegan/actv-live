@@ -105,7 +105,8 @@ async function fetchTripId(busTrack, busDirection, day, time, stop, lineId) {
         const response = await fetch(url);
         text = await response.text();
 
-        if (!response.ok) return null;
+        if (!response.ok) throw new Error("Error" + text);
+        
         const data = JSON.parse(text);
         if (data.error) {
             console.warn("Errore fetchTripId:", data);
