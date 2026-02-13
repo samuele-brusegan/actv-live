@@ -14,7 +14,7 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         $trips = dbquery($db, $time, $busTrack, $busDirection, $day, $lineId, $stop);
 
         if (count($trips) == 0) {
-            echo json_encode(["error" => "No trips found", "query" => queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop),"params" => [$time, $busTrack, $busDirection, $day, $lineId, $stop]]);
+            echo json_encode(["error" => "No trips found", "query" => queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop),"params" => ["time" => $time, "busTrack" => $busTrack, "busDirection" => $busDirection, "day" => $day, "lineId" => $lineId, "stop" => $stop]]);
             exit;
         }
         $trips = array_slice($trips, 0, $limit);
@@ -36,7 +36,7 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         }
 
     } catch (Exception $e) {
-        echo json_encode(["error" => $e->getMessage(), "query" => queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop),"params" => [$time, $busTrack, $busDirection, $day, $lineId, $stop]]);
+        echo json_encode(["error" => $e->getMessage(), "query" => queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop),"params" => [ "time" => $time, "busTrack" => $busTrack, "busDirection" => $busDirection, "day" => $day, "lineId" => $lineId, "stop" => $stop]]);
         exit;
     }
 }

@@ -12,16 +12,17 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
             exit;
         }
 
-        $dataUnpacked = array_slice($dataUnpacked, 0, $limit);
+        // $dataUnpacked = $dataUnpacked;
         if (isset($_GET["return"])) {
             header("Content-Type: application/json");
 
-            if ($limit == 1) {
+            /* if ($limit == 1) {
                 echo json_encode($trips[0]);
             }
             else {
                 echo json_encode($trips);
-            }
+            } */
+            echo json_encode($dataUnpacked[0]);
             exit;
         }
         if (isset($_GET["rtable"])) {
@@ -38,10 +39,12 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
     }
 }
 
-function queryBuilder($tripId)
-{
+function queryBuilder($tripId) {
     //busTrack, busDirection, day, time, stop, lineId
-    $q = "SELECT SUBSTRING_INDEX(t.shape_id, '_', 1) AS line_id, r.route_short_name AS bus_track, t.trip_headsign AS bus_direction    
+    $q = "SELECT SUBSTRING_INDEX(t.shape_id, '_', 1) AS line_id, 
+        r.route_short_name AS bus_track, 
+        t.trip_headsign AS bus_direction,
+        r.route_desc AS line_tag
         -- Calcoliamo la differenza normalizzata in secondi
         -- time busTrack busDirection day stop lineId limit
         FROM trips t

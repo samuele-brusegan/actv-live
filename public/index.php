@@ -21,6 +21,11 @@ require BASE_PATH . '/public/routes.php';
 
 //Send globals to JS: moved inside head.php
 
+// Redirect HTTP to HTTPS
+if (!isset($_SERVER['HTTP_X_FORWARDED_SCHEME']) || $_SERVER['HTTP_X_FORWARDED_SCHEME'] !== 'https') {
+    header("Location: https://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
+    exit();
+}
 
 // Ottieni l'URL richiesto e fai partire il router
 $url = $_SERVER['REQUEST_URI'];

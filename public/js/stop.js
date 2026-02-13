@@ -187,9 +187,14 @@ function createPassageCard(p) {
         sessionStorage.setItem('realTime', timingPoint.time);
         sessionStorage.setItem('lastStop', destination);
         sessionStorage.setItem('lineId', lineId);
+        sessionStorage.setItem('tripDetails_selectedStop', stationId);
 
         // Fetch tripId
-        const tripId = await fetchTripId(lineName, lineTag, day, time, stop, lineId);
+        const dow = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+        let day = dow[new Date().getDay()];
+
+        const tripId = await fetchTripId(lineName, destination, day, timingPoint.time, timingPoint.stop, lineId);
+        console.log(tripId);
 
         const params = new URLSearchParams({
             /* line: `${lineName}_${lineTag}`,

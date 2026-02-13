@@ -23,12 +23,21 @@ let state = {
     mergedStops: []      // Lista fermate merge
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
 
     state.tripId = urlParams.get('tripId');
 
+    let data = await unpackTripId(state.tripId);
+    state.line = data.bus_track;
+    state.destination = data.bus_direction;
+    state.tag = data.line_tag;
+    state.lineFull = state.line + "_" + state.tag;
 
+    //set stopId from url
+    state.currentStopId = sessionStorage.getItem('tripDetails_selectedStop');
+    console.log(state);
+    
 
     /* state.lineFull = urlParams.get('line');
     state.line = state.lineFull?.split('_')[0];
@@ -49,7 +58,7 @@ async function unpackTripId(tripId) {
             return: 'true',
             tripId: tripId
         });
-        let url = `/api/gtfs-identify?${params.toString()}`;
+        let url = `/api/gtfs-resolve?${params.toString()}`;
         // console.log("https://actv-live.test"+url);
 
         const response = await fetch(url);
@@ -62,7 +71,9 @@ async function unpackTripId(tripId) {
             console.warn("Errore fetchTripId:", data);
             // errorPopup(data.error);
         }
-        return data.trip_id;
+        console.log(data);
+        
+        return data;
 
     } catch (e) {
         console.error("Errore fetchTripId:", e);
@@ -179,7 +190,7 @@ async function refreshData() {
         // Try to get real time for previous stops
         getPreviousStopsRealTime();
 
-        console.log(state.mergedStops);
+        // console.log(state.mergedStops);
 
 
         renderTimeline();
@@ -282,6 +293,9 @@ function renderTimeline() {
     const selectedStopIdx = state.mergedStops.findIndex(s =>
         state.currentStopId.split('-').includes(s.stop_id.toString())
     );
+
+    console.log("Merged: ", state.mergedStops);
+    
 
     state.mergedStops.forEach((stop, index) => {
         const stopEl = document.createElement('div');

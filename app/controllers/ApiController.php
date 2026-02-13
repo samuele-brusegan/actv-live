@@ -700,6 +700,6 @@ class ApiController
         // The view expects $db variable to be available
         $db = $this->getDb($tableJoins);
 
-        require_once BASE_PATH . '/app/views/gtfsIdentify.php';
+        require_once BASE_PATH . '/app/models/gtfsTripResolver.php';
     }
 }
