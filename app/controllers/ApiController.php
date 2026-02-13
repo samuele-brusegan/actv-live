@@ -2,8 +2,7 @@
 class ApiController
 {
 
-    private function getDb($joins = "")
-    {
+    private function getDb($joins = "") {
         if (!class_exists('databaseConnector')) {
             require_once BASE_PATH . '/app/models/databaseConnector.php';
         }
@@ -13,8 +12,7 @@ class ApiController
     }
 
     // Refactored from dbControll::api_gtfsIdentify
-    function api_gtfsIdentify()
-    {
+    function api_gtfsIdentify() {
         $tableJoins = "
             INNER JOIN trips ON routes.route_id = trips.route_id 
             INNER JOIN stop_times ON trips.trip_id = stop_times.trip_id 
@@ -29,8 +27,7 @@ class ApiController
     }
 
     // Refactored from dbControll::gtfsTripBuilder
-    function gtfsTripBuilder()
-    {
+    function gtfsTripBuilder() {
         if (!isset($_GET) && !isset($_GET['return']))
             die("No parameters");
 
@@ -73,8 +70,7 @@ class ApiController
     }
 
     // Refactored from dbControll::gtfsStopTranslater
-    function gtfsStopTranslater()
-    {
+    function gtfsStopTranslater() {
         if (!isset($_GET) && !isset($_GET['return']))
             die("No parameters");
 
@@ -90,8 +86,7 @@ class ApiController
     }
 
     // Moved from Controller::stopsJson and renamed
-    function stops()
-    {
+    function stops() {
         if (!isset($_GET) && !isset($_GET['return']))
             die("No parameters");
 
@@ -104,14 +99,12 @@ class ApiController
     }
 
     // Moved from Controller::favorite
-    function favorite()
-    {
+    function favorite() {
         require_once BASE_PATH . '/app/models/addToFavorites.php';
     }
 
     // Moved from Controller::planRoute
-    function planRoute()
-    {
+    function planRoute() {
         // This service likely uses local files (RoutePlanner), keeping as is per plan/User request scope (Controllers only)
         require_once BASE_PATH . '/app/services/RoutePlanner.php';
 
@@ -227,8 +220,7 @@ class ApiController
     }
 
     // Refactored from Controller::linesShapes to use DB
-    function linesShapes()
-    {
+    function linesShapes() {
         ini_set('memory_limit', '256M');
         set_time_limit(120); // Give DB more time if needed
 
@@ -441,8 +433,7 @@ class ApiController
     }
 
     // Refactored from Controller::tripStops to use DB
-    function tripStops()
-    {
+    function tripStops() {
         $line = $_GET['line'] ?? '';
         $dest = $_GET['dest'] ?? '';
 
@@ -537,8 +528,7 @@ class ApiController
         echo json_encode($stops);
     }
 
-    function logJsError()
-    {
+    function logJsError() {
         $data = json_decode(file_get_contents('php://input'), true);
         if ($data) {
             if (!class_exists('Logger')) {
@@ -561,20 +551,19 @@ class ApiController
     }
 
     // Time Machine API endpoints
-    function getTmSessions()
-    {
+    function getTmSessions() {
         $db = $this->getDb();
         $sessions = $db->query("SELECT * FROM tm_sessions ORDER BY created_at DESC");
         header('Content-Type: application/json');
         echo json_encode($sessions);
     }
 
-    function createTmSession()
-    {
+    function createTmSession() {
         $data = json_decode(file_get_contents('php://input'), true);
         if ($data) {
             $mysqli = Closure::bind(function ($db) {
-                return $db->db; }, null, 'databaseConnector')($this->getDb());
+                return $db->db;
+            }, null, 'databaseConnector')($this->getDb());
             $stmt = $mysqli->prepare("INSERT INTO tm_sessions (name, start_time, end_time, stops) VALUES (?, ?, ?, ?)");
             $stopsJson = json_encode($data['stops']);
             $stmt->bind_param("ssss", $data['name'], $data['start_timer'], $data['end_timer'], $stopsJson);
@@ -583,8 +572,7 @@ class ApiController
         }
     }
 
-    function getSimulatedData()
-    {
+    function getSimulatedData() {
         $stopId = $_GET['stopId'] ?? null;
         $time = $_GET['time'] ?? null; // The simulated time from client
 
@@ -607,7 +595,8 @@ class ApiController
             LIMIT 1
         ";
         $mysqli = Closure::bind(function ($db) {
-            return $db->db; }, null, 'databaseConnector')($db);
+            return $db->db;
+        }, null, 'databaseConnector')($db);
         $stmt = $mysqli->prepare($query);
 
         // Bind parameters: stop IDs followed by the time
@@ -627,8 +616,7 @@ class ApiController
             echo json_encode([]);
         }
     }
-    public function runTmHeartbeat()
-    {
+    public function runTmHeartbeat() {
         $token = $_GET['token'] ?? null;
         $expectedToken = ENV['TM_HEARTBEAT_TOKEN'] ?? null;
 
@@ -640,7 +628,8 @@ class ApiController
 
         $db = $this->getDb();
         $mysqli = Closure::bind(function ($db) {
-            return $db->db; }, null, 'databaseConnector')($db);
+            return $db->db;
+        }, null, 'databaseConnector')($db);
 
         $now = date('Y-m-d H:i:s');
         $reports = [];
@@ -698,5 +687,19 @@ class ApiController
             'timestamp' => $now,
             'actions' => $reports
         ]);
+    }
+
+    function gtfsResolve() {
+        $tableJoins = "
+            INNER JOIN trips ON routes.route_id = trips.route_id 
+            INNER JOIN stop_times ON trips.trip_id = stop_times.trip_id 
+            INNER JOIN stops ON stop_times.stop_id = stops.stop_id 
+            INNER JOIN calendar ON trips.service_id = calendar.service_id
+            ";
+
+        // The view expects $db variable to be available
+        $db = $this->getDb($tableJoins);
+
+        require_once BASE_PATH . '/app/views/gtfsIdentify.php';
     }
 }
