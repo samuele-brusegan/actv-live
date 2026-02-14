@@ -390,12 +390,12 @@ html[data-theme="dark"] .form-select {
     border: 1px solid var(--color-primary-blue);
 }
 
-.error-popup {
+.error-container {
     position: fixed;
     top: 20px;
     right: 20px;
     z-index: 10000;
-    background-color: #ef4444;
+    background-color: #ef4444A0;
     color: white;
     padding: 10px;
     border-radius: 5px;
@@ -404,4 +404,18 @@ html[data-theme="dark"] .form-select {
     max-width: calc(100vw - 40px);
     max-height: calc(100vh - 40px);
     overflow: auto;
+}
+.error-popup {
+    margin-bottom: 10px;
+}
+.error-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.error-popup-title {
+    font-weight: 700;
+}
+.error-popup-message {
+    margin-top: 10px;
 }

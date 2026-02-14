@@ -2,7 +2,6 @@
 if (isset($_GET["return"]) || isset($_GET["rtable"])) {
     
     try{
-        
         $time = $_GET['time']; //07:07
         $busTrack = addslashes($_GET['busTrack']); //21
         $busDirection = addslashes($_GET['busDirection']); //Camporese Gritti
@@ -11,10 +10,24 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         $lineId = $_GET['lineId']; //29387
         $limit = $_GET['limit'] ?? 1;
         
-        $trips = dbquery($db, $time, $busTrack, $busDirection, $day, $lineId, $stop);
+        $pdo = getPDOConnection();
+        $trips = dbquery($pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop);
 
         if (count($trips) == 0) {
-            echo json_encode(["error" => "No trips found", "query" => queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop),"params" => ["time" => $time, "busTrack" => $busTrack, "busDirection" => $busDirection, "day" => $day, "lineId" => $lineId, "stop" => $stop]]);
+            header("Content-Type: application/json");
+            echo json_encode([
+                "error" => "No trips found", 
+                "query" => queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop),
+                "params" => [
+                    "time" => $time, 
+                    "busTrack" => $busTrack, 
+                    "busDirection" => $busDirection, 
+                    "day" => $day, 
+                    "lineId" => $lineId, 
+                    "stop" => $stop
+                ],
+                "link" => $_SERVER["REQUEST_SCHEME"] . "://" . $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"]
+            ]);
             exit;
         }
         $trips = array_slice($trips, 0, $limit);
@@ -36,35 +49,50 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         }
 
     } catch (Exception $e) {
-        echo json_encode(["error" => $e->getMessage(), "query" => queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop),"params" => [ "time" => $time, "busTrack" => $busTrack, "busDirection" => $busDirection, "day" => $day, "lineId" => $lineId, "stop" => $stop]]);
+        header("Content-Type: application/json");
+        echo json_encode([
+            "error" => $e->getMessage(), 
+            "query" => queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop),
+            "params" => [
+                "time" => $time, 
+                "busTrack" => $busTrack, 
+                "busDirection" => $busDirection, 
+                "day" => $day, 
+                "lineId" => $lineId, 
+                "stop" => $stop
+            ],
+            "link" => $_SERVER["REQUEST_SCHEME"] . "://" . $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"]
+        ]);
         exit;
     }
 }
 
+function getPDOConnection() {
+    static $pdo = null;
+    if ($pdo === null) {
+        $dsn = "mysql:host=" . ENV['DB_HOST'] . ";dbname=" . ENV['DB_NAME'] . ";charset=utf8mb4";
+        $pdo = new PDO($dsn, ENV['DB_USER'], ENV['DB_PASS'], [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+        ]);
+    }
+    return $pdo;
+}
+
 function queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop) {
-    /* "SELECT trips.*, stop_times.arrival_time,
-        TIMEDIFF(STR_TO_DATE('{$time}', '%H:%i:%s'), stop_times.arrival_time) AS delay
-        FROM routes 
-        {$db->getJoins()}
-        WHERE stops.stop_name = '{$busDirection}' AND routes.route_short_name = '{$busTrack}' AND calendar.{$day} = 1 AND stop_times.pickup_type = 1 
-        order by abs(delay) asc" */
-        /* "SELECT trips.*, stop_times.arrival_time,
-        TIMEDIFF(STR_TO_DATE('{$time}', '%H:%i:%s'), stop_times.arrival_time) AS delay
-        FROM routes 
-        {$db->getJoins()}
-        WHERE trips.shape_id LIKE '{$lineId}\_%' AND routes.route_short_name = '{$busTrack}' AND calendar.{$day} = 1 AND stop_times.pickup_type = 1 
-        order by abs(delay) asc" */
+    // $day è già stato validato in dbquery
     $q = "SELECT t.*, st.arrival_time, st.departure_time, r.route_short_name,
             -- Calcoliamo la differenza normalizzata in secondi
-            SEC_TO_TIME(ABS((TIME_TO_SEC(st.arrival_time) % 86400) - (TIME_TO_SEC('{$time}') % 86400))) AS delay
+            SEC_TO_TIME(ABS((TIME_TO_SEC(st.arrival_time) % 86400) - (TIME_TO_SEC(?) % 86400))) AS delay
         FROM trips t
         JOIN routes r ON t.route_id = r.route_id
         JOIN stop_times st ON t.trip_id = st.trip_id
         JOIN stops s ON st.stop_id = s.stop_id
         JOIN calendar c ON t.service_id = c.service_id
         WHERE
-            r.route_short_name = '{$busTrack}'
-            AND s.stop_name = '{$stop}'
+            r.route_short_name = ?
+            AND s.stop_name = ?
             AND c.{$day} = 1
             AND st.pickup_type IN (0, 1)
         -- Ordiniamo per la differenza assoluta minima, considerando il ciclo delle 24 ore
@@ -73,14 +101,67 @@ function queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop) {
     return $q;
 }
 
-function dbquery(DatabaseConnector $db, $time, $busTrack, $busDirection, $day, $lineId, $stop) {
-    $busTrack = addslashes($busTrack);
-    $busDirection = addslashes($busDirection);
+function get_actv_match_score($search, $target) {
+    $normalize = function($s) {
+        $s = mb_strtolower($s, 'UTF-8');
+        // Mappatura abbreviazioni ACTV
+        $replacements = [
+            ' v.' => ' villaggio ',
+            ' v ' => ' villaggio ',
+            'p.le' => ' piazzale ',
+            'f.s.' => ' ferroviaria ',
+            ' p.' => ' porto ',
+            ' s.' => ' san ', // es. S. Giuliano
+            '.' => ' ',
+            ',' => ' ',
+            '-' => ' '
+        ];
+        $s = strtr($s, $replacements);
+        
+        // Esplode in parole e tiene solo quelle significative (>1 caratt.)
+        return array_filter(explode(' ', $s), function($word) {
+            return strlen(trim($word)) > 1;
+        });
+    };
 
-    $query = queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop);
+    $tokensSearch = array_unique($normalize($search));
+    $tokensTarget = array_unique($normalize($target));
 
-    $trips = $db->query($query);
+    if (empty($tokensSearch)) return 0;
 
+    // Conta quanti token della ricerca sono presenti nel target
+    $matches = 0;
+    foreach ($tokensSearch as $token) {
+        foreach ($tokensTarget as $tTarget) {
+            // Usiamo str_contains per gestire anche match parziali tra parole
+            if (str_contains($tTarget, $token) || str_contains($token, $tTarget)) {
+                $matches++;
+                break; 
+            }
+        }
+    }
+
+    // Overlap Coefficient: rapporto tra match e numero di parole cercate
+    return $matches / count($tokensSearch);
+}
+
+function addSimilarityScores(array &$trips, string $busDirection) {
+    foreach ($trips as $i => $trip) {
+        $overlap = get_actv_match_score($busDirection, $trip['trip_headsign']);
+        $jaro = jaro_winkler(strtolower($busDirection), strtolower($trip['trip_headsign']));
+
+        // Il punteggio principale è l'overlap (0-1)
+        // Aggiungiamo il 10% del Jaro-Winkler per ordinare i risultati simili
+        $trips[$i]['match_score'] = $overlap + ($jaro * 0.1);
+    }
+
+    // Ordina per il nuovo match_score
+    usort($trips, function ($a, $b) {
+        return $b['match_score'] <=> $a['match_score'];
+    });
+}
+
+function addSimilarityScores_jaro(array &$trips, string $busDirection) {
     //Per ogni trip, calcola la distanza di jaro_winkler tra busDirection e trip_headsign
     foreach ($trips as $i => $trip) {
         $trips[$i]['jaro_winkler'] = jaro_winkler(strtolower($busDirection), strtolower($trip['trip_headsign']));
@@ -90,6 +171,20 @@ function dbquery(DatabaseConnector $db, $time, $busTrack, $busDirection, $day, $
     usort($trips, function ($a, $b) {
         return $b['jaro_winkler'] <=> $a['jaro_winkler'];
     });
+}
+
+function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop) {
+    $allowedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    if (!in_array(strtolower($day), $allowedDays)) {
+        throw new Exception("Invalid day: $day");
+    }
+
+    $query = queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop);
+    $stmt = $pdo->prepare($query);
+    $stmt->execute([$time, $busTrack, $stop]);
+    $trips = $stmt->fetchAll();
+
+    addSimilarityScores($trips, $busDirection);
 
     if (count($trips) == 0) {
         return [];
@@ -165,11 +260,18 @@ function associativeArrayToTable(array $array) {
         <h1>GTFS Identifier</h1>
 
         <?php
-        $busTracks = $db->query("SELECT DISTINCT route_short_name FROM routes");
+        $pdo = getPDOConnection();
+        $busTracks = $pdo->query("SELECT DISTINCT route_short_name FROM routes")->fetchAll();
 
         //Salva in cache!
         if (!file_exists(BASE_PATH . "/data/cache/busDirections.json")) {
-            $busDirections = $db->query("SELECT DISTINCT stops.stop_name FROM routes {$db->getJoins()} WHERE stop_times.pickup_type = 1");
+            $tableJoins = "
+                INNER JOIN trips ON routes.route_id = trips.route_id 
+                INNER JOIN stop_times ON trips.trip_id = stop_times.trip_id 
+                INNER JOIN stops ON stop_times.stop_id = stops.stop_id 
+                INNER JOIN calendar ON trips.service_id = calendar.service_id
+                ";
+            $busDirections = $pdo->query("SELECT DISTINCT stops.stop_name FROM routes {$tableJoins} WHERE stop_times.pickup_type = 1")->fetchAll();
             file_put_contents(BASE_PATH . "/data/cache/busDirections.json", json_encode($busDirections));
         } else {
             $busDirections = json_decode(file_get_contents(BASE_PATH . "/data/cache/busDirections.json"), true);
@@ -229,7 +331,8 @@ function associativeArrayToTable(array $array) {
             $lineId = $_POST['lineId'];
             $stop = $_POST['stop'];
 
-            $trips = dbquery($db, $realTimeArrival, $busTrack, $busDirection, $day, $lineId, $stop);
+            $pdo = getPDOConnection();
+            $trips = dbquery($pdo, $realTimeArrival, $busTrack, $busDirection, $day, $lineId, $stop);
 
             echo associativeArrayToTable($trips);
         }

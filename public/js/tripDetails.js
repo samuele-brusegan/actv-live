@@ -22,21 +22,16 @@ let state = {
     stopsJSON: [],       // Lista fermate da Real-Time
     mergedStops: []      // Lista fermate merge
 };
+let firstIteration = {
+    refresh: true,
+    scroll: true
+};
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
 
     state.tripId = urlParams.get('tripId');
-
-    let data = await unpackTripId(state.tripId);
-    state.line = data.bus_track;
-    state.destination = data.bus_direction;
-    state.tag = data.line_tag;
-    state.lineFull = state.line + "_" + state.tag;
-
-    //set stopId from url
-    state.currentStopId = sessionStorage.getItem('tripDetails_selectedStop');
-    console.log(state);
+    console.log(sessionStorage.getItem('tripDetails_url'));
     
 
     /* state.lineFull = urlParams.get('line');
@@ -94,6 +89,65 @@ async function init() {
     const realTime = sessionStorage.getItem('realTime');
     const lineId = sessionStorage.getItem('lineId');
 
+    if (lastStop == "BOTTENIGO") {
+        errorPopup(`
+            Ahimè il matching dei bus per Bottenigo è ancora spesso malfunzionante. <br>
+            Se vedi che il bus non è quello giusto, eh... non so che dirti. <br>
+        `)
+    }
+
+    let initUnpackTripId = async () => {
+        console.log("Start Unpacking TripID");
+        
+        let data = await unpackTripId(state.tripId);
+        state.line = data.bus_track;
+        state.destination = data.bus_direction;
+        state.tag = data.line_tag;
+        state.lineFull = state.line + "_" + state.tag;
+
+        console.log("Unpacked TripID");
+
+        let loadingBox = document.querySelector('.loading-state');
+        if (loadingBox) loadingBox.innerHTML += '<br>Info corsa caricate';
+        updateHeader();
+    }
+    let initStopsGTFS = async () => {
+        console.log("Start Fetching GTFS Stops");
+        state.stopsGTFS = await fetchGTFSStops(state.tripId);
+
+        console.log("Fetched GTFS Stops");
+
+        let loadingBox = document.querySelector('.loading-state');
+        if (loadingBox) loadingBox.innerHTML += '<br>Percorso caricato';
+    }
+    
+    await Promise.all([initUnpackTripId(), initStopsGTFS()]);
+    
+    let initStopsJSON = async () => {
+        console.log("Start Fetching Real Time Info");
+        state.currentStopId = sessionStorage.getItem('tripDetails_selectedStop');
+        state.stopsJSON = await fetchRealTimeInfo(state.currentStopId, state.line, state.today);
+
+        console.log("Fetched Real Time Info", "stopsJSON", state.stopsJSON);
+
+        let loadingBox = document.querySelector('.loading-state');
+        if (loadingBox) loadingBox.innerHTML += '<br>Fermate caricate';
+    }
+    await initStopsJSON();
+    
+    //set stopId from url
+    state.currentStopId = sessionStorage.getItem('tripDetails_selectedStop');
+    // console.log(state);
+
+    // Destination e last stop non matchano lancio un warn in console
+    if (state.destination != lastStop) {
+        console.warn(`REQUESTED USER CONTROL: \n
+            Destination e last stop non matchano\n
+            dest.   : ${state.destination}\n
+            lastStop: ${lastStop}
+        `);
+    }
+
     // 1. Identifica il Trip ID univoco nel GTFS
     //state.tripId = await fetchTripId(trackName, lastStop, state.today, realTime, timedStop, lineId);
 
@@ -105,7 +159,7 @@ async function init() {
     updateHeader();
 
     // 2. Carica il percorso statico (GTFS)
-    state.stopsGTFS = await fetchGTFSStops(state.tripId);
+    // state.stopsGTFS = await fetchGTFSStops(state.tripId);
 
     // 3. Primo rendering e avvio loop di aggiornamento
     if (state.stopsGTFS) {
@@ -116,23 +170,52 @@ async function init() {
 
 /** Utility per calcolare minuti mancanti */
 function formatMinutesRemaining(timeString) {
-    if (!timeString || !timeString.includes(':')) return timeString; // Ritorna la stringa originale se non parsabile
+    if (!timeString || !timeString.includes(':')) return timeString;
 
     const now = new Date();
     const [h, m] = timeString.split(':').map(Number);
-    const target = new Date();
+    
+    // Creiamo l'oggetto target per oggi
+    const target = new Date(now);
     target.setHours(h, m, 0, 0);
 
-    // Gestione basilare del cambio giorno (se target è ieri, ecc... non gestito profondamente qui)
-    const diffMin = Math.trunc((target - now) / 60000);
+    // --- GESTIONE CAMBIO DATA ---
+    // Se la differenza è superiore a 12 ore nel passato, assumiamo sia domani.
+    // Se la differenza è superiore a 12 ore nel futuro, assumiamo fosse ieri (opzionale).
+    const dodiciOreInMs = 12 * 60 * 60 * 1000;
+    const diffMs = target - now;
 
-    if (diffMin < 0) return "Passato";
-    if (diffMin === 0) return "< 1 min";
-    return `${diffMin} min`;
+    if (diffMs < -dodiciOreInMs) {
+        // Esempio: sono le 23:00, target è "01:00". Aggiungiamo un giorno.
+        target.setDate(target.getDate() + 1);
+    } else if (diffMs > dodiciOreInMs) {
+        // Esempio: sono le 01:00, target è "23:00". Togliamo un giorno.
+        target.setDate(target.getDate() - 1);
+    }
+
+    const diffTotalMin = Math.trunc((target - now) / 60000);
+    const absMin = Math.abs(diffTotalMin);
+    const hours = Math.floor(absMin / 60);
+    const mins = absMin % 60;
+
+    // --- FORMATTAZIONE OUTPUT ---
+    if (diffTotalMin === 0) return "< 1 min";
+
+    if (diffTotalMin > 0) {
+        // Futuro
+        return diffTotalMin < 60 
+            ? `${diffTotalMin} min` 
+            : `${hours} h ${mins} min`;
+    } else {
+        // Passato
+        return absMin < 60 
+            ? `Passato ${absMin} min fa` 
+            : `Passato ${hours} h ${mins} min fa &#128512;`;
+    }
 }
 
 /** Recupera il Trip ID univoco */
-async function fetchTripId(busTrack, busDirection, day, time, stop, lineId) {
+async function fetchTripId(busTrack, busDirection, day, time, stop, lineId) {    
     let text = '';
     try {
         const params = new URLSearchParams({
@@ -149,19 +232,19 @@ async function fetchTripId(busTrack, busDirection, day, time, stop, lineId) {
 
         const response = await fetch(url);
         text = await response.text();
-
         if (!response.ok) throw new Error("Error" + text);
 
         const data = JSON.parse(text);
         if (data.error) {
             console.warn("Errore fetchTripId:", data);
-            // errorPopup(data.error);
+            errorPopup(`${data.error}, <br> ${JSON.stringify(data.params)} <br> <a href="${data.link}" target="_blank">Link</a>`);
+            return null;
         }
         return data.trip_id;
 
     } catch (e) {
         console.error("Errore fetchTripId:", e);
-        errorPopup(text);
+        errorPopup("Errore fetchTripId: \""+text+"\"");
         return null;
     }
 }
@@ -169,7 +252,10 @@ async function fetchTripId(busTrack, busDirection, day, time, stop, lineId) {
 /** Aggiorna i dati in tempo reale e ridisegna la lista */
 async function refreshData() {
     try {
-        state.stopsJSON = await fetchRealTimeInfo();
+        if (firstIteration.refresh) {
+            state.stopsJSON = await fetchRealTimeInfo(state.currentStopId, state.line, state.today);
+            firstIteration.refresh = false;
+        }
 
         // Cerca se la fermata SELEZIONATA è nella lista GTFS
         const selectedStopInGTFS = state.stopsGTFS.find(s =>
@@ -245,35 +331,37 @@ async function fetchGTFSStops(tripId) {
 }
 
 /** Recupera informazioni real-time per la fermata selezionata */
-async function fetchRealTimeInfo() {
+async function fetchRealTimeInfo(currentStopId, line, today) {
     try {
-        const response = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${state.currentStopId}-web-aut`, {
+        let url = `https://oraritemporeale.actv.it/aut/backend/passages/${currentStopId}-web-aut`;
+        const response = await fetch(url, {
             cache: 'no-cache'
         });
         if (!response.ok) throw new Error("Errore RealTime");
         const trips = await response.json();
-
+        
         // OPTIMIZATION: Filtra solo i trip della linea corrente
         const plausibleTrips = trips.filter(trip => {
             const tripLine = trip.line?.split('_')[0];
-            return tripLine === state.line;
+            return tripLine === line;
         });
-
+        
         const matchPromises = plausibleTrips.map(async trip => {
             const stop = trip.timingPoints[trip.timingPoints.length - 1];
             const tid = await fetchTripId(
                 trip.line.split('_')[0],
                 trip.destination,
-                state.today,
+                today,
                 stop.time,
                 stop.stop,
                 trip.lineId
             );
             return { ...trip, calculatedTripId: tid };
         });
-
+        
         const results = await Promise.all(matchPromises);
-        const interestingTrip = results.find(t => t.calculatedTripId === state.tripId);
+        console.log("Fetched Real Time Info", "results", results);
+        const interestingTrip = results.find(t => t.calculatedTripId == state.tripId);
 
         return interestingTrip ? interestingTrip.timingPoints : [];
     } catch (e) {
@@ -294,73 +382,29 @@ function renderTimeline() {
         state.currentStopId.split('-').includes(s.stop_id.toString())
     );
 
-    console.log("Merged: ", state.mergedStops);
+    // console.log("Merged: ", state.mergedStops);
     
 
     state.mergedStops.forEach((stop, index) => {
         const stopEl = document.createElement('div');
-        // const rtInfo = state.stopsJSON.find(s => s.stop === stop.stop_name);
+        stopEl.dataset.stopId = stop.stop_id;
+        stopEl.dataset.index = index;
 
-        const isSelected = (index === selectedStopIdx);
-        // Calcoliamo se la fermata è graficamente precedente
-        const isGraphicallyPrevious = (selectedStopIdx !== -1 && index < selectedStopIdx);
-        const isPrevious = !stop.hasRealTime;
-
-        let statusClass = '';
-        if (isPrevious) statusClass = 'passed';
-        else if (isSelected) statusClass = 'current current-stop-item';
-
-        // --- GESTIONE VISUALIZZAZIONE ORARIO ---
-        let timeDisplay = "--:--";
-
-        if (stop.arrival_time && stop.arrival_time.includes('\'')) {
-            stop.arrival_time = stop.arrival_time.replace('\'', ' min');
-        }
-
-        if (stop.hasRealTime) {
-            timeDisplay = formatMinutesRemaining(stop.arrival_time);
-        } else {
-            timeDisplay = ("Passato (" + stop.arrival_time?.substring(0, 5) + ")*") || "Info N.D.";
-        }
-
-        if (stop.arrival_time === 'departure') {
-            timeDisplay = '< 1 min';
-        }
-
-        if (!stop.hasGTFS) {
-            console.warn("Stop without GTFS:", stop);
-            console.error("Ergo: tripID sbagliato", state);
-            return;
-        }
-
-        const stopIdShort = stop.data_url.split("-").slice(0, -2).join("-");
-        const stopNameEscaped = encodeURIComponent(stop.stop_name);
-
-        stopEl.className = `stop-item ${statusClass}`;
-        stopEl.style.cursor = 'pointer';
-        stopEl.onclick = () => {
-            window.location.href = `/aut/stops/stop?id=${stopIdShort}&name=${stopNameEscaped}`;
-        };
-
-        stopEl.innerHTML = `
-            <div class="stop-line ${isPrevious ? 'passed' : ''}"></div>
-            <div class="stop-marker ${statusClass}"></div>
-            <div class="stop-content">
-                <div class="stop-name">${stop.stop_name}</div>
-                <div class="stop-time">${timeDisplay}</div>
-            </div>
-        `;
         timeline.appendChild(stopEl);
+        updateSingleStopInTimeline(stop, selectedStopIdx, stopEl);
     });
 
     container.innerHTML = '';
     container.appendChild(timeline);
 
     // Auto-scroll
-    setTimeout(() => {
-        const current = document.querySelector('.current-stop-item');
-        current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 500);
+    if (firstIteration.scroll) {
+        setTimeout(() => {
+            const current = document.querySelector('.current-stop-item');
+            current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 500);
+        firstIteration.scroll = false;
+    }
 }
 
 /** Naviga alla mappa delle linee */
@@ -372,27 +416,43 @@ function openMap() {
 }
 
 function errorPopup(message) {
+    if (!document.querySelector('.error-container')) {
+        const container = document.createElement('div');
+        container.className = 'error-container';
+        document.body.appendChild(container);
+    }
     const popup = document.createElement('div');
     popup.className = 'error-popup';
     popup.innerHTML = `
     <div class="error-popup">
         <div class="error-popup-content">
-            <div class="error-popup-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z" fill="#EF4444"/>
-                </svg>
+            <div class="error-popup-header">
+                <div class="error-popup-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V15H13V17ZM13 13H11V7H13V13Z" fill="#EF4444"/>
+                    </svg>
+                </div>
+                <div class="error-popup-title">Errore</div>
+                <button class="btn btn-danger btn-close" onclick="errorPopupClose()"></button>
             </div>
             <div class="error-popup-message">
                 ${message}
             </div>
-            <button class="error-popup-close" onclick="errorPopupClose()">Chiudi</button>
         </div>
     </div>
+    <hr>
     `;
-    document.body.appendChild(popup);
+    document.querySelector('.error-container').appendChild(popup);
 }
 
 function errorPopupClose() {
+
+    // Rimuovi il container se è l'ultimo elemento
+    if (document.querySelector('.error-container').children.length === 1) {
+        document.querySelector('.error-container').remove();
+        return;
+    }
+
     const popup = document.querySelector('.error-popup');
     popup.remove();
 }
@@ -493,10 +553,11 @@ async function getPreviousStopsRealTime_block() {
 }
 
 function getPreviousStopsRealTime() {
+    console.log("Previous Stop Matching");
+    
     // Find the index of the current stop
     let currentStopIdSplitted = state.currentStopId.split("-");
     const currentStopIndex = state.mergedStops.findIndex(stop => currentStopIdSplitted.find(id => stop.stop_id == id));
-
 
     // Get all stops before the current stop
     let previousStops = state.mergedStops.slice(0, currentStopIndex);
@@ -521,11 +582,11 @@ function getPreviousStopsRealTime() {
                 - Same line
                 - Same direction
             */
-            let guard = true;
-            if (state.lineFull != trip.line) guard = false;
-            if (state.destination != trip.destination) guard = false;
+            let isPlausible = true;
+            if (state.lineFull != trip.line) isPlausible = false;
+            //if (state.destination != trip.destination) isPlausible = false;            
 
-            if (guard) {
+            if (isPlausible) {
                 // Calcolo il trip ID
                 let offset = 2;
                 if (trip.timingPoints.length < offset) offset = trip.timingPoints.length;
@@ -541,16 +602,18 @@ function getPreviousStopsRealTime() {
                     trip.lineId
                 );
 
-
+                // console.log(tid, state.tripId);
+                
 
                 // Se c'è il MATCH
                 if (tid == state.tripId) {
-                    console.log(stopName, tid, state.tripId, trip.time);
+                    console.log("Previous Stop Mached", stopName, tid, state.tripId, trip.time);
 
                     stop.arrival_time = trip.time;
                     stop.departure_time = trip.time;
                     stop.hasRealTime = true;
-                    renderTimeline();
+                    // renderTimeline();
+                    updateSingleStopInTimeline(stop, currentStopIndex);
                 }
 
             }
@@ -566,4 +629,80 @@ async function returnTripList(dataUrl) {
     let response = await fetch(apiBase + dataUrl);
     let data = await response.json();
     return data;
+}
+
+function updateSingleStopInTimeline(stop, selectedStopIdx, domEl=null) {
+    let stopEl;
+    if (!domEl) {
+        stopEl = document.querySelector(`.stop-item[data-stop-id="${stop.stop_id}"]`);
+    } else {
+        stopEl = domEl;
+    }
+    
+    if (!stopEl) return;
+    let index = parseInt(stopEl.dataset.index);
+
+    // const rtInfo = state.stopsJSON.find(s => s.stop === stop.stop_name);
+
+    const isSelected = (index === selectedStopIdx);
+    // Calcoliamo se la fermata è graficamente precedente
+    const isGraphicallyPrevious = (selectedStopIdx !== -1 && index < selectedStopIdx);
+    const isPrevious = !stop.hasRealTime;
+
+    let statusClass = '';
+    if (isPrevious) statusClass = 'passed';
+    else if (isSelected) statusClass = 'current current-stop-item';
+
+    // --- GESTIONE VISUALIZZAZIONE ORARIO ---
+    let timeDisplay = "--:--";
+
+    if (stop.arrival_time && stop.arrival_time.includes('\'')) {
+        stop.arrival_time = stop.arrival_time.replace('\'', ' min');
+    }
+
+    if (stop.hasRealTime) {
+        timeDisplay = formatMinutesRemaining(stop.arrival_time);
+    } else {
+        timeDisplay = ("Passato (" + stop.arrival_time?.substring(0, 5) + ")*") || "Info N.D.";
+    }
+
+    if (stop.arrival_time === 'departure') {
+        timeDisplay = '< 1 min';
+    }
+
+    if (!stop.hasGTFS) {
+        console.warn("Stop without GTFS:", stop);
+        console.error("Ergo: tripID sbagliato", state);
+        return;
+    }
+
+    // console.log(stop);
+    
+    const stopNameEscaped = encodeURIComponent(stop.stop_name);
+    
+    stopEl.className = `stop-item ${statusClass}`;
+    try{
+        stopEl.style.cursor = 'pointer';
+        const stopIdShort = stop.data_url.split("-").slice(0, -2).join("-");
+        stopEl.onclick = () => {
+            window.location.href = `/aut/stops/stop?id=${stopIdShort}&name=${stopNameEscaped}`;
+        };
+    }catch(e){
+        console.warn(e);
+        stopEl.style.cursor = 'default';
+        stopEl.style.backgroundColor = '#2222';
+        stopEl.style.borderRadius = '5px';
+        stopEl.onclick = () => {
+            errorPopup("URL Fermata non disponibile");
+        };
+    }
+
+    stopEl.innerHTML = `
+        <div class="stop-line ${isPrevious ? 'passed' : ''}"></div>
+        <div class="stop-marker ${statusClass}"></div>
+        <div class="stop-content">
+            <div class="stop-name">${stop.stop_name}</div>
+            <div class="stop-time">${timeDisplay}</div>
+        </div>
+    `;
 }

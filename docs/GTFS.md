@@ -1,67 +1,60 @@
-# GTFS Implementation Documentation
+# GTFS & Route Planning
 
-## Overview
-This project uses a simplified and cached version of the GTFS (General Transit Feed Specification) data to provide offline-capable and fast route planning. The raw GTFS data is processed into JSON files stored in `data/gtfs/cache/`.
+Il cuore dell'applicazione è la gestione dei dati GTFS per fornire orari e calcolo percorsi in modo estremamente rapido.
 
-## Cache Structure
+## Ingestione dei Dati (`GTFSParser.php`)
 
-The cache is located in `data/gtfs/cache/` and consists of the following components:
+Il parser scarica i feed ufficiali ACTV e li trasforma in una cache JSON ottimizzata. Questo passaggio è critico perché permette al server di non dover processare file CSV giganti ad ogni richiesta.
 
-### 1. `stops.json`
-Contains a list of all stops indexed by `stop_id`.
-```json
-{
-    "stop_id": {
-        "name": "Stop Name",
-        "lat": 45.123,
-        "lon": 12.123
-    }
-}
-```
+### Processo di Ingestione
+1.  **Download**: Scarica `actv_aut.zip`.
+2.  **Stops/Routes/Trips**: Converte i file `.txt` in dizionari JSON semplici.
+3.  **Stop Times (La parte difficile)**: Il file `stop_times.txt` è troppo grande per essere caricato in memoria. Il parser lo divide:
+    -   Crea un file JSON per ogni singola linea in `/data/gtfs/cache/routes/route_X.json`.
+    -   All'interno, i dati sono raggruppati per `trip_id`.
+4.  **Indexing**: Crea `stop_routes_index.json`, che mappa ogni fermata alle linee che la servono.
 
-### 2. `routes.json`
-Contains a list of all routes indexed by `route_id`.
-```json
-{
-    "route_id": {
-        "route_short_name": "10",
-        "route_long_name": "Route Description"
-    }
-}
-```
+---
 
-### 3. `stop_routes_index.json`
-A reverse index mapping each `stop_id` to a list of `route_id`s that pass through it. This is critical for finding common routes between two stops (direct connections) or finding transfer points.
-```json
-{
-    "stop_id": ["route_id_1", "route_id_2"]
-}
-```
+## Logica di Ricerca Percorsi (`RoutePlanner.php`)
 
-### 4. `routes/` Directory
-Contains individual JSON files for each route (e.g., `route_10_UM.json`). Each file contains the full schedule for that route, organized by trips.
-```json
-{
-    "trip_id": [
-        {
-            "stop_id": "stop_1",
-            "arrival_time": "10:00:00",
-            "departure_time": "10:00:00",
-            "stop_sequence": 1
-        },
+Il `RoutePlanner` implementa un algoritmo di ricerca percorsi personalizzato.
+
+### 1. Connessioni Dirette
+Cerca nel `stop_routes_index.json` se l'origine e la destinazione condividono una linea. In caso affermativo, cerca i trip che passano per entrambe le fermate nell'ordine corretto e dopo l'orario richiesto.
+
+### 2. Cambi (1 Transfer)
+Se non c'è una connessione diretta:
+1.  Prende tutte le linee che passano per l'origine.
+2.  Prende tutte le linee che passano per la destinazione.
+3.  Cerca una fermata intermedia dove queste linee si incrociano.
+4.  Calcola il tempo totale includendo un margine di 2 minuti per il cambio.
+
+### 3. Ricerca nel Giorno Successivo
+Se dopo le 23:00 non ci sono più corse, il sistema riprova automaticamente la ricerca partendo dalle 00:00 del giorno dopo, marcando i risultati con un `day_offset`.
+
+---
+
+## Struttura della Cache JSON
+
+-   **`stops.json`**: `{ "stop_id": { "name", "lat", "lon" } }`
+-   **`stop_routes_index.json`**: `{ "stop_id": ["route_id1", "route_id2"] }`
+-   **`routes/route_X.json`**:
+    ```json
+    {
+      "trip_id_1": [
+        { "stop_id": "1", "arrival_time": "08:00:00", "stop_sequence": 1 },
         ...
-    ]
-}
-```
+      ]
+    }
+    ```
 
-## Route Planning Logic (`RoutePlanner.php`)
+---
 
-The `RoutePlanner` class uses these cache files to find connections:
+## Funzioni Particolari
 
-1.  **Direct Connections**: It checks `stop_routes_index.json` for the origin and destination stops. If they share a `route_id`, it loads the specific route file and looks for trips where the origin comes before the destination and the departure time is after the requested time.
-2.  **Transfers (1 hop)**: If no direct connection is found, it looks for an intermediate stop where a route from the origin intersects with a route to the destination.
-3.  **Next Day Search**: If no results are found for the current day, the system automatically searches for trips starting from `00:00:00` of the next day. These results are marked with a `day_offset` flag.
+### `calculateGeoDistance` (Haversine)
+Utilizzata per trovare la fermata più vicina partendo da coordinate GPS. Implementa la formula matematica per calcolare la distanza su una sfera (Terra).
 
-## Limitations
--   **Calendar/Dates**: The current implementation assumes a static schedule (e.g., "Monday-Friday" or generic). It does not currently handle specific calendar dates, holidays, or day-of-week exceptions (e.g., `calendar.txt` and `calendar_dates.txt` from GTFS are not fully utilized in the runtime logic).
--   **Transfers**: Limited to 1 transfer to ensure performance.
+### `Weighted Scoring`
+I risultati non sono ordinati solo per orario di arrivo, ma penalizzati se prevedono un cambio (+15 minuti virtuali) o se sono nel giorno successivo (+24 ore virtuali). Questo assicura che un viaggio diretto alle 14:10 sia preferito a un viaggio con cambio che arriva alle 14:05.

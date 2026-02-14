@@ -33,3 +33,6 @@ $router->add('/api/tm/create-session'   , 'ApiController', 'createTmSession');
 $router->add('/api/tm/simulated-data'   , 'ApiController', 'getSimulatedData');
 $router->add('/api/tm/heartbeat'        , 'ApiController', 'runTmHeartbeat');
 $router->add('/api/gtfs-resolve'        , 'ApiController', 'gtfsResolve');
+$router->add('/api/gtfs-bnr'            , 'ApiController', 'gtfsBusesRunningNow');
+$router->add('/api/bus-position'        , 'ApiController', 'busPosition');
+$router->add('/live-map'                , 'Controller', 'liveMap');

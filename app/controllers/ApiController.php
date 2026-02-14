@@ -702,4 +702,121 @@ class ApiController
 
         require_once BASE_PATH . '/app/models/gtfsTripResolver.php';
     }
+    
+    /**
+     * API /api/gtfs-bnr
+     * Ritorna i bus attualmente in servizio (±30 min dall'orario corrente).
+     * GET params opzionali: time (HH:MM), day (monday..sunday)
+     */
+    function gtfsBusesRunningNow() {
+        header('Content-Type: application/json');
+
+        $db = $this->getDb();
+
+        // Orario e giorno: default = ora del server
+        $currentTime = $_GET['time'] ?? date('H:i');
+        $dayParam    = $_GET['day']  ?? strtolower(date('l'));
+
+        $allowedDays = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+        $dayIndex = array_search($dayParam, $allowedDays);
+        if ($dayIndex === false) {
+            echo json_encode(['error' => 'Invalid day']);
+            return;
+        }
+        $yesterday = $allowedDays[($dayIndex + 6) % 7];
+
+        // Query: bus di oggi + bus notturni di ieri (arrival_time >= 24:00:00)
+        $sql = "SELECT r.route_short_name, r.route_id, t.trip_headsign, st.arrival_time, t.trip_id, 'today' as source
+                FROM stops s
+                JOIN stop_times st ON s.stop_id = st.stop_id
+                JOIN trips t ON st.trip_id = t.trip_id
+                JOIN routes r ON t.route_id = r.route_id
+                JOIN calendar c ON t.service_id = c.service_id
+                WHERE c.{$dayParam} = 1
+                UNION ALL
+                SELECT r.route_short_name, r.route_id, t.trip_headsign, st.arrival_time, t.trip_id, 'yesterday' as source
+                FROM stops s
+                JOIN stop_times st ON s.stop_id = st.stop_id
+                JOIN trips t ON t.trip_id = st.trip_id
+                JOIN routes r ON t.route_id = r.route_id
+                JOIN calendar c ON t.service_id = c.service_id
+                WHERE c.{$yesterday} = 1 AND st.arrival_time >= '24:00:00'
+                ORDER BY arrival_time ASC";
+
+        $allTrips = $db->query($sql);
+
+        // Filtro: solo trip entro ±30 min dall'orario richiesto
+        $timeParts = explode(':', $currentTime);
+        $searchSec = ($timeParts[0] * 3600) + ($timeParts[1] * 60);
+        $range = 1800; // 30 minuti
+
+        $seen = []; // trip_id già visti (deduplicazione)
+        $results = [];
+
+        foreach ($allTrips as $trip) {
+            if (isset($seen[$trip['trip_id']])) continue;
+
+            $tParts = explode(':', $trip['arrival_time']);
+            $tripSec = ($tParts[0] * 3600) + ($tParts[1] * 60);
+
+            $diff = abs($tripSec - $searchSec);
+            if ($diff > 43200) $diff = 86400 - $diff;
+
+            if ($diff <= $range) {
+                $trip['diff_min'] = round(($tripSec - $searchSec) / 60);
+
+                if ($trip['source'] == 'yesterday' && $searchSec < 3600) {
+                    $trip['diff_min'] = round(($tripSec - 86400 - $searchSec) / 60);
+                }
+
+                $seen[$trip['trip_id']] = true;
+                $results[] = $trip;
+            }
+        }
+
+        usort($results, fn($a, $b) => $a['diff_min'] <=> $b['diff_min']);
+
+        echo json_encode([
+            'time'  => $currentTime,
+            'day'   => $dayParam,
+            'count' => count($results),
+            'buses' => $results
+        ]);
+    }
+
+    /**
+     * API /api/bus-position
+     * Dato un tripId, ritorna le fermate ordinate con coordinate e orari.
+     * GET params: tripId (required)
+     */
+    function busPosition() {
+        header('Content-Type: application/json');
+
+        $tripId = $_GET['tripId'] ?? null;
+        if (!$tripId) {
+            header('HTTP/1.1 400 Bad Request');
+            echo json_encode(['error' => 'Missing tripId parameter']);
+            return;
+        }
+
+        $db = $this->getDb();
+        $safeTripId = addslashes($tripId);
+
+        $sql = "SELECT 
+                    s.stop_id,
+                    s.stop_name,
+                    s.stop_lat,
+                    s.stop_lon,
+                    st.arrival_time,
+                    st.departure_time,
+                    st.stop_sequence
+                FROM stop_times st
+                JOIN stops s ON st.stop_id = s.stop_id
+                WHERE st.trip_id = '$safeTripId'
+                ORDER BY st.stop_sequence ASC";
+
+        $stops = $db->query($sql);
+
+        echo json_encode($stops);
+    }
 }

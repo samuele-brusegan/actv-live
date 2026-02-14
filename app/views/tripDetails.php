@@ -9,6 +9,7 @@
         <link rel="stylesheet" href="/css/structure/structure-tripDetails.css">
         <link rel="stylesheet" href="/css/tripDetails.css">
         <script type="text/javascript" src="/js/tripDetails.js"></script>
+        <script type="module" src="https://cdn.jsdelivr.net/npm/ldrs/dist/auto/hatch.js"></script>
     </head>
 
     <body>
@@ -44,7 +45,17 @@
         <div class="main-card">
             <div id="stops-container">
                 <div class="loading-state">
-                    Caricamento fermate...
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                        <l-hatch
+                            size="28"
+                            stroke="4"
+                            speed="3.5"
+                            color="black" 
+                        ></l-hatch>
+                        <br>
+
+                        Caricamento fermate...
+                    </div>
                 </div>
             </div>
         </div>

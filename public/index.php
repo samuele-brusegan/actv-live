@@ -22,7 +22,14 @@ require BASE_PATH . '/public/routes.php';
 //Send globals to JS: moved inside head.php
 
 // Redirect HTTP to HTTPS
-if (!isset($_SERVER['HTTP_X_FORWARDED_SCHEME']) || $_SERVER['HTTP_X_FORWARDED_SCHEME'] !== 'https') {
+if (
+        (isset($_SERVER['HTTP_X_FORWARDED_SCHEME']) && $_SERVER['HTTP_X_FORWARDED_SCHEME'] !== 'https') || 
+        (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'on')
+    ) {
+    /* echo "<pre>";
+    print_r($_SERVER);
+    echo "</pre>";
+    echo "Redirecting to HTTPS"; */
     header("Location: https://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
     exit();
 }
