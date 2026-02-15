@@ -2,16 +2,25 @@
 if (isset($_GET["return"]) || isset($_GET["rtable"])) {
     
     try{
-        $time = $_GET['time']; //07:07
+        /* $time = $_GET['time']; //07:07
         $busTrack = addslashes($_GET['busTrack']); //21
         $busDirection = addslashes($_GET['busDirection']); //Camporese Gritti
         $day = $_GET['day']; //monday
         $stop = addslashes($_GET['stop']); //Martellago delle Motte
         $lineId = $_GET['lineId']; //29387
+        $limit = $_GET['limit'] ?? 1; */
+
+        $time = $_GET['time'] ?? null; //07:07
+        $busTrack = $_GET['busTrack'] ?? null; //21
+        $busDirection = $_GET['busDirection'] ?? null; //Camporese Gritti
+        $day = $_GET['day'] ?? null; //monday
+        $stop = $_GET['stop'] ?? null; //Martellago delle Motte
+        $lineId = $_GET['lineId'] ?? null; //29387
+        $stopId = $_GET['stopId'] ?? null; //337-web-aut
         $limit = $_GET['limit'] ?? 1;
         
         $pdo = getPDOConnection();
-        $trips = dbquery($pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop);
+        $trips = dbquery($pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId);
 
         if (count($trips) == 0) {
             header("Content-Type: application/json");
@@ -24,7 +33,8 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
                     "busDirection" => $busDirection, 
                     "day" => $day, 
                     "lineId" => $lineId, 
-                    "stop" => $stop
+                    "stop" => $stop,
+                    "stopId" => $stopId
                 ],
                 "link" => $_SERVER["REQUEST_SCHEME"] . "://" . $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"]
             ]);
@@ -59,7 +69,8 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
                 "busDirection" => $busDirection, 
                 "day" => $day, 
                 "lineId" => $lineId, 
-                "stop" => $stop
+                "stop" => $stop,
+                "stopId" => $stopId
             ],
             "link" => $_SERVER["REQUEST_SCHEME"] . "://" . $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"]
         ]);
@@ -80,8 +91,13 @@ function getPDOConnection() {
     return $pdo;
 }
 
-function queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop) {
-    // $day è già stato validato in dbquery
+function queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId = null) {
+    if ($stopId && $stopId !== 'null' && $stopId !== 'undefined') {
+        $stopQuery = "s.data_url LIKE CONCAT('%', ?, '%')";
+    } else {
+        $stopQuery = "s.stop_name LIKE CONCAT('%', ?, '%')";
+    }
+
     $q = "SELECT t.*, st.arrival_time, st.departure_time, r.route_short_name,
             -- Calcoliamo la differenza normalizzata in secondi
             SEC_TO_TIME(ABS((TIME_TO_SEC(st.arrival_time) % 86400) - (TIME_TO_SEC(?) % 86400))) AS delay
@@ -92,7 +108,7 @@ function queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop) {
         JOIN calendar c ON t.service_id = c.service_id
         WHERE
             r.route_short_name = ?
-            AND s.stop_name = ?
+            AND $stopQuery
             AND c.{$day} = 1
             AND st.pickup_type IN (0, 1)
         -- Ordiniamo per la differenza assoluta minima, considerando il ciclo delle 24 ore
@@ -173,15 +189,16 @@ function addSimilarityScores_jaro(array &$trips, string $busDirection) {
     });
 }
 
-function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop) {
+function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId = null) {
     $allowedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     if (!in_array(strtolower($day), $allowedDays)) {
         throw new Exception("Invalid day: $day");
     }
 
-    $query = queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop);
+    $query = queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId);
     $stmt = $pdo->prepare($query);
-    $stmt->execute([$time, $busTrack, $stop]);
+    $paramStop = ($stopId && $stopId !== 'null' && $stopId !== 'undefined') ? $stopId : $stop;
+    $stmt->execute([$time, $busTrack, $paramStop]);
     $trips = $stmt->fetchAll();
 
     addSimilarityScores($trips, $busDirection);

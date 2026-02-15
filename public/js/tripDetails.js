@@ -215,7 +215,7 @@ function formatMinutesRemaining(timeString) {
 }
 
 /** Recupera il Trip ID univoco */
-async function fetchTripId(busTrack, busDirection, day, time, stop, lineId) {    
+async function fetchTripId(busTrack, busDirection, day, time, stop, lineId, stopId = null) {    
     let text = '';
     try {
         const params = new URLSearchParams({
@@ -227,6 +227,9 @@ async function fetchTripId(busTrack, busDirection, day, time, stop, lineId) {
             stop: stop,
             lineId: lineId
         });
+        if (stopId && stopId !== 'null') {
+            params.append('stopId', stopId);
+        }
         let url = `/api/gtfs-identify?${params.toString()}`;
         // console.log("https://actv-live.test"+url);
 
@@ -354,7 +357,8 @@ async function fetchRealTimeInfo(currentStopId, line, today) {
                 today,
                 stop.time,
                 stop.stop,
-                trip.lineId
+                trip.lineId,
+                currentStopId // Pass data_url as stopId
             );
             return { ...trip, calculatedTripId: tid };
         });

@@ -9,13 +9,19 @@ if (!defined('BASE_PATH')) {
 }
 
 // Mock ENV if needed or load from .env.example/testing
+// Load ENV from .env if it exists
 if (!defined('ENV')) {
-    define('ENV', [
-        'DB_HOST' => 'localhost',
-        'DB_NAME' => 'actv_live_test',
-        'DB_USER' => 'root',
-        'DB_PASS' => '',
-    ]);
+    $envFile = BASE_PATH . '/.env';
+    if (file_exists($envFile)) {
+        define('ENV', parse_ini_file($envFile));
+    } else {
+        define('ENV', [
+            'DB_HOST' => 'localhost',
+            'DB_NAME' => 'actv_live_test',
+            'DB_USER' => 'root',
+            'DB_PASS' => '',
+        ]);
+    }
 }
 
 // Load necessary files manually if not PSR-4 compliant enough yet
