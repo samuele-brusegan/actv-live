@@ -46,37 +46,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     init();
 });
 
-async function unpackTripId(tripId) {
-    let text = '';
-    try {
-        const params = new URLSearchParams({
-            return: 'true',
-            tripId: tripId
-        });
-        let url = `/api/gtfs-resolve?${params.toString()}`;
-        // console.log("https://actv-live.test"+url);
-
-        const response = await fetch(url);
-        text = await response.text();
-
-        if (!response.ok) throw new Error("Error" + text);
-
-        const data = JSON.parse(text);
-        if (data.error) {
-            console.warn("Errore fetchTripId:", data);
-            // errorPopup(data.error);
-        }
-        console.log(data);
-        
-        return data;
-
-    } catch (e) {
-        console.error("Errore fetchTripId:", e);
-        errorPopup(text);
-        return null;
-    }
-}
-
 /** Inizializzazione della pagina */
 async function init() {
     const dow = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -88,13 +57,6 @@ async function init() {
     const timedStop = sessionStorage.getItem('timedStop');
     const realTime = sessionStorage.getItem('realTime');
     const lineId = sessionStorage.getItem('lineId');
-
-    if (lastStop == "BOTTENIGO") {
-        errorPopup(`
-            Ahimè il matching dei bus per Bottenigo è ancora spesso malfunzionante. <br>
-            Se vedi che il bus non è quello giusto, eh... non so che dirti. <br>
-        `)
-    }
 
     let initUnpackTripId = async () => {
         console.log("Start Unpacking TripID");
@@ -137,7 +99,7 @@ async function init() {
     
     //set stopId from url
     state.currentStopId = sessionStorage.getItem('tripDetails_selectedStop');
-    // console.log(state);
+    console.log("State", state);
 
     // Destination e last stop non matchano lancio un warn in console
     if (state.destination != lastStop) {
@@ -165,6 +127,37 @@ async function init() {
     if (state.stopsGTFS) {
         await refreshData();
         setInterval(refreshData, 25000);
+    }
+}
+
+async function unpackTripId(tripId) {
+    let text = '';
+    try {
+        const params = new URLSearchParams({
+            return: 'true',
+            tripId: tripId
+        });
+        let url = `/api/gtfs-resolve?${params.toString()}`;
+        // console.log("https://actv-live.test"+url);
+
+        const response = await fetch(url);
+        text = await response.text();
+
+        if (!response.ok) throw new Error("Error" + text);
+
+        const data = JSON.parse(text);
+        if (data.error) {
+            console.warn("Errore fetchTripId:", data);
+            // errorPopup(data.error);
+        }
+        console.log(data);
+        
+        return data;
+
+    } catch (e) {
+        console.error("Errore fetchTripId:", e);
+        errorPopup(text);
+        return null;
     }
 }
 
@@ -264,6 +257,7 @@ async function refreshData() {
         const selectedStopInGTFS = state.stopsGTFS.find(s =>
             state.currentStopId.split('-').includes(s.stop_id.toString())
         );
+        console.log("selectedStopInGTFS", selectedStopInGTFS);
 
         if (selectedStopInGTFS) {
             const rtStop = state.stopsJSON.find(s => s.stop === selectedStopInGTFS.stop_name);
@@ -348,7 +342,7 @@ async function fetchRealTimeInfo(currentStopId, line, today) {
             const tripLine = trip.line?.split('_')[0];
             return tripLine === line;
         });
-        
+        console.log(plausibleTrips);
         const matchPromises = plausibleTrips.map(async trip => {
             const stop = trip.timingPoints[trip.timingPoints.length - 1];
             const tid = await fetchTripId(
@@ -366,8 +360,12 @@ async function fetchRealTimeInfo(currentStopId, line, today) {
         const results = await Promise.all(matchPromises);
         console.log("Fetched Real Time Info", "results", results);
         const interestingTrip = results.find(t => t.calculatedTripId == state.tripId);
+        if (interestingTrip) return interestingTrip.timingPoints;
+        
+        console.warn("No matching trip found for tripId Using loose matching", state.tripId);
+                
+        return results[0] ? results[0].timingPoints : [];
 
-        return interestingTrip ? interestingTrip.timingPoints : [];
     } catch (e) {
         console.error("fetchRealTimeInfo:", e);
         return [];

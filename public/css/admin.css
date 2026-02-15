@@ -10,6 +10,17 @@
     --danger-color: #ef4444;
     --border-color: #333;
 }
+[data-theme="dark"] {
+    --bg-dark: #121212;
+    --bg-panel: #1e1e1e;
+    --text-primary: #ffffff;
+    --text-secondary: #b0b0b0;
+    --accent-color: #3b82f6;
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --danger-color: #ef4444;
+    --border-color: #333;
+}
 
 body {
     background-color: var(--bg-dark);

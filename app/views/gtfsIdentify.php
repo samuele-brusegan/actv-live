@@ -99,8 +99,13 @@ function queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop, $st
     }
 
     $q = "SELECT t.*, st.arrival_time, st.departure_time, r.route_short_name,
-            -- Calcoliamo la differenza normalizzata in secondi
-            SEC_TO_TIME(ABS((TIME_TO_SEC(st.arrival_time) % 86400) - (TIME_TO_SEC(?) % 86400))) AS delay
+            -- Calcoliamo la differenza circolare in secondi (distanza minima su 24h)
+            SEC_TO_TIME(
+                LEAST(
+                    ABS((TIME_TO_SEC(st.arrival_time) % 86400) - (TIME_TO_SEC(?) % 86400)),
+                    86400 - ABS((TIME_TO_SEC(st.arrival_time) % 86400) - (TIME_TO_SEC(?) % 86400))
+                )
+            ) AS delay
         FROM trips t
         JOIN routes r ON t.route_id = r.route_id
         JOIN stop_times st ON t.trip_id = st.trip_id
@@ -111,8 +116,7 @@ function queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop, $st
             AND $stopQuery
             AND c.{$day} = 1
             AND st.pickup_type IN (0, 1)
-        -- Ordiniamo per la differenza assoluta minima, considerando il ciclo delle 24 ore
-        ORDER BY ABS(delay) ASC
+        ORDER BY TIME_TO_SEC(delay) ASC
         LIMIT 30";
     return $q;
 }

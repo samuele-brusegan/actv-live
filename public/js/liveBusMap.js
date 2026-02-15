@@ -123,7 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function timeToSec(t) {
         if (!t) return 0;
         const p = t.split(':');
-        return (+p[0]) * 3600 + (+p[1]) * 60 + (p[2] ? +p[2] : 0);
+        const sec = (+p[0]) * 3600 + (+p[1]) * 60 + (p[2] ? +p[2] : 0);
+        return sec % 86400; // Normalizza 24:xx a 00:xx
     }
 
     /**
@@ -199,8 +200,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Trova il segmento GTFS corrente
         let segment = null;
         for (let i = 0; i < stops.length - 1; i++) {
-            const aSec = timeToSec(stops[i].arrival_time);
-            const bSec = timeToSec(stops[i + 1].arrival_time);
+            let aSec = timeToSec(stops[i].arrival_time);
+            let bSec = timeToSec(stops[i + 1].arrival_time);
+            
+            // Gestione mezzanotte: se b < a, b è il giorno dopo
+            if (bSec < aSec) bSec += 86400;
+
             if (virtualNowSec >= aSec && virtualNowSec <= bSec) {
                 segment = {
                     idx: i,
@@ -665,7 +670,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (delayInfo && delayInfo.rtTime) {
                         const gtfsTime = timeToSec(pos.nextTime);
                         const rtTime = timeToSec(delayInfo.rtTime);
-                        delayInfo.delaySec = rtTime - gtfsTime;
+                        let diff = rtTime - gtfsTime;
+                        if (diff > 43200) diff -= 86400;
+                        else if (diff < -43200) diff += 86400;
+                        delayInfo.delaySec = diff;
                         pos = interpolateWithShape(stops, shape, nowSec, delayInfo.delaySec);
                         if (!pos) {
                             if (busMarkers.has(bus.trip_id)) {

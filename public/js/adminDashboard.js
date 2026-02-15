@@ -30,7 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function timeToSec(t) {
         if (!t) return 0;
         const p = t.split(':');
-        return (+p[0]) * 3600 + (+p[1]) * 60 + (p[2] ? +p[2] : 0);
+        const sec = (+p[0]) * 3600 + (+p[1]) * 60 + (p[2] ? +p[2] : 0);
+        return sec % 86400; // Normalizza 24:xx a 00:xx
     }
     
     function secToTime(t) {
@@ -62,9 +63,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Find current segment
         for (let i = 0; i < stops.length - 1; i++) {
-            const aSec = timeToSec(stops[i].arrival_time);
-            const bSec = timeToSec(stops[i + 1].arrival_time);
+            let aSec = timeToSec(stops[i].arrival_time);
+            let bSec = timeToSec(stops[i + 1].arrival_time);
             
+            // Gestione mezzanotte: se b < a, b è il giorno dopo
+            if (bSec < aSec) bSec += 86400;
+
             if (virtualNowSec <= aSec) {
                // Before first stop or waiting at a stop
                return {
@@ -215,7 +219,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         if (fetched && fetched.rtTime) {
                             delayInfo = fetched;
-                            delayInfo.delaySec = fetched.rtTime - gtfsStopSec;
+                            let diff = fetched.rtTime - gtfsStopSec;
+                            if (diff > 43200) diff -= 86400;
+                            else if (diff < -43200) diff += 86400;
+                            delayInfo.delaySec = diff;
                             // Re-calculate pos with delay
                             // (Optional: simply update next stop time, but simpler to just keep next stop)
                         } else if (fetched) {
