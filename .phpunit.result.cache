@@ -1,0 +1,1 @@
+{"version":2,"defects":[],"times":{"GTFSParserTest::testIsCacheValidReturnsFalseIfNoCache":0.007,"GTFSParserTest::testConstructorCreatesCacheDir":0.001,"LoggerTest::testLogMethodExists":0,"LoggerTest::testPhpErrorHandlerMethodExists":0,"LoggerTest::testExceptionHandlerMethodExists":0}}
