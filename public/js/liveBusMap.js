@@ -24,11 +24,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const counterText  = document.getElementById('counter-text');
     const lastUpdateEl = document.getElementById('last-update');
     const spinnerEl    = document.querySelector('#bus-counter .spinner-small');
+    
+    // Side Panel Container (Dynamic creation if missing)
+    let sidePanel = document.getElementById('non-rt-panel');
+    if (!sidePanel) {
+        sidePanel = document.createElement('div');
+        sidePanel.id = 'non-rt-panel';
+        sidePanel.classList.add('hidden');
+        sidePanel.innerHTML = `
+            <div class="nr-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                <span>Bus non monitorati</span>
+                <img src="svg/expand_more.svg" alt="expand_more" style="width:16px">
+            </div>
+            <ul class="nr-list"></ul>
+        `;
+        document.body.appendChild(sidePanel);
+    }
+    const sidePanelList = sidePanel.querySelector('.nr-list');
 
     // ── Mappa Leaflet ─────────────────────────────────────────
     const map = L.map('map', {
         attributionControl: false,
-        zoomControl: true
+        zoomControl: true,
+        maxZoom: 19
     }).setView([45.4384, 12.3359], 12);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -41,6 +59,50 @@ document.addEventListener('DOMContentLoaded', () => {
     let refreshTimer = null;
     let stopCache = new Map();  // Cache per i passaggi alle fermate
 
+    map.on('zoomend moveend', updateMarkerSizes);
+    // Also trigger after load
+    const originalLoadBuses = loadBuses;
+    loadBuses = async function() {
+        await originalLoadBuses.apply(this, arguments);
+        updateMarkerSizes();
+    };
+
+    // ── Event listeners e Inizializzazione ──────────────────
+
+    // Inizializza filtro da URL se presente
+    const initParams = new URLSearchParams(window.location.search);
+    if (initParams.get('line')) filterInput.value = initParams.get('line');
+    else if (initParams.get('tripId')) filterInput.value = initParams.get('tripId');
+
+    let filterTimeout = null;
+    filterInput.addEventListener('input', () => {
+        clearTimeout(filterTimeout);
+        filterTimeout = setTimeout(() => loadBuses(), 400);
+    });
+
+    filterClear.addEventListener('click', () => {
+        filterInput.value = '';
+        // Pulisci anche parametri URL
+        window.history.replaceState({}, '', window.location.pathname);
+        loadBuses();
+    });
+
+    btnRefresh.addEventListener('click', () => {
+        stopCache.clear();
+        loadBuses();
+    });
+
+    function startAutoRefresh() {
+        if (refreshTimer) clearInterval(refreshTimer);
+        refreshTimer = setInterval(() => loadBuses(), REFRESH_INTERVAL);
+    }
+
+    loadBuses();
+    startAutoRefresh();
+
+
+
+    // ── Funzioni ─────────────────────────────────────────────
     // ── Helpers ───────────────────────────────────────────────
 
     /**
@@ -62,6 +124,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!t) return 0;
         const p = t.split(':');
         return (+p[0]) * 3600 + (+p[1]) * 60 + (p[2] ? +p[2] : 0);
+    }
+
+    /**
+     * Converte secondi dal mezzanotte in "HH:MM:SS"
+     */
+    function secToTime(t) {
+        if (!t) return 0;
+        const hours = Math.floor(t / 3600);
+        const minutes = Math.floor((t % 3600) / 60);
+        const seconds = t % 60;
+        return `${hours}:${minutes}:${seconds}`;
     }
 
     /**
@@ -89,13 +162,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const firstSec = timeToSec(stops[0].arrival_time);
         const lastSec  = timeToSec(stops[stops.length - 1].arrival_time);
 
+        stops.forEach( (stop) => {
+            let real_stop_id = stop.data_url.split("-").slice(0, -2).join("-");            
+            stop.real_stop_id = real_stop_id;
+        }); 
+                
+
         // Capolinea iniziale
         if (virtualNowSec <= firstSec) {
             return {
                 lat: parseFloat(stops[0].stop_lat),
                 lng: parseFloat(stops[0].stop_lon),
                 nextStop: stops[0].stop_name,
-                nextStopId: stops[0].stop_id,
+                nextStopId: stops[0].real_stop_id,
                 prevStop: null,
                 progress: 0,
                 nextTime: stops[0].arrival_time
@@ -104,12 +183,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Capolinea finale
         if (virtualNowSec >= lastSec) {
+            return null;
             const last = stops[stops.length - 1];
             return {
                 lat: parseFloat(last.stop_lat),
                 lng: parseFloat(last.stop_lon),
-                nextStop: last.stop_name + ' (capolinea)',
-                nextStopId: last.stop_id,
+                nextStop: last.stop_name  + ' (capolinea)' ,
+                nextStopId: last.real_stop_id,
                 prevStop: stops.length > 1 ? stops[stops.length - 2].stop_name : null,
                 progress: 1,
                 nextTime: last.arrival_time
@@ -131,6 +211,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             }
         }
+        
+        // console.log("Linea 198", segment);
+        
 
         if (!segment) return null;
 
@@ -144,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 lat: latA + (latB - latA) * segment.progress,
                 lng: lngA + (lngB - lngA) * segment.progress,
                 nextStop: segment.stopB.stop_name,
-                nextStopId: segment.stopB.stop_id,
+                nextStopId: segment.stopB.real_stop_id,
                 prevStop: segment.stopA.stop_name
             };
         }
@@ -173,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 lat: latA + (latB - latA) * segment.progress,
                 lng: lngA + (lngB - lngA) * segment.progress,
                 nextStop: segment.stopB.stop_name,
-                nextStopId: segment.stopB.stop_id,
+                nextStopId: segment.stopB.real_stop_id,
                 prevStop: segment.stopA.stop_name
             };
         }
@@ -199,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     lat: parseFloat(p1.lat) + (parseFloat(p2.lat) - parseFloat(p1.lat)) * segProg,
                     lng: parseFloat(p1.lng) + (parseFloat(p2.lng) - parseFloat(p1.lng)) * segProg,
                     nextStop: segment.stopB.stop_name,
-                    nextStopId: segment.stopB.stop_id,
+                    nextStopId: segment.stopB.real_stop_id,
                     prevStop: segment.stopA.stop_name,
                     nextTime: segment.stopB.arrival_time
                 };
@@ -211,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lat: subShape[subShape.length-1].lat,
             lng: subShape[subShape.length-1].lng,
             nextStop: segment.stopB.stop_name,
-            nextStopId: segment.stopB.stop_id,
+            nextStopId: segment.stopB.real_stop_id,
             prevStop: segment.stopA.stop_name,
             nextTime: segment.stopB.arrival_time
         };
@@ -220,58 +303,196 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * Fetch dei dati real-time per una fermata (con caching)
      */
-    async function getRealTimeDelay(stopId, lineName, tripHeadsign, signal) {
+    async function getRealTimeDelay(stopId, lineName, tripHeadsign, gtfsStopSec, signal) {
         // Se la fermata è già in cache da meno di 30s, usa quella
         const now = Date.now();
         if (stopCache.has(stopId)) {
             const entry = stopCache.get(stopId);
             if (now - entry.ts < 30000) {
-                return findMatchingTrip(entry.data, lineName, tripHeadsign);
+                console.log("Using cached data for stop", stopId);
+                return findBestMatch(entry.data, lineName, tripHeadsign, gtfsStopSec);
             }
         }
 
         try {
-            const res = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stopId}-web-aut`, { signal });
+            let url = `https://oraritemporeale.actv.it/aut/backend/passages/${stopId}-web-aut`;
+            console.log("getRealTimeDelay", url, `https://actv-live.test/aut/stops/stop?id=${stopId}`);
+            
+            const res = await fetch(url, { signal });
             if (!res.ok) return null;
             const data = await res.json();
+            // console.log("fetched", url, "data", data);
+            
             stopCache.set(stopId, { ts: now, data });
-            return findMatchingTrip(data, lineName, tripHeadsign);
+            return findBestMatch(data, lineName, tripHeadsign, gtfsStopSec);
         } catch (e) {
             return null;
         }
     }
 
-    function findMatchingTrip(passages, lineName, tripHeadsign) {
-        if (!Array.isArray(passages)) return null;
+    /**
+     * Parsing avanzato dell'orario real-time
+     * Supporta: "HH:MM", "MM min", "MM'"
+     */
+    function parseRealTime(rtStr, now) {
+        if (!rtStr) return null;
+        rtStr = rtStr.trim();
         
-        // Cerca il trip che corrisponde a linea e destinazione
-        const match = passages.find(p => {
-            const pLine = p.line?.split('_')[0];
-            return pLine === lineName && tripHeadsign.toLowerCase().includes(p.destination.toLowerCase());
+        // Formato relativo: "9'", "5 min"
+        if (rtStr.includes("'") || rtStr.includes("min")) {
+            const minutes = parseInt(rtStr.replace(/[^0-9]/g, ''), 10);
+            if (isNaN(minutes)) return null;
+            // Aggiungi minuti all'ora corrente
+            const d = new Date(now);
+            d.setMinutes(d.getMinutes() + minutes);
+            return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+        }
+        
+        // Formato assoluto: "15:40"
+        if (rtStr.includes(":")) {
+            return timeToSec(rtStr + ":00");
+        }
+        
+        return null;
+    }
+
+    /**
+     * Trova il miglior match basato su prossimità temporale e similarità destinazione
+     */
+    function findBestMatch(passages, lineName, tripHeadsign, gtfsStopSec) {
+        if (!Array.isArray(passages)) return null;
+
+        passages.forEach(p => {
+            p.path = null;
         });
 
-        if (!match) return null;
+        const candidates = passages.filter(p => {
+             // Normalizza nome linea (es. "6L" vs "6L_UM")
+             const pLine = p.line ? p.line.split('_')[0] : '';
+             return pLine === lineName;
+        });
+
+        if (candidates.length === 0) return null;
+
+        let bestMatch = null;
+        let bestScore = -Infinity;
+        const now = Date.now(); // Per parsing orari relativi
+
+        // Pesi per lo scoring
+        const MAX_TIME_DIFF = 3600; // 60 min max differenza
+        const TIME_WEIGHT = 0.7;
+        const DEST_WEIGHT = 0.3;
+
+        console.log("pre_candidates", candidates, lineName);
         
-        return {
-            isReal: match.real,
-            rtTime: match.time,
-            // Info extra
-            vehicle: match.vehicle,
-            operator: match.operator
-        };
+        candidates.forEach(cand => {
+            // 1. Punteggio Tempo
+            let timeScore = 0;
+            const candSec = parseRealTime(cand.time, now);
+            
+            if (candSec !== null) {
+                // Gestione scavallamento mezzanotte (semplificata)
+                let diff = Math.abs(candSec - gtfsStopSec);
+                if (diff > 43200) diff = 86400 - diff; // Wrap-around 24h
+
+                if (diff <= MAX_TIME_DIFF) {
+                    // Score 1.0 se diff=0, scende linearmente
+                    timeScore = 1 - (diff / MAX_TIME_DIFF);
+                } else {
+                    timeScore = -1; // Troppo distante
+                }
+            }
+
+            // 2. Punteggio Destinazione (Jaccard/Overlap simplificato)
+            let destScore = 0;
+            const normCandDest = cand.destination ? cand.destination.toLowerCase() : '';
+            const normGtfsDest = tripHeadsign.toLowerCase();
+            
+            // Check parole comuni
+            const candWords = normCandDest.split(/\s+/).filter(w => w.length > 2);
+            const gtfsWords = normGtfsDest.split(/\s+/).filter(w => w.length > 2);
+            
+            let matches = 0;
+            candWords.forEach(w => {
+                if (normGtfsDest.includes(w)) matches++;
+            });
+            
+            if (candWords.length > 0) {
+                destScore = matches / candWords.length;
+            } else if (normCandDest === normGtfsDest) {
+                destScore = 1;
+            }
+
+            // 3. Score Totale
+            // Se il tempo è valido, combiniamo. Se no (es. timeScore < 0), penalizza forte.
+            let totalScore = 0;
+            if (timeScore >= 0) {
+                totalScore = (timeScore * TIME_WEIGHT) + (destScore * DEST_WEIGHT);
+            } else {
+                totalScore = -1;
+            }
+
+            if (totalScore > bestScore) {
+                bestScore = totalScore;
+                bestMatch = { candidate: cand, score: totalScore, candSec, secToTime: secToTime(candSec) };
+            }
+        });
+
+        console.log(
+            {
+                "lineName": lineName,
+                "tripToMatch":{"lineName": lineName, "tripHeadsign": tripHeadsign, "gtfsStopSec": gtfsStopSec, "secToTime": secToTime(gtfsStopSec)},
+                "bestMatch":bestMatch, 
+                "candidates": candidates
+            }
+        );
+        /* console.log('TripToMatch:', { tripHeadsign, lineName });
+        console.log('Best match:', bestMatch);
+        console.log('Candidates:', candidates);
+        console.log('Passages:', passages);
+        console.log(''); */
+
+        // Soglia minima di accettabilità per il match
+        if (bestMatch && bestMatch.score >= 0.3) {
+            return {
+                status: bestMatch.candidate.real ? 'REALTIME' : 'SCHEDULED_API_FLAG',
+                isReal: bestMatch.candidate.real,
+                rtTime: formatSecToTime(bestMatch.candSec), // Converti sec back to HH:MM:SS
+                vehicle: bestMatch.candidate.vehicle,
+                operator: bestMatch.candidate.operator,
+                debugScore: bestMatch.score
+            };
+        }
+
+        return { status: 'SCHEDULED_NO_DATA', isReal: false };
+    }
+
+    function formatSecToTime(sec) {
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
     }
 
     /**
      * Crea un'icona Leaflet per il bus (Badge circolare)
      */
-    function makeBusIcon(lineName, color, isReal = true) {
-        const grayClass = isReal ? '' : ' gray';
+    function makeBusIcon(lineName, color, status) {
+        let typeClass = '';
+        if (status === 'SCHEDULED_NO_DATA') typeClass = ' scheduled';
+        else if (status === 'SCHEDULED_API_FLAG') typeClass = ' scheduled-api';
+        else typeClass = ' realtime';
+
+        // Add specific class for easy selection
+        const markerClass = `bus-marker-${lineName.replace(/\s+/g, '-')}`;
+        
+        // Data attribute for content in mini mode
         return L.divIcon({
-            className: '',
-            html: `<div class="bus-icon${grayClass}" style="background-color:${color}">${lineName}</div>`,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
-            popupAnchor: [0, -18]
+            className: `bus-div-icon ${markerClass}`, 
+            html: `<div class="bus-icon${typeClass}" style="background-color:${color}" data-line="${lineName}">${lineName}</div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
+            popupAnchor: [0, -15]
         });
     }
 
@@ -280,9 +501,14 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function makePopup(bus, pos, delayInfo) {
         const nextTime = pos.nextTime ? pos.nextTime.substring(0, 5) : '';
-        const rtStatus = delayInfo?.isReal 
-            ? '<span style="color:#009E61">● Real-time</span>' 
-            : '<span style="color:#999">○ Programmato</span>';
+        
+        let rtStatus = '<span style="color:#999">○ Programmato (Dati non disp.)</span>';
+        if (delayInfo?.status === 'REALTIME') {
+            rtStatus = '<span style="color:#009E61">● Real-time</span>';
+        } else if (delayInfo?.status === 'SCHEDULED_API_FLAG') {
+            // rtStatus = '<span style="color:#FF9800">⚠️ Programmato (No GPS)</span>';
+             rtStatus = '<span style="color:#757575">○ Programmato (No GPS)</span>';
+        }
         
         let delayHtml = '';
         if (delayInfo?.delaySec) {
@@ -379,6 +605,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (b.polyline) map.removeLayer(b.polyline);
                 });
                 busMarkers.clear();
+                sidePanelList.innerHTML = '';
+                sidePanel.classList.add('hidden');
                 counterText.textContent = 'Nessun bus trovato';
                 spinnerEl.classList.add('hidden');
                 return;
@@ -392,6 +620,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Trip IDs che devono rimanere sulla mappa
             const validTripIds = new Set(buses.map(b => b.trip_id));
 
+            // Track non-RT trips to prune stale ones at the end
+            const activeTripsInCycle = new Set();
+
             const tasks = buses.map(bus => async () => {
                 if (signal.aborted) return;
 
@@ -403,13 +634,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const stops = posData.stops;
                     const shape = posData.shape;
-
+                    
+                    // pos = dove dovrebbe essere con 0 delay
                     let pos = interpolateWithShape(stops, shape, nowSec);
-                    if (!pos) return;
+                    if (!pos) {
+                        if (busMarkers.has(bus.trip_id)) {
+                            const old = busMarkers.get(bus.trip_id);
+                            map.removeLayer(old.marker);
+                            if (old.polyline) map.removeLayer(old.polyline);
+                            busMarkers.delete(bus.trip_id);
+                        }
+                        return;
+                    }
 
-                    let delayInfo = null;
+                    let delayInfo = { status: 'SCHEDULED_NO_DATA', isReal: false };
+                    
                     if (pos.nextStopId) {
-                        delayInfo = await getRealTimeDelay(pos.nextStopId, bus.route_short_name, bus.trip_headsign, signal);
+                        const gtfsStopSec = timeToSec(pos.nextTime);
+                        // restituisce il findBestMatch (che fallisce perché pos.nextStopId non è il paramento corretto???)
+                        const fetched = await getRealTimeDelay(
+                            pos.nextStopId,
+                            bus.route_short_name,
+                            bus.trip_headsign,
+                            gtfsStopSec,
+                            signal
+                        );
+                        if (fetched) delayInfo = fetched;
                     }
 
                     if (delayInfo && delayInfo.rtTime) {
@@ -417,11 +667,51 @@ document.addEventListener('DOMContentLoaded', () => {
                         const rtTime = timeToSec(delayInfo.rtTime);
                         delayInfo.delaySec = rtTime - gtfsTime;
                         pos = interpolateWithShape(stops, shape, nowSec, delayInfo.delaySec);
+                        if (!pos) {
+                            if (busMarkers.has(bus.trip_id)) {
+                                const old = busMarkers.get(bus.trip_id);
+                                map.removeLayer(old.marker);
+                                if (old.polyline) map.removeLayer(old.polyline);
+                                busMarkers.delete(bus.trip_id);
+                            }
+                            return;
+                        }
+                    }
+                    
+                    const isNonRt = (delayInfo.status === 'SCHEDULED_API_FLAG' || delayInfo.status === 'SCHEDULED_NO_DATA');
+                    if (isNonRt) {
+                        activeTripsInCycle.add(bus.trip_id);
+                        let li = sidePanelList.querySelector(`[data-trip-id="${bus.trip_id}"]`);
+                        if (!li) {
+                            li = document.createElement('li');
+                            li.className = 'nr-item';
+                            li.dataset.tripId = bus.trip_id;
+                            sidePanelList.appendChild(li);
+                        }
+                        const label = (delayInfo.status === 'SCHEDULED_API_FLAG') ? 'No GPS' : 'No dati';
+                        li.innerHTML = `
+                            <span class="nr-badge">${bus.route_short_name}</span>
+                            <div class="nr-content">
+                                <span>${bus.trip_headsign}</span>
+                                <span style="font-size:9px;color:#999">${label}</span>
+                            </div>
+                        `;
+                        li.onclick = () => {
+                            if (busMarkers.has(bus.trip_id)) {
+                                const m = busMarkers.get(bus.trip_id).marker;
+                                map.setView(m.getLatLng(), 16);
+                                m.openPopup();
+                            }
+                        };
+                    } else {
+                        // Remove if it was non-RT but now is RT
+                        const li = sidePanelList.querySelector(`[data-trip-id="${bus.trip_id}"]`);
+                        if (li) li.remove();
                     }
 
                     const color = getColor(bus.route_short_name);
-                    const isReal = delayInfo ? delayInfo.isReal : true;
-                    const icon = makeBusIcon(bus.route_short_name, color, isReal);
+                    const status = delayInfo ? delayInfo.status : 'SCHEDULED_NO_DATA';
+                    const icon = makeBusIcon(bus.route_short_name, color, status);
 
                     // Rimuovi il vecchio marker per questo trip
                     if (busMarkers.has(bus.trip_id)) {
@@ -445,7 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }).addTo(map);
                     }
 
-                    busMarkers.set(bus.trip_id, { marker, polyline });
+                    busMarkers.set(bus.trip_id, { marker, polyline, shape, currentPos: pos, busData: bus, status });
                 } catch (e) { }
 
                 loaded++;
@@ -453,6 +743,21 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             await parallelPool(tasks, MAX_CONCURRENT, signal);
+
+            // Prune stale side panel items (buses no longer in service)
+            Array.from(sidePanelList.children).forEach(li => {
+                if (!activeTripsInCycle.has(li.dataset.tripId)) {
+                    li.remove();
+                }
+            });
+
+            const finalNonRtCount = sidePanelList.children.length;
+            if (finalNonRtCount > 0) {
+                sidePanel.classList.remove('hidden');
+                sidePanel.querySelector('.nr-header span:first-child').textContent = `${finalNonRtCount} bus non monitorati`;
+            } else {
+                sidePanel.classList.add('hidden');
+            }
 
             // Rimuovi i bus non più in servizio
             for (let [tripId, b] of busMarkers.entries()) {
@@ -475,37 +780,190 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ── Event listeners e Inizializzazione ──────────────────
+    // ── Gestione Sovrapposizioni (Collision Detection) ────────
+    function updateMarkerSizes() {
+        const visibleMarkers = [];
+        
+        // 1. Reset all markers FIRST
+        busMarkers.forEach(b => {
+            const el = b.marker.getElement();
+            if (el) {
+                const icon = el.querySelector('.bus-icon');
+                if (icon) icon.classList.remove('mini');
+                b.marker.setZIndexOffset(0);
+                // Reset position to original calculation (stored in currentPos)
+                // We need to store original latlng to reset if displaced
+                if (b.originalLatLng) {
+                    b.marker.setLatLng(b.originalLatLng);
+                } else {
+                    b.originalLatLng = b.marker.getLatLng();
+                }
+            }
+        });
 
-    // Inizializza filtro da URL se presente
-    const initParams = new URLSearchParams(window.location.search);
-    if (initParams.get('line')) filterInput.value = initParams.get('line');
-    else if (initParams.get('tripId')) filterInput.value = initParams.get('tripId');
+        // 2. Filter visible markers
+        busMarkers.forEach((val, key) => {
+            if (map.getBounds().contains(val.marker.getLatLng())) {
+                visibleMarkers.push({
+                    key: key,
+                    marker: val.marker,
+                    shape: val.shape,
+                    originalLatLng: val.originalLatLng || val.marker.getLatLng(),
+                    screenPos: map.latLngToLayerPoint(val.marker.getLatLng()),
+                    status: val.status
+                });
+            }
+        });
 
-    let filterTimeout = null;
-    filterInput.addEventListener('input', () => {
-        clearTimeout(filterTimeout);
-        filterTimeout = setTimeout(() => loadBuses(), 400);
-    });
+        const COLLISION_DIST = 26; // pixels
+        const COLLISION_DIST_SQ = COLLISION_DIST * COLLISION_DIST;
 
-    filterClear.addEventListener('click', () => {
-        filterInput.value = '';
-        // Pulisci anche parametri URL
-        window.history.replaceState({}, '', window.location.pathname);
-        loadBuses();
-    });
+        // Group into clusters
+        // Simple disjoint-set or just iterative clustering
+        // For simplicity: iterate and check collisions. 
+        // If collision: try displacement. If fail: miniaturize.
+        
+        // Multi-pass approach:
+        
+        // Pass 1: Detect heavy collisions
+        for (let i = 0; i < visibleMarkers.length; i++) {
+            const m1 = visibleMarkers[i];
+            let cluster = [m1];
+            
+            for (let j = i + 1; j < visibleMarkers.length; j++) {
+                const m2 = visibleMarkers[j];
+                const dx = m1.screenPos.x - m2.screenPos.x;
+                const dy = m1.screenPos.y - m2.screenPos.y;
+                if ((dx*dx + dy*dy) < COLLISION_DIST_SQ) {
+                    cluster.push(m2);
+                }
+            }
 
-    btnRefresh.addEventListener('click', () => {
-        stopCache.clear();
-        loadBuses();
-    });
-
-    function startAutoRefresh() {
-        if (refreshTimer) clearInterval(refreshTimer);
-        refreshTimer = setInterval(() => loadBuses(), REFRESH_INTERVAL);
+            if (cluster.length > 1) {
+                resolveCluster(cluster);
+            }
+        }
     }
 
-    loadBuses();
-    startAutoRefresh();
+    function resolveCluster(cluster) {
+        // Sort by priority (Realtime > Scheduled)
+        // cluster.sort((a,b) => (a.status === 'REALTIME' ? -1 : 1));
+
+        // Try displacement along shape
+        let displacementPossible = true;
+        const DISPLACEMENT_STEP = 0.00015; // ~15-20 meters lat/lon degrees approximation
+
+        cluster.forEach((item, idx) => {
+            if (idx === 0) return; // Keep first one anchored (usually the most accurate or just pivot)
+            
+            // If item has shape, try to move it back/forth
+            if (item.shape && item.shape.length > 5) {
+                // Find nearest point index on shape from original pos
+                // Then move +/- N points
+                // Simplified: Just shift LatLng slightly along the bearing of the shape? 
+                // Or just naive lat/lon shift if we want to be fast.
+                // Better: move along the polyline.
+                
+                // Let's implement a simple shift: 
+                // We shift alternate items forward and backward
+                const direction = (idx % 2 === 0) ? 1 : -1;
+                const magnitude = Math.ceil(idx / 2); 
+                
+                // Find index on shape
+                // We stored 'currentPos' which had 'lat'/'lng'. 
+                // But finding exact index on shape is expensive every frame.
+                // Let's just use a naive offset if strictly visual.
+                // BUT user said "spostali un po' prima o un po' dopo, sempre sulla loro shape".
+                // So we MUST stick to shape.
+                
+                // We need to re-find position on shape. 
+                // Fortunately, we have the full shape array.
+                
+                // Optimized find:
+                let bestIdx = -1;
+                let minD = Infinity;
+                const searchRadius = 0.005; // optimization
+                for (let k=0; k<item.shape.length; k++) {
+                    const latDiff = item.shape[k].lat - item.originalLatLng.lat;
+                    const lonDiff = item.shape[k].lng - item.originalLatLng.lng;
+                    if (Math.abs(latDiff) > searchRadius || Math.abs(lonDiff) > searchRadius) continue;
+                    
+                    const d = latDiff*latDiff + lonDiff*lonDiff;
+                    if(d < minD) { minD = d; bestIdx = k; }
+                }
+
+                if (bestIdx !== -1) {
+                    // Shift index
+                    let newIdx = bestIdx + (direction * magnitude * 2); // Jump 2 points per step to ensure visibility
+                    // Clamp
+                    newIdx = Math.max(0, Math.min(newIdx, item.shape.length - 1));
+                    
+                    const newPt = item.shape[newIdx];
+                    item.marker.setLatLng([newPt.lat, newPt.lng]);
+                    
+                    // Update screen pos for next checks? No, local resolution.
+                } else {
+                    displacementPossible = false;
+                }
+            } else {
+                displacementPossible = false; // No shape, can't displace on shape
+            }
+        });
+
+        // If displacement failed or improved visibility but still tight? 
+        // User said: "se è impossibile usa il bollino piccolo"
+        // Let's re-check collisions after displacement?
+        // Computing screen positions again is expensive.
+        // Let's check distance *after* displacement.
+        
+        // Re-check first vs others (simplified)
+        const p0 = map.latLngToLayerPoint(cluster[0].marker.getLatLng());
+        let stillColliding = false;
+        
+        for (let i=1; i<cluster.length; i++) {
+            const pi = map.latLngToLayerPoint(cluster[i].marker.getLatLng());
+            const dx = p0.x - pi.x;
+            const dy = p0.y - pi.y;
+            if ((dx*dx + dy*dy) < (20*20)) { // 20px threshold for mini-dots
+                stillColliding = true; 
+                break;
+            }
+        }
+
+        if (!displacementPossible || stillColliding) {
+            // Miniaturize ALL in cluster
+            cluster.forEach(item => {
+                const el = item.marker.getElement()?.querySelector('.bus-icon');
+                //if (el) el.classList.add('mini');
+                // Even mini dots must not overlap!
+                // Apply Mini-Displacement: Jitter or Grid
+                
+                // Since we might have failed shape displacement or don't have shape,
+                // we fallback to slight screen-space offset for mini-dots.
+                // "anche i bollini biccoli non si devono sovrappore"
+                
+                // Circle layout around the center?
+                
+            });
+            
+            // Apply circle layout for minis
+             const center = cluster[0].originalLatLng;
+             const angleStep = (2 * Math.PI) / cluster.length;
+             const radius = 0.00015; // Small geo radius
+             
+             cluster.forEach((item, idx) => {
+                 // Reposition around center
+                 if (idx === 0) return; // Keep one center
+                 const angle = idx * angleStep;
+                 const latOffset = radius * Math.cos(angle);
+                 const lngOffset = radius * Math.sin(angle) * 1.5; // Aspect ratio correction
+                 
+                 item.marker.setLatLng([
+                     center.lat + latOffset,
+                     center.lng + lngOffset
+                 ]);
+             });
+        }
+    }
 });
 

@@ -327,19 +327,6 @@ function updateFilter() {
     }
 }
 
-/** Aggiorna il banner del Time Machine */
-function updateTimeMachineUI() {
-    const banner = document.getElementById('tm-banner');
-    const timeSpan = document.getElementById('tm-current-time');
-
-    if (window.TimeMachine && TimeMachine.isEnabled()) {
-        banner?.classList.remove('d-none');
-        if (timeSpan) timeSpan.innerText = TimeMachine.getSimTime();
-    } else {
-        banner?.classList.add('d-none');
-    }
-}
-
 /** Inizializzazione pagina */
 async function init() {
     if (!stationId) {
@@ -355,7 +342,6 @@ async function init() {
     document.getElementById('station-id').innerText = stationId;
 
     updateFavoriteButton();
-    updateTimeMachineUI();
 
     // Primo caricamento
     await loadPassages();

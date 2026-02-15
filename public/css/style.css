@@ -416,6 +416,149 @@ html[data-theme="dark"] .form-select {
 .error-popup-title {
     font-weight: 700;
 }
-.error-popup-message {
-    margin-top: 10px;
+
+/* Bus Status & Overlap Styles */
+.bus-div-icon {
+    transition: all 0.3s ease;
+}
+
+.bus-icon {
+    /* Base styles ensured, avoid overriding Leaflet defaults too much except what we need */
+    width: 30px;
+    height: 30px;
+    border-radius: 50%; /* Make them circular */
+    color: white;
+    font-weight: bold;
+    display: flex; /* Flex to center text */
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    border: 2px solid white;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+/* Scheduled / No Data -> Gray */
+.bus-icon.scheduled {
+    background-color: #9E9E9E !important; 
+    z-index: 400 !important;
+}
+
+/* API Flagged Non-Realtime -> Darker Gray with Dashed Border */
+.bus-icon.scheduled-api {
+    background-color: #616161 !important;
+    border: 2px dashed #ccc !important;
+    z-index: 400 !important;
+}
+
+/* Realtime -> Ensure high z-index */
+.bus-icon.realtime {
+    z-index: 1000 !important;
+}
+
+/* Mini Markers */
+.bus-icon.mini {
+    width: 16px !important;
+    height: 16px !important;
+    font-size: 0px; /* Hide original text */
+    min-width: 16px;
+    border: 1px solid white;
+    z-index: 300 !important;
+}
+
+.bus-icon.mini::after {
+    content: attr(data-line);
+    font-size: 8px;
+    display: block;
+    line-height: 1;
+    color: white;
+    font-weight: 800;
+}
+
+/* Side Panel for Non-Realtime Buses */
+#non-rt-panel {
+    position: fixed;
+    top: 180px;
+    right: 10px;
+    width: 220px;
+    background: var(--color-white);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+    z-index: 2000;
+    max-height: 50vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+}
+
+/* Dark mode support for panel */
+html[data-theme="dark"] #non-rt-panel {
+    background: var(--color-bg-gray);
+    border: 1px solid var(--color-border-gray);
+}
+
+#non-rt-panel.collapsed {
+    transform: translateX(190px);
+}
+
+#non-rt-panel.hidden {
+    display: none;
+}
+
+.nr-header {
+    background: var(--color-orange);
+    color: white;
+    padding: 8px 12px;
+    font-weight: bold;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nr-header:hover {
+    opacity: 0.9;
+}
+
+.nr-list {
+    overflow-y: auto;
+    flex: 1;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.nr-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-border-gray);
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s;
+    color: var(--color-text-dark);
+}
+
+.nr-item:hover {
+    background: var(--color-bg-light);
+}
+
+.nr-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.nr-badge {
+    background: var(--color-text-gray);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    min-width: 28px;
+    text-align: center;
+    margin-right: 8px;
 }

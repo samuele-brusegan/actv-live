@@ -4,6 +4,8 @@
  * This file initializes constants and environment variables without triggering the router.
  */
 
+date_default_timezone_set('Europe/Rome');
+
 if (!defined('BASE_PATH')) {
     define('BASE_PATH', dirname(__DIR__));
 }

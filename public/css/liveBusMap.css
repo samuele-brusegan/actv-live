@@ -206,10 +206,26 @@ body {
     transition: background-color 0.3s;
 }
 
-.bus-icon.gray {
+/* Scheduled bus (gray, transparent) */
+.bus-icon.scheduled {
     background-color: #999 !important;
     color: #eee;
+    opacity: 0.6;
+    border-color: #ccc;
+    z-index: 100 !important; /* Keep below real-time */
+}
+
+/* Mini marker (overlap mode) */
+.bus-icon.mini {
+    width: 12px;
+    height: 12px;
+    font-size: 0; /* Hide text */
+    border-width: 1px;
     opacity: 0.8;
+}
+
+.bus-icon.scheduled.mini {
+    opacity: 0.4;
 }
 
 /* Leaflet dark mode support */

@@ -37,13 +37,7 @@
             
             <div id="loading">Caricamento passaggi...</div>
 
-            <!-- Time Machine Banner -->
-            <div id="tm-banner" class="alert alert-warning py-2 mb-3 small d-none">
-                <div class="d-flex justify-content-between align-items-center">
-                    <span><?= getIcon('history', 18, 'align-middle') ?> <strong>Time Machine attiva</strong></span>
-                    <span id="tm-current-time"></span>
-                </div>
-            </div>
+
 
             <div id="passages-list">
                 <!-- Popolato via JS -->

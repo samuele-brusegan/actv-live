@@ -141,7 +141,8 @@
 
                 for (let i = 0; i < cards.length; i++) {
                     let name = cards[i].getAttribute('data-name');
-                    if (name.indexOf(filter) > -1) {
+                    let allIds = cards[i].getAttribute('data-all-ids');
+                    if (name.indexOf(filter) > -1 || allIds.indexOf(filter) > -1) {
                         cards[i].style.display = "flex";
                     } else {
                         cards[i].style.display = "none";

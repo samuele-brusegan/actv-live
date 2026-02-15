@@ -77,9 +77,11 @@ class Controller {
         require_once BASE_PATH . '/app/views/admin/logs.php';
     }
 
-    function timeMachine() {
-        require_once BASE_PATH . '/app/views/admin/time_machine.php';
+    function adminDashboard() {
+        require_once BASE_PATH . '/app/views/admin/dashboard.php';
     }
+
+
 
     function liveMap() {
         require_once BASE_PATH . '/app/views/liveBusMap.php';
