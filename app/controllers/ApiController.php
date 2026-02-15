@@ -802,7 +802,8 @@ class ApiController
         $db = $this->getDb();
         $safeTripId = addslashes($tripId);
 
-        $sql = "SELECT 
+        // 1. Get stops for the trip
+        $sqlStops = "SELECT 
                     s.stop_id,
                     s.stop_name,
                     s.stop_lat,
@@ -815,8 +816,30 @@ class ApiController
                 WHERE st.trip_id = '$safeTripId'
                 ORDER BY st.stop_sequence ASC";
 
-        $stops = $db->query($sql);
+        $stops = $db->query($sqlStops);
 
-        echo json_encode($stops);
+        if (empty($stops)) {
+            echo json_encode(['error' => 'No stops found for this trip']);
+            return;
+        }
+
+        // 2. Get the shape for this trip
+        $sqlShapeId = "SELECT shape_id FROM trips WHERE trip_id = '$safeTripId' LIMIT 1";
+        $tripInfo = $db->query($sqlShapeId);
+        
+        $shapePoints = [];
+        if (!empty($tripInfo) && !empty($tripInfo[0]['shape_id'])) {
+            $shapeId = $tripInfo[0]['shape_id'];
+            $sqlShape = "SELECT lat, lng, sequence, dist_traveled 
+                         FROM shapes_refined 
+                         WHERE shape_id = '$shapeId' 
+                         ORDER BY sequence ASC";
+            $shapePoints = $db->query($sqlShape);
+        }
+
+        echo json_encode([
+            'stops' => $stops,
+            'shape' => $shapePoints
+        ]);
     }
 }

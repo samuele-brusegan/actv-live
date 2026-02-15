@@ -36,10 +36,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }).addTo(map);
 
     // ── Stato ─────────────────────────────────────────────────
-    let busMarkers = [];   // Array di L.marker
-    let abortCtrl = null;  // Per annullare fetch in corso
+    let busMarkers = new Map(); // tripId -> { marker, polyline }
+    let abortCtrl = null;       // Per annullare fetch in corso
     let refreshTimer = null;
-    let stopCache = new Map(); // Cache per i passaggi alle fermate
+    let stopCache = new Map();  // Cache per i passaggi alle fermate
 
     // ── Helpers ───────────────────────────────────────────────
 
@@ -51,7 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 0; i < name.length; i++) {
             h = name.charCodeAt(i) + ((h << 5) - h);
         }
-        return BUS_COLORS[Math.abs(h) % BUS_COLORS.length];
+        const color = BUS_COLORS[Math.abs(h) % BUS_COLORS.length];
+        return color;
     }
 
     /**
@@ -61,6 +62,159 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!t) return 0;
         const p = t.split(':');
         return (+p[0]) * 3600 + (+p[1]) * 60 + (p[2] ? +p[2] : 0);
+    }
+
+    /**
+     * Calcola la distanza tra due coordinate (m)
+     */
+    function getDist(lat1, ln1, lat2, ln2) {
+        const R = 6371e3;
+        const φ1 = lat1 * Math.PI / 180;
+        const φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (ln2 - ln1) * Math.PI / 180;
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    /**
+     * Interpolazione precisa lungo la shape
+     */
+    function interpolateWithShape(stops, shape, nowSec, delaySec = 0) {
+        if (!stops || stops.length === 0) return null;
+
+        const virtualNowSec = nowSec - delaySec;
+        const firstSec = timeToSec(stops[0].arrival_time);
+        const lastSec  = timeToSec(stops[stops.length - 1].arrival_time);
+
+        // Capolinea iniziale
+        if (virtualNowSec <= firstSec) {
+            return {
+                lat: parseFloat(stops[0].stop_lat),
+                lng: parseFloat(stops[0].stop_lon),
+                nextStop: stops[0].stop_name,
+                nextStopId: stops[0].stop_id,
+                prevStop: null,
+                progress: 0,
+                nextTime: stops[0].arrival_time
+            };
+        }
+
+        // Capolinea finale
+        if (virtualNowSec >= lastSec) {
+            const last = stops[stops.length - 1];
+            return {
+                lat: parseFloat(last.stop_lat),
+                lng: parseFloat(last.stop_lon),
+                nextStop: last.stop_name + ' (capolinea)',
+                nextStopId: last.stop_id,
+                prevStop: stops.length > 1 ? stops[stops.length - 2].stop_name : null,
+                progress: 1,
+                nextTime: last.arrival_time
+            };
+        }
+
+        // Trova il segmento GTFS corrente
+        let segment = null;
+        for (let i = 0; i < stops.length - 1; i++) {
+            const aSec = timeToSec(stops[i].arrival_time);
+            const bSec = timeToSec(stops[i + 1].arrival_time);
+            if (virtualNowSec >= aSec && virtualNowSec <= bSec) {
+                segment = {
+                    idx: i,
+                    progress: (bSec - aSec) > 0 ? (virtualNowSec - aSec) / (bSec - aSec) : 0,
+                    stopA: stops[i],
+                    stopB: stops[i + 1]
+                };
+                break;
+            }
+        }
+
+        if (!segment) return null;
+
+        // Se non abbiamo una shape, fallback a lineare tra le fermate
+        if (!shape || shape.length === 0) {
+            const latA = parseFloat(segment.stopA.stop_lat);
+            const lngA = parseFloat(segment.stopA.stop_lon);
+            const latB = parseFloat(segment.stopB.stop_lat);
+            const lngB = parseFloat(segment.stopB.stop_lon);
+            return {
+                lat: latA + (latB - latA) * segment.progress,
+                lng: lngA + (lngB - lngA) * segment.progress,
+                nextStop: segment.stopB.stop_name,
+                nextStopId: segment.stopB.stop_id,
+                prevStop: segment.stopA.stop_name
+            };
+        }
+
+        // Identifica gli indici della shape corrispondenti alle fermate A e B
+        // (Cerchiamo il punto della shape più vicino a ciascuna fermata)
+        function findNearest(lat, lon) {
+            let minD = Infinity, bestIdx = 0;
+            for (let i = 0; i < shape.length; i++) {
+                const d = getDist(lat, lon, shape[i].lat, shape[i].lng);
+                if (d < minD) { minD = d; bestIdx = i; }
+            }
+            return bestIdx;
+        }
+
+        const idxA = findNearest(segment.stopA.stop_lat, segment.stopA.stop_lon);
+        const idxB = findNearest(segment.stopB.stop_lat, segment.stopB.stop_lon);
+        
+        // Se la shape è al contrario o incoerente, fallback lineare
+        if (idxA >= idxB) {
+            const latA = parseFloat(segment.stopA.stop_lat);
+            const lngA = parseFloat(segment.stopA.stop_lon);
+            const latB = parseFloat(segment.stopB.stop_lat);
+            const lngB = parseFloat(segment.stopB.stop_lon);
+            return {
+                lat: latA + (latB - latA) * segment.progress,
+                lng: lngA + (lngB - lngA) * segment.progress,
+                nextStop: segment.stopB.stop_name,
+                nextStopId: segment.stopB.stop_id,
+                prevStop: segment.stopA.stop_name
+            };
+        }
+
+        // Calcola distanze cumulative tra idxA e idxB
+        const subShape = shape.slice(idxA, idxB + 1);
+        let dists = [0];
+        let totalD = 0;
+        for (let i = 1; i < subShape.length; i++) {
+            totalD += getDist(subShape[i-1].lat, subShape[i-1].lng, subShape[i].lat, subShape[i].lng);
+            dists.push(totalD);
+        }
+
+        const targetD = totalD * segment.progress;
+
+        // Trova il punto esatto sulla shape
+        for (let i = 0; i < dists.length - 1; i++) {
+            if (targetD >= dists[i] && targetD <= dists[i+1]) {
+                const segProg = (dists[i+1] - dists[i]) > 0 ? (targetD - dists[i]) / (dists[i+1] - dists[i]) : 0;
+                const p1 = subShape[i];
+                const p2 = subShape[i+1];
+                return {
+                    lat: parseFloat(p1.lat) + (parseFloat(p2.lat) - parseFloat(p1.lat)) * segProg,
+                    lng: parseFloat(p1.lng) + (parseFloat(p2.lng) - parseFloat(p1.lng)) * segProg,
+                    nextStop: segment.stopB.stop_name,
+                    nextStopId: segment.stopB.stop_id,
+                    prevStop: segment.stopA.stop_name,
+                    nextTime: segment.stopB.arrival_time
+                };
+            }
+        }
+
+        // Ultimo punto della sub-shape come fallback
+        return {
+            lat: subShape[subShape.length-1].lat,
+            lng: subShape[subShape.length-1].lng,
+            nextStop: segment.stopB.stop_name,
+            nextStopId: segment.stopB.stop_id,
+            prevStop: segment.stopA.stop_name,
+            nextTime: segment.stopB.arrival_time
+        };
     }
 
     /**
@@ -97,101 +251,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (!match) return null;
-
-        // Il delay è la differenza tra l'orario real-time (p.time) e quello programmato 
-        // per l'ultima fermata passata (se presente) o quella corrente.
-        // ACTV usa p.time come orario previsto (real-time).
-        // timingPoints[last] ha l'orario teorico per questa fermata? No, timingPoints è la lista fermate passate.
-        // In realtà non abbiamo l'orario teorico del trip ACTV nel JSON passages facilmente comparabile al GTFS
-        // MA possiamo calcolare il delay come: (Minuti Real-time) - (Minuti GTFS alla prossima fermata).
-        // In realtà passiamo delaySec a interpolatePosition che lo usa come offset.
         
         return {
             isReal: match.real,
             rtTime: match.time,
-            // Se real=true, 'match.time' è il tempo reale. 
-            // Se real=false, 'match.time' è quello programmato.
-            // Per semplicità, consideriamo il delay nullo se non abbiamo un modo certo di calcolarlo qui.
-            // NOTA: interpolatePosition riceve delaySec.
+            // Info extra
+            vehicle: match.vehicle,
+            operator: match.operator
         };
     }
 
     /**
-     * Interpolazione lineare tra due fermate con correzione delay
-     * @returns {{ lat, lng, nextStop, prevStop, progress, nextStopId }}
-     */
-    function interpolatePosition(stops, nowSec, delaySec = 0) {
-        if (!stops || stops.length === 0) return null;
-
-        const virtualNowSec = nowSec - delaySec;
-
-        // Se il bus non è ancora partito → prima fermata
-        const firstSec = timeToSec(stops[0].arrival_time);
-        if (virtualNowSec <= firstSec) {
-            return {
-                lat: parseFloat(stops[0].stop_lat),
-                lng: parseFloat(stops[0].stop_lon),
-                nextStop: stops[0].stop_name,
-                nextStopId: stops[0].stop_id,
-                prevStop: null,
-                progress: 0,
-                nextTime: stops[0].arrival_time
-            };
-        }
-
-        // Se il bus ha già finito → ultima fermata
-        const lastSec = timeToSec(stops[stops.length - 1].arrival_time);
-        if (virtualNowSec >= lastSec) {
-            const last = stops[stops.length - 1];
-            return {
-                lat: parseFloat(last.stop_lat),
-                lng: parseFloat(last.stop_lon),
-                nextStop: last.stop_name + ' (capolinea)',
-                nextStopId: last.stop_id,
-                prevStop: stops.length > 1 ? stops[stops.length - 2].stop_name : null,
-                progress: 1,
-                nextTime: last.arrival_time
-            };
-        }
-
-        // Trova il segmento corrente
-        for (let i = 0; i < stops.length - 1; i++) {
-            const aSec = timeToSec(stops[i].arrival_time);
-            const bSec = timeToSec(stops[i + 1].arrival_time);
-
-            if (virtualNowSec >= aSec && virtualNowSec < bSec) {
-                const progress = (bSec - aSec) > 0
-                    ? (virtualNowSec - aSec) / (bSec - aSec)
-                    : 0;
-
-                const latA = parseFloat(stops[i].stop_lat);
-                const lngA = parseFloat(stops[i].stop_lon);
-                const latB = parseFloat(stops[i + 1].stop_lat);
-                const lngB = parseFloat(stops[i + 1].stop_lon);
-
-                return {
-                    lat: latA + (latB - latA) * progress,
-                    lng: lngA + (lngB - lngA) * progress,
-                    nextStop: stops[i + 1].stop_name,
-                    nextStopId: stops[i + 1].stop_id,
-                    prevStop: stops[i].stop_name,
-                    progress,
-                    nextTime: stops[i + 1].arrival_time
-                };
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Crea un'icona Leaflet per il bus (div colorato con nome linea)
+     * Crea un'icona Leaflet per il bus (Badge circolare)
      */
     function makeBusIcon(lineName, color, isReal = true) {
         const grayClass = isReal ? '' : ' gray';
         return L.divIcon({
             className: '',
-            html: `<div class="bus-icon${grayClass}" style="background:${color}">${lineName}</div>`,
+            html: `<div class="bus-icon${grayClass}" style="background-color:${color}">${lineName}</div>`,
             iconSize: [32, 32],
             iconAnchor: [16, 16],
             popupAnchor: [0, -18]
@@ -204,23 +281,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function makePopup(bus, pos, delayInfo) {
         const nextTime = pos.nextTime ? pos.nextTime.substring(0, 5) : '';
         const rtStatus = delayInfo?.isReal 
-            ? '<span style="color:var(--color-primary-green)">● Real-time</span>' 
+            ? '<span style="color:#009E61">● Real-time</span>' 
             : '<span style="color:#999">○ Programmato</span>';
         
         let delayHtml = '';
         if (delayInfo?.delaySec) {
             const mins = Math.round(delayInfo.delaySec / 60);
-            delayHtml = `<div class="bus-popup-time">${mins > 0 ? '+' : ''}${mins} min di ritardo</div>`;
+            const color = mins > 0 ? '#E30613' : '#009E61';
+            delayHtml = `<div class="bus-popup-time" style="color:${color};font-weight:700">${mins > 0 ? '+' : ''}${mins} min ritardo</div>`;
         }
 
         let nextStop_noCapolinea = pos.nextStop.replace(' (capolinea)', '');
         
-        let params = new URLSearchParams(
-            {
-                id: pos.nextStopId,
-                name: nextStop_noCapolinea
-            }
-        );
+        let params = new URLSearchParams({ id: pos.nextStopId, name: nextStop_noCapolinea });
+        
         return `
             <div class="bus-popup">
                 <div class="bus-popup-line">Linea ${bus.route_short_name}</div>
@@ -230,22 +304,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? `<a href="https://actv-live.test/aut/stops/stop?${params}" class="bus-popup-next">Prossima: ${pos.nextStop}</a>`
                     : ''
                 }
-                ${nextTime
-                    ? `<div class="bus-popup-time">Orario previsto: ${nextTime}</div>`
-                    : ''
-                }
+                ${nextTime ? `<div class="bus-popup-time">Orario previsto: ${nextTime}</div>` : ''}
                 ${delayHtml}
-                <div class="bus-popup-time" style="margin-top:4px;opacity:0.6">Trip: ${bus.trip_id}</div>
+                <div class="bus-popup-time" style="margin-top:8px;opacity:0.6;font-size:9px">
+                    Trip: ${bus.trip_id}
+                    ${delayInfo?.vehicle ? `<br>Veicolo: ${delayInfo.vehicle}` : ''}
+                </div>
             </div>
         `;
     }
 
     // ── Filtro ─────────────────────────────────────────────────
 
-    /**
-     * Applica il filtro testuale ai bus prima di fetchare le posizioni.
-     * Cerca in: route_short_name, trip_id, route_id, trip_headsign.
-     */
     function filterBuses(buses, query) {
         if (!query) return buses;
         const q = query.toLowerCase().trim();
@@ -257,28 +327,17 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
-    // ── Pool di fetch concorrenti ─────────────────────────────
+    // ── Pool di fetch e Caricamento ───────────────────────────
 
-    /**
-     * Esegue un array di task async con concorrenza limitata.
-     */
     async function parallelPool(tasks, concurrency, signal) {
         let idx = 0;
-
         async function worker() {
             while (idx < tasks.length) {
                 if (signal && signal.aborted) return;
                 const i = idx++;
-                try {
-                    await tasks[i]();
-                } catch (e) {
-                    if (e.name !== 'AbortError') {
-                        console.warn(`Task ${i} failed:`, e.message);
-                    }
-                }
+                try { await tasks[i](); } catch (e) { }
             }
         }
-
         const workers = [];
         for (let w = 0; w < Math.min(concurrency, tasks.length); w++) {
             workers.push(worker());
@@ -286,15 +345,10 @@ document.addEventListener('DOMContentLoaded', () => {
         await Promise.all(workers);
     }
 
-    // ── Caricamento principale ─────────────────────────────────
-
     async function loadBuses() {
         if (abortCtrl) abortCtrl.abort();
         abortCtrl = new AbortController();
         const signal = abortCtrl.signal;
-
-        busMarkers.forEach(m => map.removeLayer(m));
-        busMarkers = [];
 
         spinnerEl.classList.remove('hidden');
         counterText.textContent = 'Caricamento...';
@@ -304,20 +358,28 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error(`BNR status ${res.status}`);
             const data = await res.json();
 
-            if (data.error) {
-                counterText.textContent = `Errore: ${data.error}`;
-                spinnerEl.classList.add('hidden');
-                return;
-            }
-
             const allBuses = data.buses || [];
-            const query = filterInput.value;
-            const buses = filterBuses(allBuses, query);
+            
+            // Applica filtri da input e URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const lineFilter = urlParams.get('line');
+            const tripFilter = urlParams.get('tripId');
+            const destFilter = urlParams.get('destination');
+
+            let buses = filterBuses(allBuses, filterInput.value);
+
+            if (lineFilter) buses = buses.filter(b => b.route_short_name === lineFilter);
+            if (tripFilter) buses = buses.filter(b => b.trip_id === tripFilter);
+            if (destFilter) buses = buses.filter(b => b.trip_headsign.toLowerCase().includes(destFilter.toLowerCase()));
 
             if (buses.length === 0) {
-                counterText.textContent = query
-                    ? `Nessun bus per "${query}" (${allBuses.length} totali)`
-                    : 'Nessun bus in servizio';
+                // Pulisci tutto se nessun bus trovato
+                busMarkers.forEach(b => {
+                    map.removeLayer(b.marker);
+                    if (b.polyline) map.removeLayer(b.polyline);
+                });
+                busMarkers.clear();
+                counterText.textContent = 'Nessun bus trovato';
                 spinnerEl.classList.add('hidden');
                 return;
             }
@@ -327,54 +389,64 @@ document.addEventListener('DOMContentLoaded', () => {
             const total = buses.length;
             counterText.textContent = `0 / ${total}`;
 
+            // Trip IDs che devono rimanere sulla mappa
+            const validTripIds = new Set(buses.map(b => b.trip_id));
+
             const tasks = buses.map(bus => async () => {
                 if (signal.aborted) return;
 
                 try {
-                    // 1. Fetch GTFS stops
-                    const posRes = await fetch(
-                        `/api/bus-position?tripId=${encodeURIComponent(bus.trip_id)}`,
-                        { signal }
-                    );
+                    const posRes = await fetch(`/api/bus-position?tripId=${encodeURIComponent(bus.trip_id)}`, { signal });
                     if (!posRes.ok) return;
-                    const stops = await posRes.json();
+                    const posData = await posRes.json();
                     if (signal.aborted) return;
 
-                    // 2. Initial estimation to find next stop
-                    let pos = interpolatePosition(stops, nowSec);
+                    const stops = posData.stops;
+                    const shape = posData.shape;
+
+                    let pos = interpolateWithShape(stops, shape, nowSec);
                     if (!pos) return;
 
-                    // 3. Real-time check
                     let delayInfo = null;
                     if (pos.nextStopId) {
                         delayInfo = await getRealTimeDelay(pos.nextStopId, bus.route_short_name, bus.trip_headsign, signal);
                     }
 
-                    // 4. Adjust position if real-time delay found
                     if (delayInfo && delayInfo.rtTime) {
-                        // Calculate delay: RT Time - GTFS Time at next stop
                         const gtfsTime = timeToSec(pos.nextTime);
                         const rtTime = timeToSec(delayInfo.rtTime);
                         delayInfo.delaySec = rtTime - gtfsTime;
-                        
-                        // Re-interpolate with delay
-                        pos = interpolatePosition(stops, nowSec, delayInfo.delaySec);
+                        pos = interpolateWithShape(stops, shape, nowSec, delayInfo.delaySec);
                     }
 
-                    const isReal = delayInfo ? delayInfo.isReal : true;
                     const color = getColor(bus.route_short_name);
+                    const isReal = delayInfo ? delayInfo.isReal : true;
                     const icon = makeBusIcon(bus.route_short_name, color, isReal);
 
+                    // Rimuovi il vecchio marker per questo trip
+                    if (busMarkers.has(bus.trip_id)) {
+                        const old = busMarkers.get(bus.trip_id);
+                        map.removeLayer(old.marker);
+                        if (old.polyline) map.removeLayer(old.polyline);
+                    }
+
+                    // Aggiungi il nuovo
                     const marker = L.marker([pos.lat, pos.lng], { icon })
                         .bindPopup(makePopup(bus, pos, delayInfo))
                         .addTo(map);
 
-                    busMarkers.push(marker);
-                } catch (e) {
-                    if (e.name !== 'AbortError') {
-                        console.warn(`Fetch fallito per trip ${bus.trip_id}:`, e.message);
+                    let polyline = null;
+                    if (shape && shape.length > 0) {
+                        polyline = L.polyline(shape.map(p => [p.lat, p.lng]), {
+                            color: color,
+                            weight: 3,
+                            opacity: 0.4,
+                            dashArray: '5, 10'
+                        }).addTo(map);
                     }
-                }
+
+                    busMarkers.set(bus.trip_id, { marker, polyline });
+                } catch (e) { }
 
                 loaded++;
                 counterText.textContent = `${loaded} / ${total}`;
@@ -382,20 +454,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
             await parallelPool(tasks, MAX_CONCURRENT, signal);
 
+            // Rimuovi i bus non più in servizio
+            for (let [tripId, b] of busMarkers.entries()) {
+                if (!validTripIds.has(tripId)) {
+                    map.removeLayer(b.marker);
+                    if (b.polyline) map.removeLayer(b.polyline);
+                    busMarkers.delete(tripId);
+                }
+            }
+
             spinnerEl.classList.add('hidden');
-            counterText.textContent = `${busMarkers.length} bus sulla mappa`;
+            counterText.textContent = `${busMarkers.size} bus sulla mappa`;
             lastUpdateEl.textContent = `Agg. ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
 
         } catch (e) {
             if (e.name !== 'AbortError') {
-                console.error('Errore caricamento bus:', e);
-                counterText.textContent = 'Errore di caricamento';
                 spinnerEl.classList.add('hidden');
+                counterText.textContent = 'Errore di caricamento';
             }
         }
     }
 
-    // ── Event listeners ───────────────────────────────────────
+    // ── Event listeners e Inizializzazione ──────────────────
+
+    // Inizializza filtro da URL se presente
+    const initParams = new URLSearchParams(window.location.search);
+    if (initParams.get('line')) filterInput.value = initParams.get('line');
+    else if (initParams.get('tripId')) filterInput.value = initParams.get('tripId');
+
     let filterTimeout = null;
     filterInput.addEventListener('input', () => {
         clearTimeout(filterTimeout);
@@ -404,6 +490,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     filterClear.addEventListener('click', () => {
         filterInput.value = '';
+        // Pulisci anche parametri URL
+        window.history.replaceState({}, '', window.location.pathname);
         loadBuses();
     });
 
@@ -420,3 +508,4 @@ document.addEventListener('DOMContentLoaded', () => {
     loadBuses();
     startAutoRefresh();
 });
+
