@@ -202,7 +202,8 @@ function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop
     $query = queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId);
     $stmt = $pdo->prepare($query);
     $paramStop = ($stopId && $stopId !== 'null' && $stopId !== 'undefined') ? $stopId : $stop;
-    $stmt->execute([$time, $busTrack, $paramStop]);
+    //$stmt->execute([$time, $busTrack, $paramStop]);
+    $stmt->execute([$time, $time, $busTrack, $paramStop]);
     $trips = $stmt->fetchAll();
 
     addSimilarityScores($trips, $busDirection);
