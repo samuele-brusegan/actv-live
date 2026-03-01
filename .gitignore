@@ -6,3 +6,4 @@
 data/
 bak*
 node_modules/
+/vendor/

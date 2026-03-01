@@ -1,0 +1,24 @@
+{
+    "name": "samuele-brusegan/actv-live",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "SamueleBrusegan\\ActvLive\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "samuele-brusegan",
+            "email": "samuele.brusegan@gmail.com"
+        }
+    ],
+    "require-dev": {
+        "pestphp/pest": "^4.4"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}
