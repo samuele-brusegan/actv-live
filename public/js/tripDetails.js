@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     state.tripId = urlParams.get('tripId');
     console.log(sessionStorage.getItem('tripDetails_url'));
-    
+
 
     /* state.lineFull = urlParams.get('line');
     state.line = state.lineFull?.split('_')[0];
@@ -60,7 +60,7 @@ async function init() {
 
     let initUnpackTripId = async () => {
         console.log("Start Unpacking TripID");
-        
+
         let data = await unpackTripId(state.tripId);
         state.line = data.bus_track;
         state.destination = data.bus_direction;
@@ -82,9 +82,9 @@ async function init() {
         let loadingBox = document.querySelector('.loading-state');
         if (loadingBox) loadingBox.innerHTML += '<br>Percorso caricato';
     }
-    
+
     await Promise.all([initUnpackTripId(), initStopsGTFS()]);
-    
+
     let initStopsJSON = async () => {
         console.log("Start Fetching Real Time Info");
         state.currentStopId = sessionStorage.getItem('tripDetails_selectedStop');
@@ -96,7 +96,7 @@ async function init() {
         if (loadingBox) loadingBox.innerHTML += '<br>Fermate caricate';
     }
     await initStopsJSON();
-    
+
     //set stopId from url
     state.currentStopId = sessionStorage.getItem('tripDetails_selectedStop');
     console.log("State", state);
@@ -151,7 +151,7 @@ async function unpackTripId(tripId) {
             // errorPopup(data.error);
         }
         console.log(data);
-        
+
         return data;
 
     } catch (e) {
@@ -167,7 +167,7 @@ function formatMinutesRemaining(timeString) {
 
     const now = new Date();
     const [h, m] = timeString.split(':').map(Number);
-    
+
     // Creiamo l'oggetto target per oggi
     const target = new Date(now);
     target.setHours(h, m, 0, 0);
@@ -196,19 +196,19 @@ function formatMinutesRemaining(timeString) {
 
     if (diffTotalMin > 0) {
         // Futuro
-        return diffTotalMin < 60 
-            ? `${diffTotalMin} min` 
+        return diffTotalMin < 60
+            ? `${diffTotalMin} min`
             : `${hours} h ${mins} min`;
     } else {
         // Passato
-        return absMin < 60 
-            ? `Passato ${absMin} min fa` 
+        return absMin < 60
+            ? `Passato ${absMin} min fa`
             : `Passato ${hours} h ${mins} min fa &#128512;`;
     }
 }
 
 /** Recupera il Trip ID univoco */
-async function fetchTripId(busTrack, busDirection, day, time, stop, lineId, stopId = null) {    
+async function fetchTripId(busTrack, busDirection, day, time, stop, lineId, stopId = null) {
     let text = '';
     try {
         const params = new URLSearchParams({
@@ -240,7 +240,7 @@ async function fetchTripId(busTrack, busDirection, day, time, stop, lineId, stop
 
     } catch (e) {
         console.error("Errore fetchTripId:", e);
-        errorPopup("Errore fetchTripId: \""+text+"\"");
+        errorPopup("Errore fetchTripId: \"" + text + "\"");
         return null;
     }
 }
@@ -336,7 +336,7 @@ async function fetchRealTimeInfo(currentStopId, line, today) {
         });
         if (!response.ok) throw new Error("Errore RealTime");
         const trips = await response.json();
-        
+
         // OPTIMIZATION: Filtra solo i trip della linea corrente
         const plausibleTrips = trips.filter(trip => {
             const tripLine = trip.line?.split('_')[0];
@@ -356,14 +356,14 @@ async function fetchRealTimeInfo(currentStopId, line, today) {
             );
             return { ...trip, calculatedTripId: tid };
         });
-        
+
         const results = await Promise.all(matchPromises);
         console.log("Fetched Real Time Info", "results", results);
         const interestingTrip = results.find(t => t.calculatedTripId == state.tripId);
         if (interestingTrip) return interestingTrip.timingPoints;
-        
+
         console.warn("No matching trip found for tripId Using loose matching", state.tripId);
-                
+
         return results[0] ? results[0].timingPoints : [];
 
     } catch (e) {
@@ -385,7 +385,7 @@ function renderTimeline() {
     );
 
     // console.log("Merged: ", state.mergedStops);
-    
+
 
     state.mergedStops.forEach((stop, index) => {
         const stopEl = document.createElement('div');
@@ -556,7 +556,7 @@ async function getPreviousStopsRealTime_block() {
 
 function getPreviousStopsRealTime() {
     console.log("Previous Stop Matching");
-    
+
     // Find the index of the current stop
     let currentStopIdSplitted = state.currentStopId.split("-");
     const currentStopIndex = state.mergedStops.findIndex(stop => currentStopIdSplitted.find(id => stop.stop_id == id));
@@ -605,7 +605,7 @@ function getPreviousStopsRealTime() {
                 );
 
                 // console.log(tid, state.tripId);
-                
+
 
                 // Se c'è il MATCH
                 if (tid == state.tripId) {
@@ -633,14 +633,14 @@ async function returnTripList(dataUrl) {
     return data;
 }
 
-function updateSingleStopInTimeline(stop, selectedStopIdx, domEl=null) {
+function updateSingleStopInTimeline(stop, selectedStopIdx, domEl = null) {
     let stopEl;
     if (!domEl) {
         stopEl = document.querySelector(`.stop-item[data-stop-id="${stop.stop_id}"]`);
     } else {
         stopEl = domEl;
     }
-    
+
     if (!stopEl) return;
     let index = parseInt(stopEl.dataset.index);
 
@@ -679,17 +679,17 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl=null) {
     }
 
     // console.log(stop);
-    
+
     const stopNameEscaped = encodeURIComponent(stop.stop_name);
-    
+
     stopEl.className = `stop-item ${statusClass}`;
-    try{
+    try {
         stopEl.style.cursor = 'pointer';
         const stopIdShort = stop.data_url.split("-").slice(0, -2).join("-");
         stopEl.onclick = () => {
             window.location.href = `/aut/stops/stop?id=${stopIdShort}&name=${stopNameEscaped}`;
         };
-    }catch(e){
+    } catch (e) {
         console.warn(e);
         stopEl.style.cursor = 'default';
         stopEl.style.backgroundColor = '#2222';
@@ -707,4 +707,9 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl=null) {
             <div class="stop-time">${timeDisplay}</div>
         </div>
     `;
+}
+
+// Export per Jest
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { formatMinutesRemaining, mergeStops, state };
 }

@@ -3,7 +3,7 @@
  */
 
 // Handler globale degli errori per facilitare il debugging in produzione
-window.onerror = function(msg, url, line, col, error) {
+window.onerror = function (msg, url, line, col, error) {
     console.error("Errore JS:", msg, "a", url, line, col);
     const errorBox = document.createElement('div');
     errorBox.style.cssText = "color: red; padding: 20px; background: white; border: 2px solid red; margin: 20px; border-radius: 8px; font-family: sans-serif;";
@@ -30,7 +30,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         // Carica dati dal localStorage
         originData = safeParseJSON(localStorage.getItem('route_origin'));
         destinationData = safeParseJSON(localStorage.getItem('route_destination'));
-        
+
         departureDate = localStorage.getItem('route_departure_date') || new Date().toISOString().split('T')[0];
         departureTime = localStorage.getItem('route_departure_time') || new Date().toTimeString().slice(0, 5);
 
@@ -80,7 +80,7 @@ async function performRouteSearch() {
 
         const params = new URLSearchParams({ from, to, time: departureTime });
         const response = await fetch(`/api/plan-route?${params.toString()}`);
-        
+
         if (!response.ok) throw new Error(`Status HTTP: ${response.status}`);
 
         const data = await response.json();
@@ -105,7 +105,7 @@ function getLineBadgeDetails(lineRaw) {
     if (lineRaw === 'Cammina') return { name: '🚶', class: 'badge-walking' };
 
     const [lineName, lineTag] = lineRaw.split("_");
-    
+
     let badgeClass = "badge-red";
     if (["US", "UN", "EN"].includes(lineTag)) badgeClass = "badge-blue";
     if (lineName.startsWith("N")) badgeClass = "badge-night";
@@ -166,7 +166,7 @@ function renderLegHTML(leg, route, index) {
     }
 
     // Connettore (Il tragitto in bus o a piedi)
-    const connectorContent = isWalking 
+    const connectorContent = isWalking
         ? `<div class="line-badge badge-walking">🚶</div>
            <div class="connector-info">Cammina per ${Math.round(leg.duration)} min (${leg.distance}m)</div>`
         : `<div class="line-badge ${badge.class}">${badge.name}</div>
@@ -176,8 +176,8 @@ function renderLegHTML(leg, route, index) {
 
     // Punto di arrivo della tratta
     const markerClass = isLast ? 'end' : 'transfer';
-    const arrivalName = isWalking 
-        ? leg.destination 
+    const arrivalName = isWalking
+        ? leg.destination
         : (isLast ? destinationData.name : (route.transfer_stop || 'Cambio'));
 
     html += `
@@ -228,4 +228,9 @@ function formatItalianDate(dateStr) {
 
 function formatShortTime(timeStr) {
     return timeStr ? timeStr.substring(0, 5) : '--:--';
+}
+
+// Export per Jest
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { safeParseJSON, getLineBadgeDetails, formatItalianDate, formatShortTime };
 }

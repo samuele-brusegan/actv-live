@@ -10,7 +10,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const originData = localStorage.getItem('route_origin');
         const destinationData = localStorage.getItem('route_destination');
         const dateStr = localStorage.getItem('route_departure_date');
-        
+
         if (!routeData) {
             console.warn("Nessun percorso in cache. Ritorno al cercapercorsi.");
             window.location.href = '/route-finder';
@@ -20,16 +20,16 @@ window.addEventListener('DOMContentLoaded', () => {
         const route = JSON.parse(routeData);
         const origin = originData ? JSON.parse(originData) : { name: 'Partenza' };
         const destination = destinationData ? JSON.parse(destinationData) : { name: 'Destinazione' };
-        
+
         // Imposta info intestazione
         const dateEl = document.getElementById('route-date');
         const durationEl = document.getElementById('route-duration');
-        
+
         if (dateEl) dateEl.textContent = formatItalianDate(dateStr);
         if (durationEl) durationEl.textContent = `⏱ ${Math.round(route.duration)} min`;
-        
+
         renderRouteTimeline(route, origin, destination);
-        
+
     } catch (e) {
         console.error("Errore init routeDetails:", e);
         alert('Si è verificato un errore nel caricamento del percorso.');
@@ -41,11 +41,11 @@ function formatItalianDate(dateStr) {
     if (!dateStr) return '';
     try {
         const date = new Date(dateStr);
-        return date.toLocaleDateString('it-IT', { 
-            weekday: 'short', 
-            day: 'numeric', 
-            month: 'numeric', 
-            year: 'numeric' 
+        return date.toLocaleDateString('it-IT', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'numeric',
+            year: 'numeric'
         });
     } catch (e) {
         return dateStr;
@@ -58,29 +58,29 @@ function renderRouteTimeline(route, origin, destination) {
     if (!container) return;
 
     let html = '';
-    
+
     // Inizio: Posizione attuale -> Camminata iniziale
     html += renderTimelineStep({
         icon: 'location',
         title: 'Posizione attuale',
         connector: 'dashed'
     });
-    
+
     html += renderTimelineStep({
         icon: 'walk',
         title: 'Cammina',
         subtitle: 'carca 800 metri',
         connector: 'dashed'
     });
-    
+
     // Tratte del percorso (Legs)
     if (route.legs && route.legs.length > 0) {
         route.legs.forEach((leg, index) => {
             const isLastLeg = (index === route.legs.length - 1);
-            
+
             // Punto di imbarco/partenza tratta
             html += renderStopStep(leg.origin || origin.name, leg.route_short_name, leg.stops_count, leg.duration);
-            
+
             // Se è l'ultima tratta, aggiungiamo il punto di arrivo finale del bus
             if (isLastLeg) {
                 const arrivalName = leg.destination || destination.name;
@@ -96,7 +96,7 @@ function renderRouteTimeline(route, origin, destination) {
         html += renderStopStep(origin.name, route.route_short_name, route.stops_count, route.duration);
         html += renderTimelineStep({ icon: 'circle', title: destination.name, connector: 'dashed' });
     }
-    
+
     // Fine: Camminata finale -> Destinazione
     html += renderTimelineStep({
         icon: 'walk',
@@ -104,12 +104,12 @@ function renderRouteTimeline(route, origin, destination) {
         subtitle: 'circa 800 metri',
         connector: 'dashed'
     });
-    
+
     html += renderTimelineStep({
         icon: 'location_end',
         title: destination.name
     });
-    
+
     container.innerHTML = html;
 }
 
@@ -126,7 +126,7 @@ function renderStopStep(stopName, lineName, stopsCount, duration) {
             </div>
         `;
     }
-    
+
     return `
         <div class="timeline-item">
             <div class="timeline-icon"><div class="icon-circle"></div></div>
@@ -148,8 +148,8 @@ function renderTimelineStep({ icon, title, subtitle, connector }) {
         'circle': '<div class="icon-circle"></div>'
     }[icon] || '';
 
-    const connectorHtml = connector 
-        ? `<div class="timeline-connector ${connector}"></div>` 
+    const connectorHtml = connector
+        ? `<div class="timeline-connector ${connector}"></div>`
         : '';
 
     return `
@@ -170,4 +170,9 @@ function renderTimelineStep({ icon, title, subtitle, connector }) {
 /** Mock per apertura mappa */
 function showMap() {
     alert('Funzionalità mappa in arrivo in una prossima versione!');
+}
+
+// Export per Jest
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { formatItalianDate, renderTimelineStep, renderStopStep };
 }

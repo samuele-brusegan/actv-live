@@ -193,13 +193,13 @@ function createPassageCard(p) {
         const dow = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
         let day = dow[new Date().getDay()];
 
-        let myParams = new URLSearchParams({ 
-            rtable: 'true', 
-            time: timingPoint.time, 
-            busTrack: lineName, 
-            busDirection: destination, 
-            day: day, 
-            stop: timingPoint.stop, 
+        let myParams = new URLSearchParams({
+            rtable: 'true',
+            time: timingPoint.time,
+            busTrack: lineName,
+            busDirection: destination,
+            day: day,
+            stop: timingPoint.stop,
             lineId: lineId,
             limit: 50
         });
@@ -351,3 +351,8 @@ async function init() {
 }
 
 window.onload = init;
+
+// Export per Jest
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { getFavorites, isFavorite, toggleFavorite, updateFavoriteButton, createPassageCard };
+}

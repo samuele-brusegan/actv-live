@@ -21,7 +21,7 @@ async function loadStops() {
         const response = await fetch('/api/stops');
         if (!response.ok) throw new Error('Errore di rete');
         const data = await response.json();
-        
+
         // Mappa per raggruppare fermate con lo stesso nome
         const stopsMap = new Map();
 
@@ -40,7 +40,7 @@ async function loadStops() {
                 });
             }
         });
-        
+
         // Converte la mappa in array
         allStops = Array.from(stopsMap.values()).map(stop => ({
             id: stop.ids[0],
@@ -50,7 +50,7 @@ async function loadStops() {
             lng: stop.lng,
             type: 'stop'
         }));
-        
+
         renderFavorites();
         renderRecent();
     } catch (error) {
@@ -66,7 +66,7 @@ function renderFavorites() {
     const favorites = JSON.parse(localStorage.getItem('favorite_stops') || '[]');
     const container = document.getElementById('favorites-list');
     if (!container) return;
-    
+
     if (favorites.length === 0) {
         container.innerHTML = '<div class="no-results">Nessuna fermata preferita</div>';
         return;
@@ -79,7 +79,7 @@ function renderRecent() {
     const recent = JSON.parse(localStorage.getItem('recent_stops') || '[]').filter(Boolean);
     const container = document.getElementById('recent-list');
     if (!container) return;
-    
+
     if (recent.length === 0) {
         container.innerHTML = '<div class="no-results">Nessuna fermata recente</div>';
         return;
@@ -97,7 +97,7 @@ function createStopCardHTML(stop, isFavorite) {
         const displayName = stop.parsedName || stop.name;
         // Escaping per l'attributo onclick
         const stopJson = JSON.stringify(stop).replace(/'/g, "&#39;");
-        
+
         return `
             <div class="stop-card" onclick='handleAddressSelection(${stopJson}, this)'>
                 <div class="stop-icon address-icon">📍</div>
@@ -153,7 +153,7 @@ function updateActiveUI(element) {
         card.classList.remove('selected');
         card.style.background = ''; // Reset inline styles if any
     });
-    
+
     if (element) {
         element.classList.add('selected');
         element.style.background = '#E8F5E9'; // Verde leggero per selezione
@@ -164,7 +164,7 @@ function updateActiveUI(element) {
 function addToRecent(stop) {
     if (!stop) return;
     let recent = JSON.parse(localStorage.getItem('recent_stops') || '[]').filter(Boolean);
-    
+
     // Rimuove eventuali duplicati
     recent = recent.filter(s => {
         if (stop.type === 'address') return s.name !== stop.name;
@@ -198,7 +198,7 @@ function cancelSelection() {
 /** Filtra le fermate e cerca indirizzi in base all'input utente */
 function filterStops() {
     const query = document.getElementById('search-input').value.toLowerCase().trim();
-    
+
     const favoritesSection = document.getElementById('favorites-section');
     const recentSection = document.getElementById('recent-section');
     const allStopsSection = document.getElementById('all-stops-section');
@@ -215,14 +215,14 @@ function filterStops() {
     if (allStopsSection) allStopsSection.style.display = 'block';
 
     // 1. Filtro fermate locali
-    const filteredLocalStops = allStops.filter(stop => 
+    const filteredLocalStops = allStops.filter(stop =>
         stop.name.toLowerCase().includes(query)
     );
 
     // 2. Filtro suggerimenti dai preferiti/recenti
     const favorites = JSON.parse(localStorage.getItem('favorite_stops') || '[]');
     const recent = JSON.parse(localStorage.getItem('recent_stops') || '[]').filter(Boolean);
-    
+
     const combined = [...favorites, ...recent];
     const seenKeys = new Set();
     const suggestions = combined.filter(item => {
@@ -241,21 +241,21 @@ function filterStops() {
         addressResults = [];
         renderAllResults(filteredLocalStops, [], suggestions);
     }
-    
+
     // Rendering iniziale immediato
-    renderAllResults(filteredLocalStops, addressResults, suggestions); 
+    renderAllResults(filteredLocalStops, addressResults, suggestions);
 }
 
 /** Effettua la ricerca su Nominatim (OpenStreetMap) */
 async function fetchAddresses(query) {
     try {
         // Area geografica di Venezia (lon1,lat1,lon2,lat2)
-        const viewbox = '12.1,45.3,12.6,45.5'; 
+        const viewbox = '12.1,45.3,12.6,45.5';
         const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=${viewbox}&bounded=1&limit=5`;
-        
+
         const response = await fetch(url);
         const data = await response.json();
-        
+
         addressResults = data.map(item => {
             const parts = item.display_name.split(',');
             return {
@@ -269,11 +269,11 @@ async function fetchAddresses(query) {
                 ids: []
             };
         });
-        
+
         // Riesegue il filtro locale per consistenza nel re-render
         const currentQuery = document.getElementById('search-input').value.toLowerCase();
         const filtered = allStops.filter(s => s.name.toLowerCase().includes(currentQuery));
-        
+
         // Nota: Qui si potrebbero ricalcolare anche i suggestions se necessario
         renderAllResults(filtered, addressResults);
 
@@ -286,7 +286,7 @@ async function fetchAddresses(query) {
 function renderAllResults(stops, addresses = [], suggestions = []) {
     const listEl = document.getElementById('all-stops-list');
     if (!listEl) return;
-    
+
     let html = '';
 
     if (suggestions.length > 0) {
@@ -313,3 +313,8 @@ function renderAllResults(stops, addresses = [], suggestions = []) {
 
 // Inizializzazione
 window.addEventListener('DOMContentLoaded', loadStops);
+
+// Export per Jest
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { addToRecent, createStopCardHTML, renderAllResults };
+}

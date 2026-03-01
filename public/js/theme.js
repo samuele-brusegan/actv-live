@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", updateTheme);
 function toggleTheme() {
     const currentTheme = localStorage.getItem("theme");
     const newTheme = currentTheme === "dark" ? "light" : "dark";
-    
+
     localStorage.setItem("theme", newTheme);
     updateTheme();
 }
@@ -34,4 +34,9 @@ function updateTheme() {
     if (icon) {
         icon.src = isDark ? "/svg/dark_mode.svg" : "/svg/light_mode.svg";
     }
+}
+
+// Export per Jest
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { toggleTheme, updateTheme };
 }

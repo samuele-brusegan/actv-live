@@ -23,14 +23,14 @@ function renderFavorites() {
 
     section.style.display = 'block';
     if (hr) hr.style.display = 'block';
-    
+
     list.innerHTML = favorites.map(stop => createFavoriteCardHTML(stop)).join('');
 }
 
 function createFavoriteCardHTML(stop) {
     const ids = stop.ids || [stop.id];
     const encodedName = encodeURIComponent(stop.name);
-    const idBadges = ids.map(id => 
+    const idBadges = ids.map(id =>
         `<div class="id-badge-small">${id}</div>`
     ).join('');
 
@@ -57,9 +57,9 @@ function createFavoriteCardHTML(stop) {
 async function initHomeMap() {
     renderFavorites();
 
-    const map = L.map('map', { 
-        attributionControl: false, 
-        fullscreenControl: { pseudoFullscreen: true } 
+    const map = L.map('map', {
+        attributionControl: false,
+        fullscreenControl: { pseudoFullscreen: true }
     }).setView([45.4384, 12.3359], 12);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -85,7 +85,7 @@ async function initHomeMap() {
 
     map.on('locationfound', (e) => {
         if (userMarker) map.removeLayer(userMarker);
-        
+
         userMarker = L.circleMarker(e.latlng, {
             color: '#009E61', fillColor: '#009E61', fillOpacity: 0.9, radius: 8
         }).addTo(map).bindPopup("La tua posizione").openPopup();
@@ -97,7 +97,7 @@ async function initHomeMap() {
         })).sort((a, b) => a.distance - b.distance).slice(0, 3);
 
         updateNearbyUI(near, map, e.latlng);
-        
+
         // Evidenzia sulla mappa
         near.forEach(s => s.marker.setStyle(nearStopStyle).setPopupContent(createPopupContent(s, true)));
 
@@ -139,7 +139,7 @@ function updateNearbyUI(near, map, userPos) {
     list.innerHTML = near.map(stop => {
         const ids = stop.id.split('-web-aut')[0].split('-');
         const idBadges = ids.map(id => `<div class="id-badge-small">${id}</div>`).join('');
-        
+
         return `
             <a href="/aut/stops/stop?id=${ids.join('-')}&name=${encodeURIComponent(stop.name)}" class="stop-card">
                 <div class="d-flex align-items-center w-100">
@@ -231,3 +231,8 @@ window.onload = () => {
     initHomeMap();
     checkImportantNotices();
 };
+
+// Export per Jest
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { calculateDistance, createFavoriteCardHTML, createPopupContent, showStatusBanner };
+}

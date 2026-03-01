@@ -75,3 +75,8 @@ class CookieNotice {
 window.addEventListener('load', () => {
     new CookieNotice();
 });
+
+// Export per Jest
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CookieNotice;
+}
