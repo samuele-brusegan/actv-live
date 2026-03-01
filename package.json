@@ -1,0 +1,27 @@
+{
+  "name": "actv-live",
+  "version": "1.0.0",
+  "description": "Questo progetto è rilasciato sotto la licenza MIT. Vedere il file [LICENSE](LICENSE.md) per maggiori dettagli.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samuele-brusegan/actv-live.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/samuele-brusegan/actv-live/issues"
+  },
+  "homepage": "https://github.com/samuele-brusegan/actv-live#readme",
+  "devDependencies": {
+    "jest": "^30.2.0"
+  }
+}
