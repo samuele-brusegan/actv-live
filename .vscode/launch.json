@@ -10,6 +10,26 @@
             "request": "launch",
             "command": "npm run test",
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Run Pest Tests",
+            "type": "php",
+            "request": "launch",
+            "port": 9003,
+            "pathMappings": {
+                "${workspaceFolder}": "/var/www/html"
+            },
+            "program": "${workspaceFolder}/vendor/bin/pest",
+            "args": [
+                "--filter",
+                "${filter}"
+            ],
+            "env": {
+                "DB_HOST": "localhost",
+                "DB_DATABASE": "actv_live_test",
+                "DB_USERNAME": "root",
+                "DB_PASSWORD": "password"
+            }
         }
     ]
 }
