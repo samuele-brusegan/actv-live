@@ -1,6 +1,6 @@
 <?php
 
-function getBusesSmartMidnight(PDO $pdo, $currentTime, $day) {
+function getBusesSmartMidnight(DatabaseConnector $db, $currentTime, $day) {
     $allowedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     $dayIndex = array_search(strtolower($day), $allowedDays);
     
@@ -26,9 +26,7 @@ function getBusesSmartMidnight(PDO $pdo, $currentTime, $day) {
             WHERE c.{$yesterday} = 1 AND st.arrival_time >= '24:00:00'
             ORDER BY arrival_time ASC";
 
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute();
-    $allTrips = $stmt->fetchAll();
+    $allTrips = $db->query($sql);
 
     $results = [];
     
@@ -73,24 +71,16 @@ function getBusesSmartMidnight(PDO $pdo, $currentTime, $day) {
     return $results;
 }
 
+function dbquery(DatabaseConnector $db, $currentTime, $day) {
+    return getBusesSmartMidnight($db, $currentTime, $day);
+}
+
 header('Content-Type: application/json');
 
-$currentTime = "00:13";
-$day = "monday";
+$currentTime = $_GET['time'] ?? $currentTime ?? "00:13";
+$day = $_GET['day'] ?? $day ?? "monday";
 
-function getPDOConnection() {
-    static $pdo = null;
-    if ($pdo === null) {
-        $dsn = "mysql:host=" . ENV['DB_HOST'] . ";dbname=" . ENV['DB_NAME'] . ";charset=utf8mb4";
-        $pdo = new PDO($dsn, ENV['DB_USER'], ENV['DB_PASS'], [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-        ]);
-    }
-    return $pdo;
-}
-$arr = getBusesSmartMidnight(getPDOConnection(), $currentTime, $day);
+$arr = dbquery($db, $currentTime, $day);
 echo json_encode([count($arr), $arr]);
 
 ?>

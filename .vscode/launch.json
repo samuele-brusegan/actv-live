@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "type": "node-terminal",
             "name": "Run Script: test",
@@ -16,10 +17,8 @@
             "type": "php",
             "request": "launch",
             "port": 9003,
-            "pathMappings": {
-                "${workspaceFolder}": "/var/www/html"
-            },
             "program": "${workspaceFolder}/vendor/bin/pest",
+            "cwd": "${workspaceFolder}",
             "args": [
                 "--filter",
                 "${filter}"

@@ -14,7 +14,8 @@
         }
     ],
     "require-dev": {
-        "pestphp/pest": "^4.4"
+        "pestphp/pest": "^4.4",
+        "symfony/var-dumper": "^8.0"
     },
     "config": {
         "allow-plugins": {

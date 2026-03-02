@@ -3,29 +3,48 @@ class databaseConnector {
 
     private $db = null;
     private $tableJoins = "";
+    private static $instance = null;
 
     public function __construct() {
     }
 
-    public function connect(string $dbUsername, string $dbPassword, string $url, string $dbName, string $tableJoins = ""): bool {
-
-        $this->tableJoins = $tableJoins;
-        $conn = new mysqli($url, $dbUsername, $dbPassword, $dbName);
-
-        if (!$conn->connect_error) $this->db = $conn;
-
-        return !($conn->connect_errno == 0);
+    public static function getInstance(): self {
+        if (self::$instance === null) {
+            self::$instance = new self();
+        }
+        return self::$instance;
     }
 
-    public function query(string $query): array {
-        //TODO: Assert $query is a valid SQL query
-        $result = $this->db->query($query);
+    public function connect(string $dbUsername, string $dbPassword, string $url, string $dbName, string $tableJoins = ""): bool {
+        $this->tableJoins = $tableJoins;
+        
+        if ($this->db !== null) {
+            return true;
+        }
 
-        return $result->fetch_all(MYSQLI_ASSOC);
+        try {
+            $dsn = "mysql:host=$url;dbname=$dbName;charset=utf8mb4";
+            $options = [
+                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES   => false,
+            ];
+            $this->db = new PDO($dsn, $dbUsername, $dbPassword, $options);
+            return true;
+        } catch (PDOException $e) {
+            error_log("Connection failed: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function query(string $query, array $params = []): array {
+        $stmt = $this->db->prepare($query);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
     }
 
     public function close() {
-        $this->db->close();
+        $this->db = null;
     }
 
     public function getJoins(): string {
@@ -38,14 +57,12 @@ class databaseConnector {
      * @return bool True if the query is a valid SQL query, false otherwise
      */
     public function seamsValidSQL(string $query): bool {
-        if (
-            strpos($query, "SELECT") !== false ||
-            strpos($query, "UPDATE") !== false ||
-            strpos($query, "DELETE") !== false ||
-            strpos($query, "INSERT") !== false
-        ) {
-            return false;
-        }
-        return true;
+        $query = strtoupper(trim($query));
+        return (
+            str_starts_with($query, "SELECT") ||
+            str_starts_with($query, "UPDATE") ||
+            str_starts_with($query, "DELETE") ||
+            str_starts_with($query, "INSERT")
+        );
     }
 }

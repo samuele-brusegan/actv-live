@@ -149,6 +149,56 @@
                     }
                 }
             }
+            async function getStopsFromGTFS() {
+                if (document.querySelectorAll('.stations-item').length != 0) return;
+
+                try {
+                    let res = await fetch('/api/gtfs-stops?return=true');
+                    let data = await res.json();
+
+                    //remove duplicates by data_url
+                    data = data.filter((item, index) => data.findIndex(t => t.data_url === item.data_url) === index);
+                    createStopCards(data);
+                } catch (error) {
+                    console.log(error);
+                }
+            }
+            function createStopCards(data) {
+                let stationsList = document.getElementById('stations-list');
+                let ids = [];
+                data.forEach(station => {
+                    if (station.data_url != null) {
+                        let dirtyIds = station.data_url.split('-')
+                        ids = dirtyIds.splice(0, dirtyIds.length - 2)
+                    } else {
+                        ids = [station.stop_id];
+                    }
+
+                    let card = document.createElement('div');
+                    card.classList.add('station-item', 'stop-card');
+                    card.setAttribute('data-name', station.stop_name.toUpperCase());
+                    card.setAttribute('data-all-ids', JSON.stringify(ids));
+                    card.innerHTML = `
+                        <div class="d-flex align-items-center" style="width: 100%;">
+                            <div class="stop-ids-container">
+                                ${ids.map(id => `<div class="stop-id-badge">${id}</div>`).join('')}
+                            </div>
+                            <div class="stop-info ms-3" style="flex-grow: 1;">
+                                <span class="stop-name d-block">${station.stop_name}</span>
+                                <span class="stop-desc">Servizio non in tempo reale (Server ACTV Down)</span>
+                            </div>
+                        </div>
+                        <div class="quick-action">
+                            <span style="font-size: 20px; color: #ccc;">&rsaquo;</span>
+                        </div>
+                    `;
+                    card.addEventListener('click', () => {
+                        window.location.href = `/aut/stops/stop?id=${JSON.parse(card.getAttribute('data-all-ids')).join('-')}&name=${station.stop_name}`;
+                    });
+                    stationsList.appendChild(card);
+                });
+            }
+            document.addEventListener('DOMContentLoaded', getStopsFromGTFS);
         </script>
 
     </body>

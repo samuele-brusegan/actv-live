@@ -83,16 +83,37 @@ async function fetchPassages() {
     if (!stationId) return [];
 
     try {
+        const ctrl = new AbortController();
+        const timeoutId = setTimeout(() => ctrl.abort(), 2500);
         const response = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stationId}-web-aut`, {
-            cache: 'no-cache'
+            cache: 'no-cache',
+            signal: ctrl.signal
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
         return data || [];
     } catch (error) {
-        console.error("Errore fetch passaggi:", error);
+        console.warn("Errore fetch passaggi:", error);
+        try {
+            
+            const response = await fetch(`/api/gtfs-passages?stop=${stationId}&return=true`, {
+                cache: 'no-cache',
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+
+            //todo:correct format
+
+            return data || [];
+        } catch (error) {
+            console.warn("Errore fetch passaggi:", error);
+        }
         return null;
     }
 }

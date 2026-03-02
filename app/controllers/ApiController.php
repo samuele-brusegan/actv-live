@@ -1,12 +1,11 @@
 <?php
-class ApiController
-{
+class ApiController {
 
     private function getDb($joins = "") {
         if (!class_exists('databaseConnector')) {
             require_once BASE_PATH . '/app/models/databaseConnector.php';
         }
-        $db = new databaseConnector();
+        $db = databaseConnector::getInstance();
         $db->connect(ENV['DB_USER'], ENV['DB_PASS'], ENV['DB_HOST'], ENV['DB_NAME'], $joins);
         return $db;
     }
@@ -33,27 +32,20 @@ class ApiController
 
         $db = $this->getDb();
 
-        $tripId = $db->query("SELECT 1") ? addslashes($_GET['trip_id']) : ''; // Simple check and sanitize
-        // Note: addslashes is basic protection. Prepared statements would be better but keeping consistency with existing codebase style for now.
-        $tripId = $_GET['trip_id'];
+        $tripId = $_GET['trip_id'] ?? '';
 
         header("Content-Type: application/json");
 
-        // Use safe query construction or parameterized if class supports it. 
-        // Existing class only has query() taking string.
-        // We will trust internal usage or add basic sanitization.
-        $safeTripId = $tripId; // In a real app we need usage of prepared statements
-
         $stops = $db->query(
-            // "SELECT stops.*, stop_times.* FROM stops INNER JOIN stop_times ON stops.stop_id = stop_times.stop_id WHERE trip_id = '$safeTripId' ORDER BY stop_times.arrival_time"
             "SELECT 
                 stops.*, 
                 stop_times.*
             FROM stops
             INNER JOIN stop_times ON stops.stop_id = stop_times.stop_id
-            WHERE stop_times.trip_id = '$safeTripId'
+            WHERE stop_times.trip_id = ?
             ORDER BY stop_times.stop_sequence
-            "
+            ",
+            [$tripId]
         );
 
         //Controllo se ci sono fermate duplicate una dopo l'altra
@@ -76,12 +68,12 @@ class ApiController
 
         $db = $this->getDb();
 
-        $tripId = $_GET['trip_id'];
+        $tripId = $_GET['trip_id'] ?? '';
 
         header("Content-Type: application/json");
 
         // Fixed typo in original query: 'stops.,' -> 'stops.*,'
-        $stops = $db->query("SELECT stops.*, stop_times.* FROM stops INNER JOIN stop_times ON stops.stop_id = stop_times.stop_id WHERE trip_id = '$tripId' ORDER BY stop_times.arrival_time");
+        $stops = $db->query("SELECT stops.*, stop_times.* FROM stops INNER JOIN stop_times ON stops.stop_id = stop_times.stop_id WHERE trip_id = ? ORDER BY stop_times.arrival_time", [$tripId]);
         echo json_encode($stops);
     }
 
@@ -134,7 +126,7 @@ class ApiController
             // Handle Origin Address
             if (strpos($origin, ',') !== false) {
                 list($lat, $lon) = explode(',', $origin);
-                $nearest = $planner->findNearestStop((float)$lat, (float)$lon);
+                $nearest = $planner->findNearestStop((float) $lat, (float) $lon);
 
                 if ($nearest) {
                     $planningOrigin = $nearest['stop_id'];
@@ -154,7 +146,7 @@ class ApiController
             // Handle Destination Address
             if (strpos($dest, ',') !== false) {
                 list($lat, $lon) = explode(',', $dest);
-                $nearest = $planner->findNearestStop((float)$lat, (float)$lon);
+                $nearest = $planner->findNearestStop((float) $lat, (float) $lon);
 
                 if ($nearest) {
                     $planningDest = $nearest['stop_id'];
@@ -212,8 +204,7 @@ class ApiController
             header('Content-Type: application/json');
             echo json_encode(['success' => true, 'routes' => $routes]);
 
-        }
-        catch (Exception $e) {
+        } catch (Exception $e) {
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
@@ -233,7 +224,6 @@ class ApiController
         // Costruzione dinamica della query
         // Caso A: Specifico Trip ID
         if ($targetTripId) {
-            $safeTripId = addslashes($targetTripId);
             $sql = "
                 SELECT 
                     r.route_id, 
@@ -246,13 +236,13 @@ class ApiController
                 JOIN routes r ON t.route_id = r.route_id
                 JOIN stop_times st ON t.trip_id = st.trip_id
                 JOIN stops s ON st.stop_id = s.stop_id
-                WHERE t.trip_id = '$safeTripId'
+                WHERE t.trip_id = ?
                 ORDER BY st.stop_sequence ASC
             ";
+            $results = $db->query($sql, [$targetTripId]);
         }
         // Caso B: Specifica Linea
         elseif ($targetLine) {
-            $safeLine = addslashes($targetLine);
             $sql = "
                 SELECT 
                     r.route_id, 
@@ -269,9 +259,10 @@ class ApiController
                 ) t_rep ON r.route_id = t_rep.route_id
                 JOIN stop_times st ON t_rep.representative_trip_id = st.trip_id
                 JOIN stops s ON st.stop_id = s.stop_id
-                WHERE r.route_short_name = '$safeLine'
+                WHERE r.route_short_name = ?
                 ORDER BY r.route_id, st.stop_sequence ASC
             ";
+            $results = $db->query($sql, [$targetLine]);
         }
         // Caso C: Tutte le linee (Default)
         else {
@@ -293,9 +284,8 @@ class ApiController
                 JOIN stops s ON st.stop_id = s.stop_id
                 ORDER BY r.route_id, st.stop_sequence ASC
             ";
+            $results = $db->query($sql);
         }
-
-        $results = $db->query($sql);
         //$results = $stmt->fetchAll(PDO::FETCH_ASSOC); // Assumo tu stia usando PDO o driver simile
 
         $routesMap = [];
@@ -332,7 +322,7 @@ class ApiController
         /*
          // 1. Get all routes
          $routes = $db->query("SELECT route_id, route_short_name, route_long_name FROM routes");
-         
+
          $shapes = [];
          */
         /*
@@ -390,20 +380,20 @@ class ApiController
          }
          ]
          },
-         
+
          */
         /*
-         
+
          foreach ($routes as $route) {
          $routeId = $route['route_id'];
-         
+
          // 2. Get one representative trip for this route
          // We just take one trip LIMIT 1. To be better we might check direction or longest trip, but any valid trip gives the shape roughly.
          $trips = $db->query("SELECT trip_id FROM trips WHERE route_id = '$routeId' LIMIT 1");
-         
+
          if (!empty($trips)) {
          $tripId = $trips[0]['trip_id'];
-         
+
          // 3. Get stops for this trip in order
          $pathQuery = "
          SELECT s.stop_lat as lat, s.stop_lon as lng, s.stop_name as name 
@@ -413,11 +403,11 @@ class ApiController
          ORDER BY st.stop_sequence ASC
          ";
          $stops = $db->query($pathQuery);
-         
+
          if (!empty($stops)) {
          // Convert float strings to real floats if needed, though JSON handles numeric strings fine usually.
          // But lat/lon in stops table might be stored as decimal/double.
-         
+
          $shapes[] = [
          'route_id' => $routeId,
          'route_short_name' => $route['route_short_name'],
@@ -447,9 +437,8 @@ class ApiController
 
         // 1. Find route by short name
         // Use exact match for safely
-        $safeLine = addslashes($line);
-        $routeQuery = "SELECT route_id FROM routes WHERE route_short_name = '$safeLine'";
-        $routes = $db->query($routeQuery);
+        $routeQuery = "SELECT route_id FROM routes WHERE route_short_name = ?";
+        $routes = $db->query($routeQuery, [$line]);
 
         if (empty($routes)) {
             header('HTTP/1.1 404 Not Found');
@@ -462,17 +451,15 @@ class ApiController
         $selectedTripId = null;
 
         if ($dest) {
-            $safeDest = addslashes($dest);
-            $tripByHeadsign = $db->query("SELECT trip_id FROM trips WHERE route_id = '$targetRouteId' AND trip_headsign LIKE '%$safeDest%' LIMIT 1");
+            $tripByHeadsign = $db->query("SELECT trip_id FROM trips WHERE route_id = ? AND trip_headsign LIKE ? LIMIT 1", [$targetRouteId, "%$dest%"]);
 
             if (!empty($tripByHeadsign)) {
                 $selectedTripId = $tripByHeadsign[0]['trip_id'];
-            }
-            else {
+            } else {
                 $deepQuery = "
                     SELECT t.trip_id 
                     FROM trips t
-                    WHERE t.route_id = '$targetRouteId'
+                    WHERE t.route_id = ?
                     AND (
                         SELECT s.stop_name 
                         FROM stop_times st 
@@ -480,10 +467,10 @@ class ApiController
                         WHERE st.trip_id = t.trip_id 
                         ORDER BY st.stop_sequence DESC 
                         LIMIT 1
-                    ) LIKE '%$safeDest%'
+                    ) LIKE ?
                     LIMIT 1
                 ";
-                $trips = $db->query($deepQuery);
+                $trips = $db->query($deepQuery, [$targetRouteId, "%$dest%"]);
                 if (!empty($trips)) {
                     $selectedTripId = $trips[0]['trip_id'];
                 }
@@ -491,7 +478,7 @@ class ApiController
         }
 
         if (!$selectedTripId) {
-            $trips = $db->query("SELECT trip_id FROM trips WHERE route_id = '$targetRouteId' LIMIT 1");
+            $trips = $db->query("SELECT trip_id FROM trips WHERE route_id = ? LIMIT 1", [$targetRouteId]);
             if (!empty($trips)) {
                 $selectedTripId = $trips[0]['trip_id'];
             }
@@ -513,11 +500,11 @@ class ApiController
                 st.departure_time as time
             FROM stop_times st
             JOIN stops s ON st.stop_id = s.stop_id
-            WHERE st.trip_id = '$selectedTripId'
+            WHERE st.trip_id = ?
             ORDER BY st.stop_sequence ASC
         ";
 
-        $stops = $db->query($stopsQuery);
+        $stops = $db->query($stopsQuery, [$selectedTripId]);
 
         // Format time to HH:MM (substr)
         foreach ($stops as &$stop) {
@@ -540,11 +527,10 @@ class ApiController
                 $data['url'] ?? null,
                 $data['line'] ?? null,
                 $data['stack'] ?? null,
-            ['userAgent' => $_SERVER['HTTP_USER_AGENT'] ?? null]
+                ['userAgent' => $_SERVER['HTTP_USER_AGENT'] ?? null]
             );
             echo json_encode(['success' => true]);
-        }
-        else {
+        } else {
             header('HTTP/1.1 400 Bad Request');
             echo json_encode(['error' => 'Invalid data']);
         }
@@ -563,7 +549,7 @@ class ApiController
 
         require_once BASE_PATH . '/app/models/gtfsTripResolver.php';
     }
-    
+
     /**
      * API /api/gtfs-bnr
      * Ritorna i bus attualmente in servizio (±30 min dall'orario corrente).
@@ -576,9 +562,9 @@ class ApiController
 
         // Orario e giorno: default = ora del server
         $currentTime = $_GET['time'] ?? date('H:i');
-        $dayParam    = $_GET['day']  ?? strtolower(date('l'));
+        $dayParam = $_GET['day'] ?? strtolower(date('l'));
 
-        $allowedDays = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+        $allowedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         $dayIndex = array_search($dayParam, $allowedDays);
         if ($dayIndex === false) {
             echo json_encode(['error' => 'Invalid day']);
@@ -615,13 +601,15 @@ class ApiController
         $results = [];
 
         foreach ($allTrips as $trip) {
-            if (isset($seen[$trip['trip_id']])) continue;
+            if (isset($seen[$trip['trip_id']]))
+                continue;
 
             $tParts = explode(':', $trip['arrival_time']);
             $tripSec = ($tParts[0] * 3600) + ($tParts[1] * 60);
 
             $diff = abs($tripSec - $searchSec);
-            if ($diff > 43200) $diff = 86400 - $diff;
+            if ($diff > 43200)
+                $diff = 86400 - $diff;
 
             if ($diff <= $range) {
                 $trip['diff_min'] = round(($tripSec - $searchSec) / 60);
@@ -638,8 +626,8 @@ class ApiController
         usort($results, fn($a, $b) => $a['diff_min'] <=> $b['diff_min']);
 
         echo json_encode([
-            'time'  => $currentTime,
-            'day'   => $dayParam,
+            'time' => $currentTime,
+            'day' => $dayParam,
             'count' => count($results),
             'buses' => $results
         ]);
@@ -661,17 +649,16 @@ class ApiController
         }
 
         $db = $this->getDb();
-        $safeTripId = addslashes($tripId);
 
         // 1. Get stops for the trip
         $sqlStops = "SELECT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon,
                     st.arrival_time, st.departure_time, st.stop_sequence, s.data_url
                 FROM stop_times st
                 JOIN stops s ON st.stop_id = s.stop_id
-                WHERE st.trip_id = '$safeTripId'
+                WHERE st.trip_id = ?
                 ORDER BY st.stop_sequence ASC";
 
-        $stops = $db->query($sqlStops);
+        $stops = $db->query($sqlStops, [$tripId]);
 
         if (empty($stops)) {
             echo json_encode(['error' => 'No stops found for this trip']);
@@ -679,22 +666,32 @@ class ApiController
         }
 
         // 2. Get the shape for this trip
-        $sqlShapeId = "SELECT shape_id FROM trips WHERE trip_id = '$safeTripId' LIMIT 1";
-        $tripInfo = $db->query($sqlShapeId);
-        
+        $sqlShapeId = "SELECT shape_id FROM trips WHERE trip_id = ? LIMIT 1";
+        $tripInfo = $db->query($sqlShapeId, [$tripId]);
+
         $shapePoints = [];
         if (!empty($tripInfo) && !empty($tripInfo[0]['shape_id'])) {
             $shapeId = $tripInfo[0]['shape_id'];
             $sqlShape = "SELECT lat, lng, sequence, dist_traveled 
                          FROM shapes_refined 
-                         WHERE shape_id = '$shapeId' 
+                         WHERE shape_id = ? 
                          ORDER BY sequence ASC";
-            $shapePoints = $db->query($sqlShape);
+            $shapePoints = $db->query($sqlShape, [$shapeId]);
         }
 
         echo json_encode([
             'stops' => $stops,
             'shape' => $shapePoints
         ]);
+    }
+
+    function gtfsStops() {
+        $db = $this->getDb();
+        require_once BASE_PATH . '/app/models/gtfsStops.php';
+    }
+
+    function gtfsPassages() {
+        $db = $this->getDb();
+        require_once BASE_PATH . '/app/models/gtfsPassages.php';
     }
 }

@@ -2,20 +2,20 @@
 
 require_once __DIR__ . '/../../../app/models/databaseConnector.php';
 
-test('database connector seamsValidSQL returns false for SQL keywords', function () {
+test('database connector seamsValidSQL returns true for SQL keywords', function () {
     $connector = new databaseConnector();
 
-    expect($connector->seamsValidSQL('SELECT * FROM users'))->toBeFalse();
-    expect($connector->seamsValidSQL('UPDATE users SET name = "test"'))->toBeFalse();
-    expect($connector->seamsValidSQL('DELETE FROM users'))->toBeFalse();
-    expect($connector->seamsValidSQL('INSERT INTO users (name) VALUES ("test")'))->toBeFalse();
+    expect($connector->seamsValidSQL('SELECT * FROM users'))->toBeTrue();
+    expect($connector->seamsValidSQL('UPDATE users SET name = "test"'))->toBeTrue();
+    expect($connector->seamsValidSQL('DELETE FROM users'))->toBeTrue();
+    expect($connector->seamsValidSQL('INSERT INTO users (name) VALUES ("test")'))->toBeTrue();
 });
 
-test('database connector seamsValidSQL returns true for other strings', function () {
+test('database connector seamsValidSQL returns false for other strings', function () {
     $connector = new databaseConnector();
 
-    expect($connector->seamsValidSQL('Some random string'))->toBeTrue();
-    expect($connector->seamsValidSQL('DROP TABLE users'))->toBeTrue(); // Current implementation only checks for SELECT, UPDATE, DELETE, INSERT
+    expect($connector->seamsValidSQL('Some random string'))->toBeFalse();
+    expect($connector->seamsValidSQL('DROP TABLE users'))->toBeFalse(); // Current implementation only checks for SELECT, UPDATE, DELETE, INSERT
 });
 
 test('database connector getJoins returns initialized joins', function () {

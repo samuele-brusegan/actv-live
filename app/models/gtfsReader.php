@@ -15,13 +15,19 @@ function readGTFS(string $file, string $sqlQuery): array|false {
     // --- 1. Controllo Preliminare e Apertura File ---
     if (!file_exists($file) || !is_readable($file)) {
         echo "Errore: il file '$file' non è accessibile o non esiste.\n";
-        return false;
+        return [
+            "errorCode" => "FILE_NOT_FOUND",
+            "message" => "file not found, impossible to open",
+        ];
     }
 
     $handle = fopen($file, 'r');
     if ($handle === false) {
         echo "Errore: Impossibile aprire il file '$file'.\n";
-        return false;
+        return [
+            "errorCode" => "FILE_NOT_FOUND",
+            "message" => "file not found, impossible to open",
+        ];
     }
 
     // --- 2. Inizializzazione del Database SQLite in Memoria ---
@@ -32,7 +38,10 @@ function readGTFS(string $file, string $sqlQuery): array|false {
     } catch (PDOException $e) {
         echo "Errore di connessione a SQLite: " . $e->getMessage() . "\n";
         fclose($handle);
-        return false;
+        return [
+            "errorCode" => "SQLITE_CONNECTION_ERROR",
+            "message" => "sqlite connection error",
+        ];
     }
 
     // --- 3. Parsing del CSV, Creazione Tabella e Inserimento Dati ---
@@ -42,7 +51,10 @@ function readGTFS(string $file, string $sqlQuery): array|false {
     if ($header === false) {
         echo "Errore: Impossibile leggere l'intestazione del file.\n";
         fclose($handle);
-        return false;
+        return [
+            "errorCode" => "READ_ERROR",
+            "message" => "read error",
+        ];
     }
 
     // Pulisci e normalizza i nomi delle colonne per l'uso SQL
@@ -59,7 +71,10 @@ function readGTFS(string $file, string $sqlQuery): array|false {
     } catch (PDOException $e) {
         echo "Errore durante la creazione della tabella '$tableName': " . $e->getMessage() . "\n";
         fclose($handle);
-        return false;
+        return [
+            "errorCode" => "SQLITE_CONNECTION_ERROR",
+            "message" => "sqlite connection error",
+        ];
     }
 
     // c) Prepara la Query per l'Inserimento Dati
@@ -81,7 +96,10 @@ function readGTFS(string $file, string $sqlQuery): array|false {
         $pdo->rollBack();
         echo "Errore durante l'inserimento dei dati: " . $e->getMessage() . "\n";
         fclose($handle);
-        return false;
+        return [
+            "errorCode" => "SQLITE_CONNECTION_ERROR",
+            "message" => "sqlite connection error",
+        ];
     }
 
     fclose($handle);
@@ -93,7 +111,10 @@ function readGTFS(string $file, string $sqlQuery): array|false {
         return $results;
     } catch (PDOException $e) {
         echo "Errore durante l'esecuzione della query SQL: " . $e->getMessage() . "\n";
-        return false;
+        return [
+            "errorCode" => "SQLITE_CONNECTION_ERROR",
+            "message" => "sqlite connection error",
+        ];
     }
 }
 ?>

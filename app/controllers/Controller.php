@@ -9,7 +9,7 @@ class Controller {
     }
 
     function stops() {
-        $stations = $this->fetchData('https://oraritemporeale.actv.it/aut/backend/page/stops');
+        $stations = $this->fetchData('https://oraritemporeale.actv.it/aut/backend/page/stops', 0.5);
         require_once BASE_PATH . '/app/views/stopList.php';
     }
 
@@ -34,11 +34,16 @@ class Controller {
         require_once BASE_PATH . '/app/views/routeDetails.php';
     }
 
-    private function fetchData($url) {
+    private function fetchData($url, $timeout = 10) {
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Often needed for dev/test
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 1);
         $response = curl_exec($ch);
+        if (curl_errno($ch)) {
+            // echo 'cURL Error:' . curl_error($ch);
+        }
         //curl_close($ch);
         return json_decode($response, true) ?? [];
     }
@@ -68,11 +73,13 @@ class Controller {
         
         $type = $_GET['type'] ?? null;
         $query = "SELECT * FROM logs";
+        $params = [];
         if ($type) {
-            $query .= " WHERE type = '" . addslashes($type) . "'";
+            $query .= " WHERE type = ?";
+            $params[] = $type;
         }
         $query .= " ORDER BY created_at DESC LIMIT 100";
-        $logs = $db->query($query);
+        $logs = $db->query($query, $params);
         
         require_once BASE_PATH . '/app/views/admin/logs.php';
     }
