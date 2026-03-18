@@ -10,6 +10,9 @@
         <script src="/js/stop.js"></script>
     </head>
     <body>
+        <?php 
+        // phpinfo();
+        ?>
 
         <!-- Header -->
         <div class="header-green">

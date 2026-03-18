@@ -637,6 +637,8 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl = null) {
     let stopEl;
     if (!domEl) {
         stopEl = document.querySelector(`.stop-item[data-stop-id="${stop.stop_id}"]`);
+        console.log(stop.stop_id);
+
     } else {
         stopEl = domEl;
     }

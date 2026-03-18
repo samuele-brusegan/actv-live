@@ -235,7 +235,7 @@ function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop
     return $trips;
 }
 
-function associativeArrayToTable(array $array) {
+/* function associativeArrayToTable(array $array) {
     if (count($array) == 0) {
         return "<p>Nessun risultato</p>";
     }
@@ -262,7 +262,7 @@ function associativeArrayToTable(array $array) {
 
     $tableStr .= "</table>";
     return $tableStr;
-}
+} */
 ?>
 
 <html lang="en">

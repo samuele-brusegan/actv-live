@@ -6,4 +6,5 @@
 data/
 bak*
 node_modules/
-/vendor/
+vendor/
+.phpunit.cache/
