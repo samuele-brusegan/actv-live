@@ -84,7 +84,11 @@ async function performRouteSearch() {
         const from = (originData.type === 'address') ? `${originData.lat},${originData.lng}` : originData.id;
         const to = (destinationData.type === 'address') ? `${destinationData.lat},${destinationData.lng}` : destinationData.id;
 
+        const optimize = localStorage.getItem('route_optimize');
         const params = new URLSearchParams({ from, to, time: departureTime });
+        if (optimize && ['time', 'transfers', 'walking'].includes(optimize)) {
+            params.set('optimize', optimize);
+        }
         const response = await fetch(`/api/plan-route?${params.toString()}`);
 
         if (!response.ok) throw new Error(`Status HTTP: ${response.status}`);

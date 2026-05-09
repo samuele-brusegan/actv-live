@@ -15,27 +15,28 @@ $router->add('/route-details'           , 'Controller', 'routeDetails');
 $router->add('/stopList'                , 'Controller', 'stops');
 $router->add('/aut/stops/stop'          , 'Controller', 'stop');
 $router->add('/lines-map'               , 'Controller', 'linesMap');
+$router->add('/live-map'                , 'Controller', 'liveMap');
 $router->add('/trip-details'            , 'Controller', 'tripDetails');
+$router->add('/widget'                  , 'Controller', 'widget');
+$router->add('/delay-stats'             , 'Controller', 'delayStats');
 $router->add('/admin/logs'              , 'Controller', 'logs');
 $router->add('/admin/dashboard'         , 'Controller', 'adminDashboard');
 
-
+// === API ===
 $router->add('/api/addFavorite'         , 'ApiController', 'favorite');
 $router->add('/api/plan-route'          , 'ApiController', 'planRoute');
 $router->add('/api/stops'               , 'ApiController', 'stops');
+$router->add('/api/stop-lines'          , 'ApiController', 'stopLines');
 $router->add('/api/lines-shapes'        , 'ApiController', 'linesShapes');
 $router->add('/api/trip-stops'          , 'ApiController', 'tripStops');
+$router->add('/api/bus-position'        , 'ApiController', 'busPosition');
+$router->add('/api/log-js-error'        , 'ApiController', 'logJsError');
+
+// === API GTFS ===
 $router->add('/api/gtfs-identify'       , 'ApiController', 'api_gtfsIdentify');
 $router->add('/api/gtfs-builder'        , 'ApiController', 'gtfsTripBuilder');
 $router->add('/api/gtfs-stop-translater', 'ApiController', 'gtfsStopTranslater');
-$router->add('/api/log-js-error'        , 'ApiController', 'logJsError');
-
 $router->add('/api/gtfs-resolve'        , 'ApiController', 'gtfsResolve');
 $router->add('/api/gtfs-bnr'            , 'ApiController', 'gtfsBusesRunningNow');
-$router->add('/api/bus-position'        , 'ApiController', 'busPosition');
-$router->add('/live-map'                , 'Controller', 'liveMap');
 $router->add('/api/gtfs-stops'          , 'ApiController', 'gtfsStops');
 $router->add('/api/gtfs-passages'       , 'ApiController', 'gtfsPassages');
-$router->add('/api/stop-lines'          , 'ApiController', 'stopLines');
-$router->add('/widget'                  , 'Controller', 'widget');
-$router->add('/delay-stats'             , 'Controller', 'delayStats');

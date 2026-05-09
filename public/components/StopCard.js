@@ -34,13 +34,13 @@ class StopCard {
         // Generate stop IDs badges (multiple if merged)
         let stopIdsHtml = '';
         if (showIds) {
-            if (stop.id.includes("web")) {
-                stop.id = stop.id.replace("-web-aut", "");
-                stop.id = stop.id.replace("-web", "");
+            const idStr = String(stop.id);
+            if (idStr.includes("web")) {
+                stop.id = idStr.replace("-web-aut", "").replace("-web", "");
             }
 
-            if (stop.id.includes("-")) {
-                let idSplitted = stop.id.split("-");
+            if (String(stop.id).includes("-")) {
+                let idSplitted = String(stop.id).split("-");
                 if (idSplitted[0] !== 'terminal') {
                     stop.ids = idSplitted;
                 }

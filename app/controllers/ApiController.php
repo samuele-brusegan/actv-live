@@ -95,14 +95,16 @@ class ApiController {
         require_once BASE_PATH . '/app/models/addToFavorites.php';
     }
 
-    // Moved from Controller::planRoute
     function planRoute() {
-        // This service likely uses local files (RoutePlanner), keeping as is per plan/User request scope (Controllers only)
         require_once BASE_PATH . '/app/services/RoutePlanner.php';
 
         $origin = $_GET['from'] ?? '';
         $dest = $_GET['to'] ?? '';
         $time = $_GET['time'] ?? date('H:i:s');
+        $optimize = $_GET['optimize'] ?? 'time';
+        if (!in_array($optimize, ['time', 'transfers', 'walking'], true)) {
+            $optimize = 'time';
+        }
 
         // Ensure time is in HH:MM:SS format
         if (strlen($time) == 5) {
@@ -111,12 +113,6 @@ class ApiController {
 
         try {
             $planner = new RoutePlanner();
-            // ... Logic from Controller.php ...
-            // Since the logic is long and depends on RoutePlanner, we just copy the body.
-            // But wait, the user asked to "remove LOCAL GTFS calls" from Controllers.
-            // planRoute logic in Controller.php handles logic "around" RoutePlanner.
-
-            // Re-implementing the logic from Controller::planRoute
             $startWalk = null;
             $endWalk = null;
             $planningOrigin = $origin;
@@ -200,9 +196,34 @@ class ApiController {
                     ];
                 }
             }
+            unset($route);
+
+            // Apply user-selected optimization sort
+            if ($optimize !== 'time') {
+                usort($routes, function($a, $b) use ($optimize) {
+                    if ($optimize === 'transfers') {
+                        $ta = ($a['type'] ?? '') === 'transfer' ? 1 : 0;
+                        $tb = ($b['type'] ?? '') === 'transfer' ? 1 : 0;
+                        if ($ta !== $tb) return $ta - $tb;
+                        return ($a['duration'] ?? 0) - ($b['duration'] ?? 0);
+                    }
+                    if ($optimize === 'walking') {
+                        $wa = 0; $wb = 0;
+                        foreach ($a['legs'] ?? [] as $l) {
+                            if (($l['type'] ?? '') === 'walking') $wa += (int)($l['distance'] ?? 0);
+                        }
+                        foreach ($b['legs'] ?? [] as $l) {
+                            if (($l['type'] ?? '') === 'walking') $wb += (int)($l['distance'] ?? 0);
+                        }
+                        if ($wa !== $wb) return $wa - $wb;
+                        return ($a['duration'] ?? 0) - ($b['duration'] ?? 0);
+                    }
+                    return 0;
+                });
+            }
 
             header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'routes' => $routes]);
+            echo json_encode(['success' => true, 'routes' => $routes, 'optimize' => $optimize]);
 
         } catch (Exception $e) {
             header('Content-Type: application/json');

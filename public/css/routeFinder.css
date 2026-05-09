@@ -204,6 +204,34 @@ input:checked+.toggle-slider:before {
     background: var(--color-primary-blue-dark);
 }
 
+/* Optimization Pills */
+.optimize-pills {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.optimize-pill {
+    flex: 1;
+    padding: 0.6rem 0;
+    border: 2px solid var(--color-border-gray);
+    border-radius: 25px;
+    background: var(--color-white);
+    font-family: 'SF Pro', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--color-text-gray);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.optimize-pill.active {
+    background: var(--color-primary-green);
+    border-color: var(--color-primary-green);
+    color: white;
+}
+
 /* Custom Date/Time Picker Triggers */
 .datetime-trigger {
     flex: 1;

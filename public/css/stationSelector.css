@@ -29,10 +29,41 @@
     box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease;
     cursor: pointer;
+    border: 2px solid transparent;
+    position: relative;
 }
 
 .stop-card:active {
     transform: scale(0.98);
+}
+
+.stop-card.selected {
+    border: 2px solid var(--color-primary-green);
+    background: #E8F5E9;
+    box-shadow: 0px 2px 12px rgba(0, 158, 97, 0.3);
+}
+
+.stop-card.selected::after {
+    content: '\2713';
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    width: 24px;
+    height: 24px;
+    background: var(--color-primary-green);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 24px;
+    text-align: center;
+}
+
+.stop-card.selected .stop-ids-container .stop-id-badge {
+    background: var(--color-primary-green);
 }
 
 .stop-name {

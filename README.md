@@ -24,3 +24,27 @@ composer install
 ## Configurazione Docker
 
 [non ancora implementato]
+
+## TODO / Da fare
+
+### 🔴 Priorità alta
+- [ ] **Notifiche push reali**: l'attuale implementazione (`public/js/notifications.js`) fa polling locale dell'API ACTV e mostra notifiche solo a tab aperto. Per vere push in background servono:
+  - Generazione e configurazione chiavi VAPID
+  - Endpoint `/api/push/subscribe` per salvare le subscription dei client
+  - Cron/job lato server che pusha quando rileva ritardi
+  - Chiamata `pushManager.subscribe()` in `notifications.js`
+  - In alternativa: rinominare la feature in "Avvisi ritardi (mentre l'app è aperta)"
+
+### 🟡 Priorità media
+- [ ] **Widget embed CORS**: `app/views/widget.php` chiama direttamente `https://oraritemporeale.actv.it/...`. In contesti embed su domini terzi potrebbe rompersi. Valutare proxy `/api/widget-passages` con CORS aperto.
+- [ ] **Format adapter `/api/gtfs-passages`**: in `public/js/stop.js:111` c'è un `//todo:correct format` — il fallback locale ritorna le righe raw di `stop_times` invece del formato `{line, destination, time, real}` di ACTV. Serve un mapper.
+- [ ] **Rimuovere `console.log` di debug** in produzione (sono volutamente lasciati per ora):
+  - `public/js/stop.js:237`
+  - `public/js/liveBusMap.js:317, 324, 391, 446`
+  - `app/views/stopList.php:163`
+
+### 🟢 Pulizia / quality
+- [ ] **CSS empty rulesets** pre-esistenti in `public/css/stop.css` (linee 2, 58, 79)
+- [ ] **Documentazione Docker** (sezione sopra è vuota)
+- [ ] **Pre-cache GTFS in SW**: la funzione `cacheGtfsData()` in `sw.js` è già pronta ma nessuno invia il messaggio `CACHE_GTFS` al SW
+- [ ] **Bottone widget in home**: la feature widget è scoperta solo dal pulsante share nella pagina fermata; valutare punto di accesso più visibile

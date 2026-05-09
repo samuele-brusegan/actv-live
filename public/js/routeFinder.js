@@ -9,7 +9,8 @@ const searchState = {
     destination: null,
     selectedDate: new Date(),
     selectedHour: new Date().getHours(),
-    selectedMinute: Math.floor(new Date().getMinutes() / 5) * 5 // Arrotonda ai 5 min
+    selectedMinute: Math.floor(new Date().getMinutes() / 5) * 5,
+    optimize: 'time' // 'time' | 'transfers' | 'walking'
 };
 
 /**
@@ -235,12 +236,20 @@ function updateUI() {
     if (destLabel) destLabel.textContent = searchState.destination?.name || 'Seleziona destinazione';
 }
 
+function updateOptimizeUI() {
+    document.querySelectorAll('.optimize-pill').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === searchState.optimize);
+    });
+}
+
 function persistState() {
     if (searchState.origin) localStorage.setItem('route_origin', JSON.stringify(searchState.origin));
     else localStorage.removeItem('route_origin');
 
     if (searchState.destination) localStorage.setItem('route_destination', JSON.stringify(searchState.destination));
     else localStorage.removeItem('route_destination');
+
+    localStorage.setItem('route_optimize', searchState.optimize);
 }
 
 /** Avvia la ricerca percorsi */
@@ -255,6 +264,7 @@ function searchRoutes() {
 
     localStorage.setItem('route_departure_date', dateStr);
     localStorage.setItem('route_departure_time', timeStr);
+    localStorage.setItem('route_optimize', searchState.optimize);
 
     window.location.href = '/route-results';
 }
@@ -272,12 +282,26 @@ window.addEventListener('DOMContentLoaded', () => {
     // Carica dati salvati
     const savedOrigin = localStorage.getItem('route_origin');
     const savedDest = localStorage.getItem('route_destination');
+    const savedOptimize = localStorage.getItem('route_optimize');
 
     if (savedOrigin) searchState.origin = JSON.parse(savedOrigin);
     if (savedDest) searchState.destination = JSON.parse(savedDest);
+    if (savedOptimize && ['time', 'transfers', 'walking'].includes(savedOptimize)) {
+        searchState.optimize = savedOptimize;
+    }
 
     updateUI();
     updateDisplayDateTime();
+    updateOptimizeUI();
+
+    // Optimization pills
+    document.querySelectorAll('.optimize-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+            searchState.optimize = btn.dataset.value;
+            updateOptimizeUI();
+            persistState();
+        });
+    });
 
     initPullToCancel('date-modal', closeDateModal);
     initPullToCancel('time-modal', closeTimeModal);
@@ -285,5 +309,5 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { searchState, swapStations, updateDisplayDateTime, searchRoutes };
+    module.exports = { searchState, swapStations, updateDisplayDateTime, searchRoutes, updateOptimizeUI };
 }

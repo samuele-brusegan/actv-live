@@ -58,6 +58,16 @@
                 </div>
             </div>
 
+            <!-- Optimization Selector -->
+            <div class="optimize-section">
+                <div class="section-label">ottimizza per:</div>
+                <div class="optimize-pills">
+                    <button class="optimize-pill active" data-value="time">tempo</button>
+                    <button class="optimize-pill" data-value="transfers">cambi</button>
+                    <button class="optimize-pill" data-value="walking">a piedi</button>
+                </div>
+            </div>
+
             <!-- Return Trip Toggle -->
             <div class="toggle-container">
                 <span class="toggle-label">ritorno</span>
