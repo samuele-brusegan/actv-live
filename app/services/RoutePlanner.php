@@ -369,6 +369,62 @@ class RoutePlanner {
         return $nearestStop;
     }
 
+    /**
+     * Get all lines serving a stop with their next scheduled departures
+     * @param string $stopId
+     * @param string $afterTime HH:MM:SS - only show departures after this time
+     * @param int $limit Max departures per line
+     * @return array
+     */
+    public function getLinesForStop($stopId, $afterTime = '00:00:00', $limit = 5) {
+        if (!$this->stopRoutesIndex || !isset($this->stopRoutesIndex[$stopId])) {
+            return [];
+        }
+
+        $routeIds = $this->stopRoutesIndex[$stopId];
+        $lines = [];
+
+        foreach ($routeIds as $routeId) {
+            $routeInfo = $this->routes[$routeId] ?? null;
+            if (!$routeInfo) continue;
+
+            $trips = $this->getRouteData($routeId);
+            $departures = [];
+
+            foreach ($trips as $tripId => $stops) {
+                foreach ($stops as $stop) {
+                    if ($stop['stop_id'] == $stopId && $stop['departure_time'] >= $afterTime) {
+                        $lastStop = end($stops);
+                        $departures[] = [
+                            'time' => substr($stop['departure_time'], 0, 5),
+                            'destination' => $this->stops[$lastStop['stop_id']]['name'] ?? $lastStop['stop_id']
+                        ];
+                        break;
+                    }
+                }
+            }
+
+            usort($departures, function($a, $b) {
+                return strcmp($a['time'], $b['time']);
+            });
+
+            if (!empty($departures)) {
+                $lines[] = [
+                    'route_id' => $routeId,
+                    'route_short_name' => $routeInfo['route_short_name'] ?? $routeId,
+                    'route_long_name' => $routeInfo['route_long_name'] ?? '',
+                    'departures' => array_slice($departures, 0, $limit)
+                ];
+            }
+        }
+
+        usort($lines, function($a, $b) {
+            return strcmp($a['route_short_name'], $b['route_short_name']);
+        });
+
+        return $lines;
+    }
+
     private function calculateGeoDistance($lat1, $lon1, $lat2, $lon2) {
         $earthRadius = 6371000; // meters
 

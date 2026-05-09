@@ -348,6 +348,93 @@ function updateFilter() {
     }
 }
 
+/**
+ * Tab Switching
+ */
+let linesLoaded = false;
+
+function switchTab(tabName) {
+    document.querySelectorAll('.stop-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.toggle('active', tab.id === `tab-${tabName}`);
+    });
+
+    if (tabName === 'lines' && !linesLoaded) {
+        linesLoaded = true;
+        loadStopLines();
+    }
+}
+
+/**
+ * Linee e Orari
+ */
+async function loadStopLines() {
+    if (!stationId) return;
+
+    const loadingEl = document.getElementById('lines-loading');
+    const listEl = document.getElementById('lines-list');
+    const emptyEl = document.getElementById('lines-empty');
+
+    try {
+        const now = new Date().toTimeString().slice(0, 5);
+        const params = new URLSearchParams({ stop: stationId.split('-')[0], time: now });
+        const response = await fetch(`/api/stop-lines?${params.toString()}`);
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+
+        if (loadingEl) loadingEl.style.display = 'none';
+
+        if (data.success && data.lines && data.lines.length > 0) {
+            renderStopLines(data.lines, listEl);
+        } else {
+            if (emptyEl) emptyEl.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Errore caricamento linee:', error);
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (listEl) listEl.innerHTML = "<p class='text-center text-danger'>Errore nel caricamento delle linee.</p>";
+    }
+}
+
+function renderStopLines(lines, container) {
+    if (!container) return;
+
+    container.innerHTML = lines.map(line => {
+        const [lineName, lineTag] = (line.route_short_name || '').split('_');
+
+        let badgeClass = 'badge-red';
+        if (['US', 'UN', 'EN'].includes(lineTag)) badgeClass = 'badge-blue';
+        if (lineName && lineName.startsWith('N')) badgeClass = 'badge-night';
+
+        const departuresHtml = line.departures.map(dep =>
+            `<div class="line-departure">
+                <span class="dep-time">${dep.time}</span>
+                <span class="dep-dest">${dep.destination}</span>
+            </div>`
+        ).join('');
+
+        return `
+            <div class="line-card">
+                <div class="line-card-header">
+                    <div class="line-badge ${badgeClass}">${lineName || line.route_short_name}</div>
+                    <div class="line-card-name">${line.route_long_name || ''}</div>
+                </div>
+                <div class="line-departures">
+                    <div class="departures-header">
+                        <span>Orario</span>
+                        <span>Direzione</span>
+                    </div>
+                    ${departuresHtml}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
 /** Inizializzazione pagina */
 async function init() {
     if (!stationId) {
@@ -375,5 +462,5 @@ window.onload = init;
 
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { getFavorites, isFavorite, toggleFavorite, updateFavoriteButton, createPassageCard };
+    module.exports = { getFavorites, isFavorite, toggleFavorite, updateFavoriteButton, createPassageCard, switchTab, renderStopLines };
 }
