@@ -10,7 +10,7 @@ beforeEach(() => {
     document.body.innerHTML = '';
 });
 
-const { toggleTheme, updateTheme } = require('../public/js/theme');
+const { toggleTheme, updateTheme } = require('../../public/js/theme');
 
 describe('updateTheme', () => {
     test('imposta tema light di default', () => {

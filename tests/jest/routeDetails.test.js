@@ -2,7 +2,7 @@
  * Test per routeDetails.js
  * Funzioni testate: formatItalianDate, renderTimelineStep, renderStopStep
  */
-const { formatItalianDate, renderTimelineStep, renderStopStep } = require('../public/js/routeDetails');
+const { formatItalianDate, renderTimelineStep, renderStopStep } = require('../../public/js/routeDetails');
 
 describe('formatItalianDate (routeDetails)', () => {
     test('formatta una data valida', () => {

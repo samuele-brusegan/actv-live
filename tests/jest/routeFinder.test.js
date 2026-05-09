@@ -15,7 +15,7 @@ beforeEach(() => {
     `;
 });
 
-const { searchState, swapStations, updateDisplayDateTime, searchRoutes } = require('../public/js/routeFinder');
+const { searchState, swapStations, updateDisplayDateTime, searchRoutes } = require('../../public/js/routeFinder');
 
 describe('searchState', () => {
     test('stato iniziale ha origin e destination null', () => {

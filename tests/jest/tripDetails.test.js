@@ -6,7 +6,7 @@
 // Usiamo history.pushState per cambiare l'URL in jsdom
 window.history.pushState({}, 'Test', '?tripId=123');
 
-const { formatMinutesRemaining, mergeStops, state } = require('../public/js/tripDetails');
+const { formatMinutesRemaining, mergeStops, state } = require('../../public/js/tripDetails');
 
 describe('formatMinutesRemaining', () => {
     test('ritorna la stringa originale se non contiene ":"', () => {

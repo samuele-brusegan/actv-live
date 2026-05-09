@@ -2,7 +2,7 @@
  * Test per script-home.js
  * Funzioni testate: calculateDistance, createFavoriteCardHTML, createPopupContent
  */
-const { calculateDistance, createFavoriteCardHTML, createPopupContent } = require('../public/js/script-home');
+const { calculateDistance, createFavoriteCardHTML, createPopupContent } = require('../../public/js/script-home');
 
 describe('calculateDistance', () => {
     test('distanza tra lo stesso punto è 0', () => {

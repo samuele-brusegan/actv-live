@@ -8,7 +8,7 @@ beforeEach(() => {
     document.body.innerHTML = '';
 });
 
-const CookieNotice = require('../public/js/cookie-notice');
+const CookieNotice = require('../../public/js/cookie-notice');
 
 describe('CookieNotice', () => {
     test('crea un\'istanza con opzioni di default', () => {

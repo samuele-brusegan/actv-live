@@ -10,7 +10,7 @@ beforeEach(() => {
     window.history.pushState({}, 'Test', '?type=origin');
 });
 
-const { addToRecent, createStopCardHTML } = require('../public/js/stationSelector');
+const { addToRecent, createStopCardHTML } = require('../../public/js/stationSelector');
 
 describe('addToRecent', () => {
     test('aggiunge una fermata alla cronologia', () => {

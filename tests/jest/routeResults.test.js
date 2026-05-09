@@ -2,7 +2,7 @@
  * Test per routeResults.js
  * Funzioni testate: safeParseJSON, getLineBadgeDetails, formatItalianDate, formatShortTime
  */
-const { safeParseJSON, getLineBadgeDetails, formatItalianDate, formatShortTime } = require('../public/js/routeResults');
+const { safeParseJSON, getLineBadgeDetails, formatItalianDate, formatShortTime } = require('../../public/js/routeResults');
 
 describe('safeParseJSON', () => {
     let consoleSpy;

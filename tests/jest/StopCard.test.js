@@ -2,7 +2,7 @@
  * Test per StopCard.js
  * Funzioni testate: StopCard.create, StopCard.createMultiple
  */
-const StopCard = require('../public/components/StopCard');
+const StopCard = require('../../public/components/StopCard');
 
 describe('StopCard.create', () => {
     test('genera HTML per fermata semplice', () => {
