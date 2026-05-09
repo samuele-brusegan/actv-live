@@ -8,6 +8,7 @@
         <link rel="stylesheet" href="/css/structure/structure-stop.css">
         <link rel="stylesheet" href="/css/stop.css">
         <script src="/js/notifications.js"></script>
+        <script src="/js/widget.js"></script>
         <script src="/js/delayHistory.js"></script>
         <script src="/js/stop.js"></script>
     </head>
@@ -31,6 +32,9 @@
                 </button>
                 <button class="notify-button" id="notify-btn" onclick="toggleStopNotifications()" title="Notifiche ritardi">
                     &#128276;
+                </button>
+                <button class="share-button" id="share-btn" onclick="shareWidget()" title="Condividi widget">
+                    &#x1F517;
                 </button>
             </div>
         </div>

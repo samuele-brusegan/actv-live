@@ -504,6 +504,13 @@ function renderStopLines(lines, container) {
     }).join('');
 }
 
+/** Condividi widget */
+function shareWidget() {
+    if (typeof showWidgetDialog !== 'undefined') {
+        showWidgetDialog(stationId, stationName);
+    }
+}
+
 /** Inizializzazione pagina */
 async function init() {
     if (!stationId) {
