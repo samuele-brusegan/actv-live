@@ -48,3 +48,10 @@ test('route planner calculates geo distance', function () {
     expect($dist)->toBeGreaterThan(1500);
     expect($dist)->toBeLessThan(2000);
 });
+
+test('getLinesForStop returns empty array for unknown stop', function () {
+    $planner = new RoutePlanner();
+    $result = $planner->getLinesForStop('NONEXISTENT_STOP_ID');
+    expect($result)->toBeArray();
+    expect($result)->toBeEmpty();
+});

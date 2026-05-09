@@ -1,5 +1,6 @@
 /**
  * Gestione della visualizzazione dei risultati di ricerca del percorso.
+ * Include la funzionalità di confronto side-by-side tra percorsi.
  */
 
 // Handler globale degli errori per facilitare il debugging in produzione
@@ -21,6 +22,11 @@ let originData = null;
 let destinationData = null;
 let departureDate = null;
 let departureTime = null;
+
+// Stato confronto percorsi
+let compareMode = false;
+let selectedRoutes = [];
+let allRoutes = [];
 
 /**
  * Inizializzazione della Pagina
@@ -86,6 +92,7 @@ async function performRouteSearch() {
         const data = await response.json();
 
         if (data.success && data.routes?.length > 0) {
+            allRoutes = data.routes;
             renderRouteResults(data.routes);
         } else {
             showErrorState(data.error || 'Nessun percorso trovato per i parametri specificati.');
@@ -102,7 +109,7 @@ async function performRouteSearch() {
 
 function getLineBadgeDetails(lineRaw) {
     if (!lineRaw) return { name: '?', class: 'badge-red' };
-    if (lineRaw === 'Cammina') return { name: '🚶', class: 'badge-walking' };
+    if (lineRaw === 'Cammina') return { name: '\u{1F6B6}', class: 'badge-walking' };
 
     const [lineName, lineTag] = lineRaw.split("_");
 
@@ -122,23 +129,27 @@ function renderRouteResults(routes) {
     if (containerEl) containerEl.style.display = 'block';
     if (!listEl) return;
 
-    listEl.innerHTML = routes.map(route => {
+    listEl.innerHTML = routes.map((route, idx) => {
         const legsHtml = route.legs.map((leg, index) => renderLegHTML(leg, route, index)).join('');
         const routeJson = JSON.stringify(route).replace(/'/g, "&#39;");
+        const isSelected = selectedRoutes.includes(idx);
 
         return `
-            <div class="route-card" onclick='viewRouteDetails(${routeJson})'>
-                <div class="route-header-row">
-                    <div class="route-date">${formatItalianDate(departureDate)}</div>
-                    <div class="route-total-duration">⏱ ${Math.round(route.duration)} min</div>
-                </div>
-                <div class="route-timeline">
-                    ${legsHtml}
-                </div>
-                <div class="route-footer">
-                    <button class="btn-select" onclick='confirmRouteSelection(${routeJson}, event)'>
-                        Seleziona &rarr;
-                    </button>
+            <div class="route-card ${compareMode ? 'compare-mode' : ''} ${isSelected ? 'compare-selected' : ''}"
+                 onclick='${compareMode ? `toggleRouteSelection(${idx})` : `viewRouteDetails(${routeJson})`}'
+                 data-route-index="${idx}">
+                ${compareMode ? `<div class="compare-checkbox ${isSelected ? 'checked' : ''}"><span>${isSelected ? '\u2713' : ''}</span></div>` : ''}
+                <div class="route-card-body">
+                    <div class="route-header-row">
+                        <div class="route-date">${formatItalianDate(departureDate)}</div>
+                        <div class="route-total-duration">\u23F1 ${Math.round(route.duration)} min</div>
+                    </div>
+                    <div class="route-timeline">
+                        ${legsHtml}
+                    </div>
+                    <div class="route-footer">
+                        ${compareMode ? '' : `<button class="btn-select" onclick='confirmRouteSelection(${routeJson}, event)'>Seleziona &rarr;</button>`}
+                    </div>
                 </div>
             </div>
         `;
@@ -153,7 +164,6 @@ function renderLegHTML(leg, route, index) {
 
     let html = '';
 
-    // Punto di partenza della tratta (solo se è la prima o un cambio)
     if (isFirst) {
         html += `
             <div class="timeline-item">
@@ -165,16 +175,14 @@ function renderLegHTML(leg, route, index) {
             </div>`;
     }
 
-    // Connettore (Il tragitto in bus o a piedi)
     const connectorContent = isWalking
-        ? `<div class="line-badge badge-walking">🚶</div>
+        ? `<div class="line-badge badge-walking">\u{1F6B6}</div>
            <div class="connector-info">Cammina per ${Math.round(leg.duration)} min (${leg.distance}m)</div>`
         : `<div class="line-badge ${badge.class}">${badge.name}</div>
            <div class="connector-info">per ${leg.stops_count} fermate</div>`;
 
     html += `<div class="timeline-connector">${connectorContent}</div>`;
 
-    // Punto di arrivo della tratta
     const markerClass = isLast ? 'end' : 'transfer';
     const arrivalName = isWalking
         ? leg.destination
@@ -190,6 +198,212 @@ function renderLegHTML(leg, route, index) {
         </div>`;
 
     return html;
+}
+
+/**
+ * Confronto Percorsi
+ */
+
+function toggleCompareMode() {
+    compareMode = !compareMode;
+    selectedRoutes = [];
+
+    const toggleBtn = document.getElementById('btn-compare-toggle');
+    const compareBar = document.getElementById('compare-bar');
+
+    if (toggleBtn) {
+        toggleBtn.classList.toggle('active', compareMode);
+        toggleBtn.textContent = compareMode ? 'Annulla' : 'Confronta';
+    }
+
+    if (compareBar) compareBar.style.display = compareMode ? 'flex' : 'none';
+
+    renderRouteResults(allRoutes);
+    updateCompareBar();
+}
+
+function toggleRouteSelection(index) {
+    const pos = selectedRoutes.indexOf(index);
+    if (pos >= 0) {
+        selectedRoutes.splice(pos, 1);
+    } else if (selectedRoutes.length < 3) {
+        selectedRoutes.push(index);
+    }
+
+    renderRouteResults(allRoutes);
+    updateCompareBar();
+}
+
+function updateCompareBar() {
+    const countEl = document.getElementById('compare-count');
+    const compareBtn = document.querySelector('.btn-compare');
+
+    if (countEl) {
+        countEl.textContent = `${selectedRoutes.length} selezionat${selectedRoutes.length === 1 ? 'o' : 'i'}`;
+    }
+    if (compareBtn) {
+        compareBtn.disabled = selectedRoutes.length < 2;
+    }
+}
+
+function openCompareModal() {
+    if (selectedRoutes.length < 2) return;
+
+    const modal = document.getElementById('compare-modal');
+    const body = document.getElementById('compare-body');
+    if (!modal || !body) return;
+
+    const routes = selectedRoutes.map(idx => allRoutes[idx]);
+
+    body.innerHTML = renderComparisonView(routes);
+    modal.classList.add('active');
+}
+
+function closeCompareModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    const modal = document.getElementById('compare-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+function renderComparisonView(routes) {
+    const best = findBestValues(routes);
+
+    // Table header
+    let html = `<div class="compare-table">`;
+
+    // Route labels
+    html += `<div class="compare-row compare-header-row">
+        <div class="compare-label"></div>
+        ${routes.map((_, i) => `<div class="compare-cell compare-route-label">Percorso ${i + 1}</div>`).join('')}
+    </div>`;
+
+    // Lines
+    html += `<div class="compare-row">
+        <div class="compare-label">Linee</div>
+        ${routes.map(r => {
+            const badges = getRouteBadges(r);
+            return `<div class="compare-cell">${badges}</div>`;
+        }).join('')}
+    </div>`;
+
+    // Departure time
+    html += `<div class="compare-row">
+        <div class="compare-label">Partenza</div>
+        ${routes.map(r => {
+            const dep = getRouteDepartureTime(r);
+            return `<div class="compare-cell">${formatShortTime(dep)}</div>`;
+        }).join('')}
+    </div>`;
+
+    // Arrival time
+    html += `<div class="compare-row">
+        <div class="compare-label">Arrivo</div>
+        ${routes.map(r => {
+            const arr = getRouteArrivalTime(r);
+            return `<div class="compare-cell">${formatShortTime(arr)}</div>`;
+        }).join('')}
+    </div>`;
+
+    // Duration
+    html += `<div class="compare-row">
+        <div class="compare-label">Durata</div>
+        ${routes.map(r => {
+            const dur = Math.round(r.duration);
+            const isBest = dur === best.duration;
+            return `<div class="compare-cell ${isBest ? 'best-value' : ''}">${dur} min</div>`;
+        }).join('')}
+    </div>`;
+
+    // Stops count
+    html += `<div class="compare-row">
+        <div class="compare-label">Fermate</div>
+        ${routes.map(r => {
+            const stops = r.stops_count || r.legs.reduce((sum, l) => sum + (l.stops_count || 0), 0);
+            const isBest = stops === best.stops;
+            return `<div class="compare-cell ${isBest ? 'best-value' : ''}">${stops}</div>`;
+        }).join('')}
+    </div>`;
+
+    // Transfers
+    html += `<div class="compare-row">
+        <div class="compare-label">Cambi</div>
+        ${routes.map(r => {
+            const transfers = getTransferCount(r);
+            const isBest = transfers === best.transfers;
+            return `<div class="compare-cell ${isBest ? 'best-value' : ''}">${transfers}</div>`;
+        }).join('')}
+    </div>`;
+
+    // Walking
+    html += `<div class="compare-row">
+        <div class="compare-label">A piedi</div>
+        ${routes.map(r => {
+            const walkMin = getWalkingMinutes(r);
+            const isBest = walkMin === best.walking;
+            return `<div class="compare-cell ${isBest ? 'best-value' : ''}">${walkMin} min</div>`;
+        }).join('')}
+    </div>`;
+
+    html += `</div>`;
+
+    // Action buttons
+    html += `<div class="compare-actions">
+        ${routes.map((r, i) => {
+            const routeJson = JSON.stringify(r).replace(/'/g, "&#39;");
+            return `<button class="btn-select-compare" onclick='confirmRouteSelection(${routeJson}, event)'>
+                Seleziona Percorso ${i + 1}
+            </button>`;
+        }).join('')}
+    </div>`;
+
+    return html;
+}
+
+function findBestValues(routes) {
+    const durations = routes.map(r => Math.round(r.duration));
+    const stops = routes.map(r => r.stops_count || r.legs.reduce((sum, l) => sum + (l.stops_count || 0), 0));
+    const transfers = routes.map(r => getTransferCount(r));
+    const walking = routes.map(r => getWalkingMinutes(r));
+
+    return {
+        duration: Math.min(...durations),
+        stops: Math.min(...stops),
+        transfers: Math.min(...transfers),
+        walking: Math.min(...walking)
+    };
+}
+
+function getRouteBadges(route) {
+    if (!route.legs) return '';
+    return route.legs
+        .filter(l => l.type !== 'walking' && l.route_short_name)
+        .map(l => {
+            const badge = getLineBadgeDetails(l.route_short_name);
+            return `<span class="line-badge ${badge.class}">${badge.name}</span>`;
+        })
+        .join(' ');
+}
+
+function getRouteDepartureTime(route) {
+    if (route.legs && route.legs.length > 0) return route.legs[0].departure_time;
+    return route.departure_time;
+}
+
+function getRouteArrivalTime(route) {
+    if (route.legs && route.legs.length > 0) return route.legs[route.legs.length - 1].arrival_time;
+    return route.arrival_time;
+}
+
+function getTransferCount(route) {
+    if (!route.legs) return 0;
+    return Math.max(0, route.legs.filter(l => l.type !== 'walking').length - 1);
+}
+
+function getWalkingMinutes(route) {
+    if (!route.legs) return 0;
+    return Math.round(route.legs
+        .filter(l => l.type === 'walking')
+        .reduce((sum, l) => sum + (l.duration || 0), 0));
 }
 
 /**
@@ -232,5 +446,5 @@ function formatShortTime(timeStr) {
 
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { safeParseJSON, getLineBadgeDetails, formatItalianDate, formatShortTime };
+    module.exports = { safeParseJSON, getLineBadgeDetails, formatItalianDate, formatShortTime, getTransferCount, getWalkingMinutes, findBestValues };
 }

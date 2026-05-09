@@ -1,6 +1,8 @@
 {
   "name": "Actv Live",
   "short_name": "Actv Live",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/pwa/web-app-manifest-192x192.png",

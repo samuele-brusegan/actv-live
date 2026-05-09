@@ -29,7 +29,7 @@
                         <div class="route-stop-label">da</div>
                         <div class="route-stop-name" id="origin-name">-</div>
                     </div>
-                    <div class="route-arrow">→</div>
+                    <div class="route-arrow">&rarr;</div>
                     <div class="route-stop">
                         <div class="route-stop-label">a</div>
                         <div class="route-stop-name" id="destination-name">-</div>
@@ -46,14 +46,21 @@
 
             <!-- Routes List -->
             <div id="routes-container" style="display: none;">
-                <div class="section-title">percorsi disponibili</div>
+                <div class="section-title-row">
+                    <div class="section-title">percorsi disponibili</div>
+                    <button class="btn-compare-toggle" id="btn-compare-toggle" onclick="toggleCompareMode()">Confronta</button>
+                </div>
                 <div id="routes-list"></div>
+                <div id="compare-bar" class="compare-bar" style="display: none;">
+                    <span id="compare-count">0 selezionati</span>
+                    <button class="btn-compare" onclick="openCompareModal()">Confronta percorsi</button>
+                </div>
             </div>
 
             <!-- No Routes -->
             <div id="no-routes" style="display: none;">
                 <div class="no-routes">
-                    <div class="no-routes-icon">🚫</div>
+                    <div class="no-routes-icon">&#x1F6AB;</div>
                     <div class="no-routes-text">Nessun percorso trovato</div>
                     <div class="no-routes-subtext">Prova a selezionare fermate diverse</div>
                     <button class="btn-back" onclick="window.location.href='/route-finder'">Torna indietro</button>
@@ -62,17 +69,26 @@
 
         </div>
 
-        <!-- Modal -->
+        <!-- Modal Dettagli -->
         <div id="details-modal" class="modal-overlay" onclick="closeModal(event)">
             <div class="modal-content" onclick="event.stopPropagation()">
                 <div class="modal-header">
                     <div class="modal-title">Dettagli Viaggio</div>
                     <button class="modal-close" onclick="closeModal()">&times;</button>
                 </div>
-                <div id="modal-body">
-                    <!-- Content injected by JS -->
-                </div>
+                <div id="modal-body"></div>
                 <button class="btn-back" style="margin-top: 1rem;" onclick="closeModal()">Chiudi</button>
+            </div>
+        </div>
+
+        <!-- Modal Confronto Percorsi -->
+        <div id="compare-modal" class="modal-overlay" onclick="closeCompareModal(event)">
+            <div class="modal-content compare-modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <div class="modal-title">Confronto Percorsi</div>
+                    <button class="modal-close" onclick="closeCompareModal()">&times;</button>
+                </div>
+                <div id="compare-body"></div>
             </div>
         </div>
     </body>

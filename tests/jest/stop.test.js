@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 
 // 3. Carichiamo il modulo (ora stationId sarà "4825")
-const { getFavorites, isFavorite, createPassageCard } = require('../../public/js/stop');
+const { getFavorites, isFavorite, createPassageCard, switchTab, renderStopLines } = require('../../public/js/stop');
 
 describe('getFavorites', () => {
     test('ritorna array vuoto se non ci sono preferiti', () => {
@@ -122,5 +122,61 @@ describe('createPassageCard', () => {
         };
         const card = createPassageCard(passage);
         expect(card.innerHTML).toContain('Ora');
+    });
+});
+
+describe('switchTab', () => {
+    beforeEach(() => {
+        document.body.innerHTML = `
+            <button class="stop-tab active" data-tab="passages"></button>
+            <button class="stop-tab" data-tab="lines"></button>
+            <div id="tab-passages" class="tab-content active"></div>
+            <div id="tab-lines" class="tab-content"></div>
+        `;
+    });
+
+    test('attiva il tab linee', () => {
+        switchTab('lines');
+        expect(document.querySelector('[data-tab="lines"]').classList.contains('active')).toBe(true);
+        expect(document.getElementById('tab-lines').classList.contains('active')).toBe(true);
+        expect(document.querySelector('[data-tab="passages"]').classList.contains('active')).toBe(false);
+    });
+
+    test('torna al tab passaggi', () => {
+        switchTab('lines');
+        switchTab('passages');
+        expect(document.querySelector('[data-tab="passages"]').classList.contains('active')).toBe(true);
+        expect(document.getElementById('tab-passages').classList.contains('active')).toBe(true);
+    });
+});
+
+describe('renderStopLines', () => {
+    test('renderizza le linee nel container', () => {
+        const container = document.createElement('div');
+        const lines = [
+            {
+                route_short_name: '2_US',
+                route_long_name: 'Lido - P.le Roma',
+                departures: [
+                    { time: '08:30', destination: 'P.le Roma' },
+                    { time: '09:00', destination: 'P.le Roma' }
+                ]
+            },
+            {
+                route_short_name: 'N1_UM',
+                route_long_name: 'Notturno 1',
+                departures: [{ time: '23:30', destination: 'Lido' }]
+            }
+        ];
+        renderStopLines(lines, container);
+        expect(container.innerHTML).toContain('badge-blue');
+        expect(container.innerHTML).toContain('badge-night');
+        expect(container.innerHTML).toContain('08:30');
+        expect(container.innerHTML).toContain('P.le Roma');
+        expect(container.querySelectorAll('.line-card').length).toBe(2);
+    });
+
+    test('gestisce container null', () => {
+        expect(() => renderStopLines([], null)).not.toThrow();
     });
 });
