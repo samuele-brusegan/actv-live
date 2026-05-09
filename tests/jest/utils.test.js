@@ -13,7 +13,7 @@ const {
     getDeterministicColor,
     filterBuses,
     findNextStopWithDelay
-} = require('../public/js/utils');
+} = require('../../public/js/utils');
 
 // ─── timeToSec ──────────────────────────────────────────────
 

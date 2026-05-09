@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 
 // 3. Carichiamo il modulo (ora stationId sarà "4825")
-const { getFavorites, isFavorite, createPassageCard } = require('../public/js/stop');
+const { getFavorites, isFavorite, createPassageCard } = require('../../public/js/stop');
 
 describe('getFavorites', () => {
     test('ritorna array vuoto se non ci sono preferiti', () => {
