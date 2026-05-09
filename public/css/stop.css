@@ -2,6 +2,15 @@
 .header-green {
 }
 
+/* Header actions row */
+.header-actions {
+    display: flex;
+    gap: 8px;
+    position: absolute;
+    top: 2rem;
+    right: 1.5rem;
+}
+
 .favorite-button {
     background: none;
     border: none;
@@ -147,4 +156,110 @@
         transform: scale(0.95);
         box-shadow: 0 0 0 0 rgba(0, 158, 97, 0);
     }
+}
+
+/* Notification Button */
+.notify-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.6);
+    transition: all 0.2s ease;
+    padding: 4px;
+}
+
+.notify-button.notify-active {
+    color: var(--color-gold);
+    animation: bellRing 0.5s ease;
+}
+
+@keyframes bellRing {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(15deg); }
+    50% { transform: rotate(-15deg); }
+    75% { transform: rotate(10deg); }
+}
+
+/* Notification Settings Panel */
+.notification-panel {
+    background: var(--color-white);
+    margin: 0 1.5rem;
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.notif-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--color-primary-green);
+    color: var(--color-white);
+    font-family: 'SF Pro', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.notif-panel-close {
+    background: none;
+    border: none;
+    color: var(--color-white);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.notif-panel-body {
+    padding: 16px;
+}
+
+.notif-setting label {
+    font-family: 'SF Pro', sans-serif;
+    font-size: 13px;
+    color: var(--color-text-gray);
+    display: block;
+    margin-bottom: 8px;
+}
+
+.threshold-selector {
+    display: flex;
+    gap: 8px;
+}
+
+.threshold-btn {
+    flex: 1;
+    padding: 8px 4px;
+    border: 2px solid var(--color-border-gray);
+    border-radius: 8px;
+    background: var(--color-white);
+    font-family: 'SF Pro', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--color-text-dark);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.threshold-btn.active {
+    border-color: var(--color-primary-green);
+    background: var(--color-primary-green);
+    color: var(--color-white);
+}
+
+.notif-info {
+    font-family: 'SF Pro', sans-serif;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    margin-top: 12px;
+    margin-bottom: 0;
+    line-height: 1.4;
 }
