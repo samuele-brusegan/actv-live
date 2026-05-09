@@ -37,3 +37,4 @@ $router->add('/live-map'                , 'Controller', 'liveMap');
 $router->add('/api/gtfs-stops'          , 'ApiController', 'gtfsStops');
 $router->add('/api/gtfs-passages'       , 'ApiController', 'gtfsPassages');
 $router->add('/api/stop-lines'          , 'ApiController', 'stopLines');
+$router->add('/widget'                  , 'Controller', 'widget');
