@@ -2,7 +2,7 @@
  * Test per routeResults.js
  * Funzioni testate: safeParseJSON, getLineBadgeDetails, formatItalianDate, formatShortTime
  */
-const { safeParseJSON, getLineBadgeDetails, formatItalianDate, formatShortTime } = require('../../public/js/routeResults');
+const { safeParseJSON, getLineBadgeDetails, formatItalianDate, formatShortTime, getTransferCount, getWalkingMinutes, findBestValues } = require('../../public/js/routeResults');
 
 describe('safeParseJSON', () => {
     let consoleSpy;
@@ -119,5 +119,67 @@ describe('formatShortTime', () => {
 
     test('gestisce orario già corto', () => {
         expect(formatShortTime('14:30')).toBe('14:30');
+    });
+});
+
+describe('getTransferCount', () => {
+    test('percorso diretto senza cambi', () => {
+        const route = { legs: [{ type: 'transit', route_short_name: '2_US' }] };
+        expect(getTransferCount(route)).toBe(0);
+    });
+
+    test('percorso con un cambio', () => {
+        const route = { legs: [
+            { type: 'transit', route_short_name: '2_US' },
+            { type: 'transit', route_short_name: '5_UN' }
+        ]};
+        expect(getTransferCount(route)).toBe(1);
+    });
+
+    test('percorso con camminata e bus (no cambio)', () => {
+        const route = { legs: [
+            { type: 'walking', duration: 5 },
+            { type: 'transit', route_short_name: '2_US' }
+        ]};
+        expect(getTransferCount(route)).toBe(0);
+    });
+
+    test('percorso senza legs', () => {
+        expect(getTransferCount({})).toBe(0);
+    });
+});
+
+describe('getWalkingMinutes', () => {
+    test('percorso con camminata', () => {
+        const route = { legs: [
+            { type: 'walking', duration: 5 },
+            { type: 'transit', duration: 20 },
+            { type: 'walking', duration: 3 }
+        ]};
+        expect(getWalkingMinutes(route)).toBe(8);
+    });
+
+    test('percorso senza camminata', () => {
+        const route = { legs: [{ type: 'transit', duration: 20 }] };
+        expect(getWalkingMinutes(route)).toBe(0);
+    });
+
+    test('percorso senza legs', () => {
+        expect(getWalkingMinutes({})).toBe(0);
+    });
+});
+
+describe('findBestValues', () => {
+    test('trova i valori migliori tra percorsi', () => {
+        const routes = [
+            { duration: 30, stops_count: 8, legs: [{ type: 'transit', stops_count: 8 }] },
+            { duration: 25, stops_count: 5, legs: [{ type: 'walking', duration: 3 }, { type: 'transit', stops_count: 5 }] },
+            { duration: 35, stops_count: 10, legs: [{ type: 'transit', stops_count: 4 }, { type: 'transit', stops_count: 6 }] }
+        ];
+        const best = findBestValues(routes);
+        expect(best.duration).toBe(25);
+        expect(best.stops).toBe(5);
+        expect(best.transfers).toBe(0);
+        expect(best.walking).toBe(0);
     });
 });

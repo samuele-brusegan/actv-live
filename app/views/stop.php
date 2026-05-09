@@ -32,25 +32,50 @@
             <div id="filter-container"></div>
         </div>
 
+        <!-- Tab Navigation -->
+        <div class="stop-tabs">
+            <button class="stop-tab active" data-tab="passages" onclick="switchTab('passages')">Passaggi</button>
+            <button class="stop-tab" data-tab="lines" onclick="switchTab('lines')">Linee e Orari</button>
+        </div>
+
         <!-- Contenuto Principale -->
         <div class="main-content pb-5">
             
-            <div class="section-title">Prossimi Passaggi</div>
+            <!-- Tab Passaggi -->
+            <div id="tab-passages" class="tab-content active">
+                <div class="section-title">Prossimi Passaggi</div>
 
-            <div id="noticeboard"></div>
-            
-            <div id="loading">Caricamento passaggi...</div>
+                <div id="noticeboard"></div>
+                
+                <div id="loading">Caricamento passaggi...</div>
 
-
-
-            <div id="passages-list">
-                <!-- Popolato via JS -->
+                <div id="passages-list">
+                    <!-- Popolato via JS -->
+                </div>
+                
+                <div class="text-center mt-4">
+                    <button class="btn btn-outline-secondary rounded-pill px-4 py-2" onclick="location.reload()">
+                        Aggiorna
+                    </button>
+                </div>
             </div>
-            
-            <div class="text-center mt-4">
-                <button class="btn btn-outline-secondary rounded-pill px-4 py-2" onclick="location.reload()">
-                    Aggiorna
-                </button>
+
+            <!-- Tab Linee e Orari -->
+            <div id="tab-lines" class="tab-content">
+                <div class="section-title">Linee che passano da questa fermata</div>
+
+                <div id="lines-loading" class="loading">
+                    <div class="spinner"></div>
+                    <div>Caricamento linee...</div>
+                </div>
+
+                <div id="lines-list">
+                    <!-- Popolato via JS -->
+                </div>
+
+                <div id="lines-empty" style="display: none;">
+                    <p class="text-center text-muted">Nessuna linea trovata per questa fermata.</p>
+                </div>
             </div>
 
         </div>
