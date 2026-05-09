@@ -694,4 +694,36 @@ class ApiController {
         $db = $this->getDb();
         require_once BASE_PATH . '/app/models/gtfsPassages.php';
     }
+
+    function stopLines() {
+        require_once BASE_PATH . '/app/services/RoutePlanner.php';
+
+        $stopId = $_GET['stop'] ?? '';
+        $time = $_GET['time'] ?? date('H:i:s');
+
+        if (strlen($time) == 5) {
+            $time .= ':00';
+        }
+
+        if (empty($stopId)) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Parametro stop mancante']);
+            return;
+        }
+
+        try {
+            $planner = new RoutePlanner();
+            $lines = $planner->getLinesForStop($stopId, $time);
+
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'stop_id' => $stopId,
+                'lines' => $lines
+            ]);
+        } catch (\Exception $e) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
 }

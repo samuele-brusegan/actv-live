@@ -11,7 +11,7 @@
         <script src="/js/stop.js"></script>
     </head>
     <body>
-        <?php 
+        <?php
         // phpinfo();
         ?>
 
@@ -21,7 +21,7 @@
                 <a href="javascript:history.back()" style="color: white; text-decoration: none; font-size: 24px;">
                     <?= getIcon('arrow_back', 24) ?>
                 </a>
-            </div> 
+            </div>
             <div class="header-title" id="station-name">Caricamento...</div>
             <div class="header-subtitle" id="station-id"></div>
             <div class="header-actions">
@@ -59,17 +59,17 @@
 
         <!-- Contenuto Principale -->
         <div class="main-content pb-5">
-            
+
             <div class="section-title">Prossimi Passaggi</div>
 
             <div id="noticeboard"></div>
-            
+
             <div id="loading">Caricamento passaggi...</div>
 
             <div id="passages-list">
                 <!-- Popolato via JS -->
             </div>
-            
+
             <div class="text-center mt-4">
                 <button class="btn btn-outline-secondary rounded-pill px-4 py-2" onclick="location.reload()">
                     Aggiorna

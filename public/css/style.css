@@ -562,3 +562,32 @@ html[data-theme="dark"] #non-rt-panel {
     text-align: center;
     margin-right: 8px;
 }
+
+/* Offline Indicator */
+.offline-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--color-actv-red);
+    color: var(--color-white);
+    padding: 8px 16px;
+    font-family: 'SF Pro', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 1000;
+    animation: slideDown 0.3s ease;
+}
+
+.offline-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-white);
+    animation: blink 1.5s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}

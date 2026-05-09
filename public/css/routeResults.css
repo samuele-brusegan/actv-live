@@ -466,3 +466,197 @@ body {
     margin-right: 5px;
     background: var(--color-primary-blue);
 }
+
+/* Section Title Row */
+.section-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 1.5rem 0 0.75rem;
+}
+
+.section-title-row .section-title {
+    margin: 0;
+}
+
+/* Compare Toggle Button */
+.btn-compare-toggle {
+    background: none;
+    border: 2px solid var(--color-primary-blue);
+    color: var(--color-primary-blue);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-family: 'SF Pro', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-compare-toggle.active {
+    background: var(--color-primary-blue);
+    color: var(--color-white);
+}
+
+/* Compare Mode Cards */
+.route-card.compare-mode {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.route-card.compare-selected {
+    border: 2px solid var(--color-primary-blue);
+    box-shadow: 0 0 0 1px var(--color-primary-blue), 0px 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.route-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.compare-checkbox {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--color-light-gray);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 4px;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    color: var(--color-white);
+}
+
+.compare-checkbox.checked {
+    background: var(--color-primary-blue);
+    border-color: var(--color-primary-blue);
+}
+
+/* Compare Bar (sticky bottom) */
+.compare-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--color-white);
+    padding: 12px 1.5rem;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 100;
+}
+
+.compare-bar span {
+    font-family: 'SF Pro', sans-serif;
+    font-size: 14px;
+    color: var(--color-text-gray);
+}
+
+.btn-compare {
+    background: var(--color-primary-blue);
+    color: var(--color-white);
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-family: 'SF Pro', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-compare:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Compare Modal */
+.compare-modal-content {
+    max-height: 85vh;
+}
+
+.compare-table {
+    width: 100%;
+}
+
+.compare-row {
+    display: flex;
+    border-bottom: 1px solid var(--color-lighter-gray);
+    padding: 10px 0;
+    align-items: center;
+}
+
+.compare-row:last-child {
+    border-bottom: none;
+}
+
+.compare-header-row {
+    font-weight: 700;
+    border-bottom: 2px solid var(--color-border-gray);
+}
+
+.compare-label {
+    width: 80px;
+    flex-shrink: 0;
+    font-family: 'SF Pro', sans-serif;
+    font-size: 13px;
+    color: var(--color-text-gray);
+    font-weight: 600;
+}
+
+.compare-cell {
+    flex: 1;
+    text-align: center;
+    font-family: 'SF Pro', sans-serif;
+    font-size: 14px;
+    color: var(--color-black);
+    padding: 0 4px;
+}
+
+.compare-route-label {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--color-primary-blue);
+}
+
+.best-value {
+    color: var(--color-primary-green);
+    font-weight: 700;
+}
+
+.compare-cell .line-badge {
+    font-size: 12px;
+    padding: 3px 8px;
+    margin: 2px;
+}
+
+.compare-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-lighter-gray);
+}
+
+.btn-select-compare {
+    background: var(--color-primary-green);
+    color: var(--color-white);
+    border: none;
+    border-radius: 10px;
+    padding: 12px;
+    font-family: 'SF Pro', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-select-compare:active {
+    transform: scale(0.98);
+    background: #008552;
+}

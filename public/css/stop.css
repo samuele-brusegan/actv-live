@@ -263,3 +263,143 @@
     margin-bottom: 0;
     line-height: 1.4;
 }
+
+/* Tab Navigation */
+.stop-tabs {
+    display: flex;
+    background: var(--color-white);
+    border-bottom: 2px solid var(--color-lighter-gray);
+    padding: 0 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.stop-tab {
+    flex: 1;
+    padding: 12px 8px;
+    border: none;
+    background: none;
+    font-family: 'SF Pro', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--color-text-gray);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.stop-tab.active {
+    color: var(--color-primary-green);
+    border-bottom-color: var(--color-primary-green);
+}
+
+/* Tab Content */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Lines & Timetable */
+.line-card {
+    background: var(--color-white);
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.line-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--color-lighter-gray);
+}
+
+.line-card-header .line-badge {
+    font-size: 16px;
+    padding: 6px 14px;
+}
+
+.line-card-name {
+    font-family: 'SF Pro', sans-serif;
+    font-size: 13px;
+    color: var(--color-text-gray);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.line-departures {
+    padding: 8px 16px 12px;
+}
+
+.departures-header {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'SF Pro', sans-serif;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--color-lighter-gray);
+    margin-bottom: 4px;
+}
+
+.line-departure {
+    display: flex;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--color-bg-gray);
+}
+
+.line-departure:last-child {
+    border-bottom: none;
+}
+
+.dep-time {
+    font-family: 'SF Pro', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--color-black);
+    width: 55px;
+    flex-shrink: 0;
+}
+
+.dep-dest {
+    font-family: 'SF Pro', sans-serif;
+    font-size: 13px;
+    color: var(--color-text-gray);
+    flex: 1;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Loading spinner for lines tab */
+.loading {
+    text-align: center;
+    padding: 2rem 1rem;
+}
+
+.loading .spinner {
+    border: 3px solid var(--color-spinner-base);
+    border-top: 3px solid var(--color-primary-green);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
