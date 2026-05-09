@@ -12,12 +12,6 @@
             <directory>tests/Feature</directory>
         </testsuite>
     </testsuites>
-    <coverage>
-        <report>
-            <html outputDirectory="docs/coverage"/>
-            <text outputFile="php://stdout" showUncoveredFiles="false"/>
-        </report>
-    </coverage>
     <source>
         <include>
             <directory>app</directory>

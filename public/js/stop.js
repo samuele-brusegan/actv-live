@@ -165,6 +165,11 @@ async function loadPassages() {
         listContainer.appendChild(card);
     });
 
+    // Registra ritardi nello storico
+    if (typeof recordPassageDelays !== 'undefined') {
+        recordPassageDelays(passages, stationId, stationName);
+    }
+
     updateFilter();
 }
 

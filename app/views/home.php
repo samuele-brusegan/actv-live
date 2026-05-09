@@ -81,12 +81,12 @@
                 </button>
             </div>
 
-            <!-- Pulsante Mappa Linee -->
-            <!-- <div class="text-center mt-4 mb-3">
-                <button class="btn btn-secondary rounded-pill px-4 py-2" onclick="window.location.href='/lines-map'">
-                    Mappa linee (NON definitivo)
+            <!-- Pulsante Storico Ritardi -->
+            <div class="text-center mt-4 mb-3">
+                <button class="btn btn-outline-secondary rounded-pill px-4 py-2" onclick="window.location.href='/delay-stats'" style="width: 100%;">
+                    Storico ritardi e statistiche
                 </button>
-            </div> -->
+            </div>
             <div id="important-info-btn" class="hidden">!</div>
             <div id="important-info-toast" style="display: none;">
                 <h6>Attenzione!</h6>
