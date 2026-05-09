@@ -36,3 +36,4 @@ $router->add('/api/bus-position'        , 'ApiController', 'busPosition');
 $router->add('/live-map'                , 'Controller', 'liveMap');
 $router->add('/api/gtfs-stops'          , 'ApiController', 'gtfsStops');
 $router->add('/api/gtfs-passages'       , 'ApiController', 'gtfsPassages');
+$router->add('/widget'                  , 'Controller', 'widget');

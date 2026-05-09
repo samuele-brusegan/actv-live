@@ -93,4 +93,8 @@ class Controller {
     function liveMap() {
         require_once BASE_PATH . '/app/views/liveBusMap.php';
     }
+
+    function widget() {
+        require_once BASE_PATH . '/app/views/widget.php';
+    }
 }

@@ -7,6 +7,7 @@
         <?php require COMMON_HTML_HEAD; ?>
         <link rel="stylesheet" href="/css/structure/structure-stop.css">
         <link rel="stylesheet" href="/css/stop.css">
+        <script src="/js/widget.js"></script>
         <script src="/js/stop.js"></script>
     </head>
     <body>
@@ -23,9 +24,14 @@
             </div> 
             <div class="header-title" id="station-name">Caricamento...</div>
             <div class="header-subtitle" id="station-id"></div>
-            <button class="favorite-button" id="favorite-btn" onclick="toggleFavorite()" title="Aggiungi ai preferiti">
-                ★
-            </button>
+            <div class="header-actions">
+                <button class="favorite-button" id="favorite-btn" onclick="toggleFavorite()" title="Aggiungi ai preferiti">
+                    ★
+                </button>
+                <button class="share-button" id="share-btn" onclick="shareWidget()" title="Condividi widget">
+                    &#x1F517;
+                </button>
+            </div>
         </div>
         <div class="parent-wrapper">
             <div id="filter-container"></div>
@@ -39,8 +45,6 @@
             <div id="noticeboard"></div>
             
             <div id="loading">Caricamento passaggi...</div>
-
-
 
             <div id="passages-list">
                 <!-- Popolato via JS -->
