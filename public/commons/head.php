@@ -28,6 +28,7 @@
 	<link rel="stylesheet" href="<?=URL_PATH?>/css/cookie-notice.css">
 	<script src="/js/cookie-notice.js"></script>
 	<script src="/js/theme.js"></script>
+	<script src="/js/offline.js"></script>
 
 <?php 
 //Send globals to JS
