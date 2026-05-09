@@ -97,4 +97,8 @@ class Controller {
     function widget() {
         require_once BASE_PATH . '/app/views/widget.php';
     }
+
+    function delayStats() {
+        require_once BASE_PATH . '/app/views/delayStats.php';
+    }
 }

@@ -9,6 +9,7 @@
         <link rel="stylesheet" href="/css/stop.css">
         <script src="/js/notifications.js"></script>
         <script src="/js/widget.js"></script>
+        <script src="/js/delayHistory.js"></script>
         <script src="/js/stop.js"></script>
     </head>
     <body>
