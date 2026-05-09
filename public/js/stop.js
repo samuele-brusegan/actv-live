@@ -354,6 +354,70 @@ function updateFilter() {
 }
 
 /**
+ * Notifiche Ritardi per questa fermata
+ */
+
+function toggleStopNotifications() {
+    if (typeof isStopMonitored === 'undefined') return;
+
+    const monitored = isStopMonitored(stationId);
+    const panel = document.getElementById('notification-panel');
+
+    if (monitored) {
+        removeMonitoredStop(stationId);
+        if (panel) panel.style.display = 'none';
+        updateNotifyButton();
+    } else {
+        if (panel) panel.style.display = 'block';
+        enableStopNotifications();
+    }
+}
+
+async function enableStopNotifications() {
+    if (typeof toggleNotifications === 'undefined') return;
+
+    const enabled = await toggleNotifications();
+    if (!enabled && !areNotificationsEnabled()) {
+        const panel = document.getElementById('notification-panel');
+        if (panel) panel.style.display = 'none';
+        return;
+    }
+
+    addMonitoredStop(stationId, stationName || `Fermata ${stationId}`);
+    updateNotifyButton();
+    updateThresholdButtons();
+}
+
+function closeNotificationPanel() {
+    const panel = document.getElementById('notification-panel');
+    if (panel) panel.style.display = 'none';
+}
+
+function setThreshold(minutes) {
+    if (typeof setDelayThreshold !== 'undefined') {
+        setDelayThreshold(minutes);
+    }
+    updateThresholdButtons();
+}
+
+function updateNotifyButton() {
+    const btn = document.getElementById('notify-btn');
+    if (!btn) return;
+
+    const monitored = typeof isStopMonitored !== 'undefined' && isStopMonitored(stationId);
+    btn.classList.toggle('notify-active', monitored);
+    btn.title = monitored ? 'Disattiva notifiche' : 'Attiva notifiche ritardi';
+}
+
+function updateThresholdButtons() {
+    const current = typeof getDelayThreshold !== 'undefined' ? getDelayThreshold() : 5;
+    document.querySelectorAll('.threshold-btn').forEach(btn => {
+        const val = parseInt(btn.textContent, 10);
+        btn.classList.toggle('active', val === current);
+    });
+}
+
+/**
  * Tab Switching
  */
 let linesLoaded = false;
@@ -455,6 +519,7 @@ async function init() {
     document.getElementById('station-id').innerText = stationId;
 
     updateFavoriteButton();
+    updateNotifyButton();
 
     // Primo caricamento
     await loadPassages();
@@ -467,5 +532,5 @@ window.onload = init;
 
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { getFavorites, isFavorite, toggleFavorite, updateFavoriteButton, createPassageCard, switchTab, renderStopLines };
+    module.exports = { getFavorites, isFavorite, toggleFavorite, updateFavoriteButton, createPassageCard, updateNotifyButton, switchTab, renderStopLines };
 }
