@@ -27,14 +27,16 @@ class ApiController {
 
     // Refactored from dbControll::gtfsTripBuilder
     function gtfsTripBuilder() {
-        if (!isset($_GET) && !isset($_GET['return']))
-            die("No parameters");
-
-        $db = $this->getDb();
-
         $tripId = $_GET['trip_id'] ?? '';
 
         header("Content-Type: application/json");
+        if ($tripId === '') {
+            header('HTTP/1.1 400 Bad Request');
+            echo json_encode(['error' => 'Missing trip_id parameter']);
+            return;
+        }
+
+        $db = $this->getDb();
 
         $stops = $db->query(
             "SELECT 
@@ -63,14 +65,16 @@ class ApiController {
 
     // Refactored from dbControll::gtfsStopTranslater
     function gtfsStopTranslater() {
-        if (!isset($_GET) && !isset($_GET['return']))
-            die("No parameters");
-
-        $db = $this->getDb();
-
         $tripId = $_GET['trip_id'] ?? '';
 
         header("Content-Type: application/json");
+        if ($tripId === '') {
+            header('HTTP/1.1 400 Bad Request');
+            echo json_encode(['error' => 'Missing trip_id parameter']);
+            return;
+        }
+
+        $db = $this->getDb();
 
         // Fixed typo in original query: 'stops.,' -> 'stops.*,'
         $stops = $db->query("SELECT stops.*, stop_times.* FROM stops INNER JOIN stop_times ON stops.stop_id = stop_times.stop_id WHERE trip_id = ? ORDER BY stop_times.arrival_time", [$tripId]);
@@ -79,9 +83,6 @@ class ApiController {
 
     // Moved from Controller::stopsJson and renamed
     function stops() {
-        if (!isset($_GET) && !isset($_GET['return']))
-            die("No parameters");
-
         $db = $this->getDb();
 
         header("Content-Type: application/json");
@@ -90,9 +91,25 @@ class ApiController {
         echo json_encode($stops);
     }
 
-    // Moved from Controller::favorite
-    function favorite() {
-        require_once BASE_PATH . '/app/models/addToFavorites.php';
+    /**
+     * Parse a "lat,lon" string into validated [lat, lon] floats, or null if invalid.
+     */
+    private function parseLatLon(string $value): ?array {
+        $parts = explode(',', $value);
+        if (count($parts) !== 2) {
+            return null;
+        }
+        $lat = trim($parts[0]);
+        $lon = trim($parts[1]);
+        if (!is_numeric($lat) || !is_numeric($lon)) {
+            return null;
+        }
+        $lat = (float) $lat;
+        $lon = (float) $lon;
+        if ($lat < -90 || $lat > 90 || $lon < -180 || $lon > 180) {
+            return null;
+        }
+        return [$lat, $lon];
     }
 
     function planRoute() {
@@ -120,12 +137,11 @@ class ApiController {
             $planningTime = $time;
 
             // Handle Origin Address
-            if (strpos($origin, ',') !== false) {
-                list($lat, $lon) = explode(',', $origin);
-                $nearest = $planner->findNearestStop((float) $lat, (float) $lon);
+            if (strpos($origin, ',') !== false && ($coords = $this->parseLatLon($origin)) !== null) {
+                $nearest = $planner->findNearestStop($coords[0], $coords[1]);
 
                 if ($nearest) {
-                    $planningOrigin = $nearest['stop_id'];
+                    $planningOrigin = $nearest['id'];
                     $startWalk = [
                         'type' => 'walking',
                         'distance' => $nearest['distance'],
@@ -140,19 +156,35 @@ class ApiController {
             }
 
             // Handle Destination Address
-            if (strpos($dest, ',') !== false) {
-                list($lat, $lon) = explode(',', $dest);
-                $nearest = $planner->findNearestStop((float) $lat, (float) $lon);
+            if (strpos($dest, ',') !== false && ($coords = $this->parseLatLon($dest)) !== null) {
+                $nearest = $planner->findNearestStop($coords[0], $coords[1]);
 
                 if ($nearest) {
-                    $planningDest = $nearest['stop_id'];
+                    $planningDest = $nearest['id'];
                     $endWalk = [
                         'stop_info' => $nearest
                     ];
                 }
             }
 
-            $routes = $planner->findRoutes($planningOrigin, $planningDest, $planningTime);
+            // Diagnostica: /api/plan-route?debug=1 (eventualmente con from/to/time)
+            if (isset($_GET['debug'])) {
+                header('Content-Type: application/json');
+                $out = [
+                    'received' => ['from' => $origin, 'to' => $dest, 'time' => $time],
+                    'resolved' => ['origin' => $planningOrigin, 'dest' => $planningDest, 'time' => $planningTime],
+                    'cache' => $planner->getCacheStats(),
+                ];
+                if ($planningOrigin !== '') $out['origin_debug'] = $planner->debugStop($planningOrigin);
+                if ($planningDest !== '') $out['dest_debug'] = $planner->debugStop($planningDest);
+                if ($planningOrigin !== '' && $planningDest !== '') {
+                    $out['routes_found'] = count($planner->findRoutesMulti($planningOrigin, $planningDest, $planningTime));
+                }
+                echo json_encode($out, JSON_PRETTY_PRINT);
+                return;
+            }
+
+            $routes = $planner->findRoutesMulti($planningOrigin, $planningDest, $planningTime);
 
             // Post-process routes to inject walking legs
             foreach ($routes as &$route) {
@@ -226,8 +258,9 @@ class ApiController {
             echo json_encode(['success' => true, 'routes' => $routes, 'optimize' => $optimize]);
 
         } catch (Exception $e) {
+            Logger::log('EXCEPTION', $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());
             header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            echo json_encode(['success' => false, 'error' => 'Errore durante la pianificazione del percorso']);
         }
     }
 
@@ -307,7 +340,6 @@ class ApiController {
             ";
             $results = $db->query($sql);
         }
-        //$results = $stmt->fetchAll(PDO::FETCH_ASSOC); // Assumo tu stia usando PDO o driver simile
 
         $routesMap = [];
 
@@ -338,106 +370,6 @@ class ApiController {
         // 3. Reset delle chiavi dell'array per ottenere un JSON array pulito (es. [ {...}, {...} ])
         $shapes = array_values($routesMap);
 
-        // L'output $shapes è ora identico al tuo formato originale
-
-        /*
-         // 1. Get all routes
-         $routes = $db->query("SELECT route_id, route_short_name, route_long_name FROM routes");
-
-         $shapes = [];
-         */
-        /*
-         {
-         "route_id": "1",
-         "route_short_name": "11",
-         "route_long_name": "Santa Maria Elisabetta - Pellestrina Cimitero",
-         "path": [
-         {
-         "lat": "45.41782",
-         "lng": "12.368981",
-         "name": "Santa Maria Elisabetta"
-         },
-         {
-         "lat": "45.405041",
-         "lng": "12.367017",
-         "name": "Palazzo del Cinema"
-         },
-         {
-         "lat": "45.266838",
-         "lng": "12.301488",
-         "name": "Pellestrina Tre Rose"
-         },
-         {
-         "lat": "45.262878",
-         "lng": "12.300303",
-         "name": "Pellestrina Cimitero"
-         }
-         ]
-         },
-         {
-         "route_id": "2",
-         "route_short_name": "11",
-         "route_long_name": "Santa Maria Elisabetta - Pellestrina Cimitero",
-         "path": [
-         {
-         "lat": "45.41782",
-         "lng": "12.368981",
-         "name": "Santa Maria Elisabetta"
-         },
-         {
-         "lat": "45.405041",
-         "lng": "12.367017",
-         "name": "Palazzo del Cinema"
-         },
-         {
-         "lat": "45.266838",
-         "lng": "12.301488",
-         "name": "Pellestrina Tre Rose"
-         },
-         {
-         "lat": "45.262878",
-         "lng": "12.300303",
-         "name": "Pellestrina Cimitero"
-         }
-         ]
-         },
-
-         */
-        /*
-
-         foreach ($routes as $route) {
-         $routeId = $route['route_id'];
-
-         // 2. Get one representative trip for this route
-         // We just take one trip LIMIT 1. To be better we might check direction or longest trip, but any valid trip gives the shape roughly.
-         $trips = $db->query("SELECT trip_id FROM trips WHERE route_id = '$routeId' LIMIT 1");
-
-         if (!empty($trips)) {
-         $tripId = $trips[0]['trip_id'];
-
-         // 3. Get stops for this trip in order
-         $pathQuery = "
-         SELECT s.stop_lat as lat, s.stop_lon as lng, s.stop_name as name 
-         FROM stop_times st 
-         JOIN stops s ON st.stop_id = s.stop_id 
-         WHERE st.trip_id = '$tripId' 
-         ORDER BY st.stop_sequence ASC
-         ";
-         $stops = $db->query($pathQuery);
-
-         if (!empty($stops)) {
-         // Convert float strings to real floats if needed, though JSON handles numeric strings fine usually.
-         // But lat/lon in stops table might be stored as decimal/double.
-
-         $shapes[] = [
-         'route_id' => $routeId,
-         'route_short_name' => $route['route_short_name'],
-         'route_long_name' => $route['route_long_name'],
-         'path' => $stops
-         ];
-         }
-         }
-         } */
 
         header('Content-Type: application/json');
         echo json_encode($shapes);
@@ -743,8 +675,9 @@ class ApiController {
                 'lines' => $lines
             ]);
         } catch (\Exception $e) {
+            Logger::log('EXCEPTION', $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());
             header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            echo json_encode(['success' => false, 'error' => 'Errore durante il recupero delle linee']);
         }
     }
 }

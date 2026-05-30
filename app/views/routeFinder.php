@@ -26,7 +26,7 @@
             <div class="selection-card" onclick="selectStation('origin')">
                 <div class="selection-icon">📍</div>
                 <div class="selection-content">
-                    <div class="selection-label">fermata più vicina</div>
+                    <div class="selection-label">partenza</div>
                     <div class="selection-value" id="origin-value">Seleziona partenza</div>
                 </div>
             </div>
@@ -38,7 +38,7 @@
             <div class="selection-card" onclick="selectStation('destination')">
                 <div class="selection-icon">📍</div>
                 <div class="selection-content">
-                    <div class="selection-label">selezionata prima</div>
+                    <div class="selection-label">destinazione</div>
                     <div class="selection-value" id="destination-value">Seleziona destinazione</div>
                 </div>
             </div>
@@ -75,7 +75,17 @@
                     <input type="checkbox" id="return-toggle" onchange="toggleReturn()">
                     <span class="toggle-slider"></span>
                 </label>
-                <span style="font-size: 10px;">&nbsp;(non ancora implementato)</span>
+            </div>
+
+            <!-- Return Time (visibile solo con "ritorno" attivo) -->
+            <div class="datetime-section return-section" id="return-section" style="display: none;">
+                <div class="section-label">orario di ritorno:</div>
+                <div class="datetime-inputs">
+                    <div class="datetime-trigger" onclick="openTimeModal('return')">
+                        <span id="display-return-time">--:--</span>
+                        <span class="chevron">›</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Search Button -->

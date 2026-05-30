@@ -7,6 +7,7 @@ class RoutePlanner {
     private $routes;
     private $stopRoutesIndex;
     private $loadedRoutesData = []; // Cache for loaded route files
+    private $nameIndex = null; // Index: normalized stop name -> [stop_id, ...]
     
     public function __construct() {
         $this->cacheDir = BASE_PATH . '/data/gtfs/cache';
@@ -225,7 +226,132 @@ class RoutePlanner {
         // Limit results
         return array_slice($results, 0, 10);
     }
-    
+
+    /**
+     * Normalize a stop name for grouping (same logic as the station selector).
+     */
+    private function normalizeStopName($name) {
+        return preg_replace('/\s+/', ' ', trim(mb_strtolower((string) $name, 'UTF-8')));
+    }
+
+    /**
+     * Returns every stop_id that shares the same name as the given stop
+     * (i.e. all the physical platforms/directions of that stop).
+     */
+    private function getSiblingStopIds($stopId) {
+        if (!$this->stops || !isset($this->stops[$stopId])) {
+            return [$stopId];
+        }
+
+        if ($this->nameIndex === null) {
+            $this->nameIndex = [];
+            foreach ($this->stops as $sid => $info) {
+                $key = $this->normalizeStopName($info['name'] ?? '');
+                $this->nameIndex[$key][] = $sid;
+            }
+        }
+
+        $key = $this->normalizeStopName($this->stops[$stopId]['name'] ?? '');
+        return $this->nameIndex[$key] ?? [$stopId];
+    }
+
+    /**
+     * Find routes considering ALL platforms of the origin and destination stops.
+     * In the ACTV GTFS a physical stop has several stop_ids (one per direction),
+     * so searching only the selected stop_id often misses valid connections.
+     */
+    public function findRoutesMulti($originId, $destId, $departureTime) {
+        $originIds = $this->getSiblingStopIds($originId);
+        $destIds = $this->getSiblingStopIds($destId);
+
+        $all = [];
+        $seen = [];
+
+        foreach (array_unique($originIds) as $o) {
+            foreach (array_unique($destIds) as $d) {
+                if ($o === $d) continue;
+                foreach ($this->findRoutes($o, $d, $departureTime) as $r) {
+                    $key = ($r['departure_time'] ?? '') . '|' . ($r['arrival_time'] ?? '')
+                        . '|' . ($r['route_short_name'] ?? '') . '|' . ($r['type'] ?? '');
+                    if (isset($seen[$key])) continue;
+                    $seen[$key] = true;
+                    $all[] = $r;
+                }
+            }
+        }
+
+        usort($all, function ($a, $b) {
+            $penalty = 15 * 60;
+            $day = 24 * 3600;
+            $sa = $this->gtfsToSeconds($a['arrival_time'])
+                + (($a['type'] ?? '') === 'transfer' ? $penalty : 0)
+                + (($a['day_offset'] ?? 0) * $day);
+            $sb = $this->gtfsToSeconds($b['arrival_time'])
+                + (($b['type'] ?? '') === 'transfer' ? $penalty : 0)
+                + (($b['day_offset'] ?? 0) * $day);
+            if ($sa === $sb) {
+                return ($a['duration'] ?? 0) <=> ($b['duration'] ?? 0);
+            }
+            return $sa <=> $sb;
+        });
+
+        return array_slice($all, 0, 10);
+    }
+
+    /**
+     * Diagnostica: stato della cache caricata.
+     */
+    public function getCacheStats() {
+        return [
+            'cache_dir' => $this->cacheDir,
+            'stops_json_exists' => file_exists($this->cacheDir . '/stops.json'),
+            'routes_json_exists' => file_exists($this->cacheDir . '/routes.json'),
+            'index_json_exists' => file_exists($this->cacheDir . '/stop_routes_index.json'),
+            'routes_dir_exists' => is_dir($this->routesDir),
+            'stops_count' => is_array($this->stops) ? count($this->stops) : 0,
+            'routes_count' => is_array($this->routes) ? count($this->routes) : 0,
+            'index_count' => is_array($this->stopRoutesIndex) ? count($this->stopRoutesIndex) : 0,
+            'sample_stop_ids' => is_array($this->stops) ? array_slice(array_keys($this->stops), 0, 8) : [],
+            'sample_index_ids' => is_array($this->stopRoutesIndex) ? array_slice(array_keys($this->stopRoutesIndex), 0, 8) : [],
+        ];
+    }
+
+    /**
+     * Diagnostica: informazioni su una singola fermata richiesta.
+     */
+    public function debugStop($stopId) {
+        $siblings = $this->getSiblingStopIds($stopId);
+        $inIndex = [];
+        foreach ($siblings as $s) {
+            if (is_array($this->stopRoutesIndex) && isset($this->stopRoutesIndex[$s])) {
+                $inIndex[$s] = count($this->stopRoutesIndex[$s]);
+            }
+        }
+        return [
+            'input' => $stopId,
+            'in_stops_cache' => is_array($this->stops) && isset($this->stops[$stopId]),
+            'name' => $this->stops[$stopId]['name'] ?? null,
+            'directly_in_route_index' => is_array($this->stopRoutesIndex) && isset($this->stopRoutesIndex[$stopId]),
+            'siblings' => $siblings,
+            'siblings_in_route_index' => $inIndex,
+        ];
+    }
+
+    /**
+     * Restituisce il nome (breve/lungo) di una rotta, gestendo sia il formato
+     * della cache (`short_name`/`long_name`) sia quello del DB (`route_short_name`).
+     */
+    private function getRouteName($routeId, $which = 'short') {
+        $info = $this->routes[$routeId] ?? null;
+        if (!$info) {
+            return $which === 'long' ? '' : $routeId;
+        }
+        if ($which === 'long') {
+            return $info['route_long_name'] ?? $info['long_name'] ?? '';
+        }
+        return $info['route_short_name'] ?? $info['short_name'] ?? $routeId;
+    }
+
     /**
      * Get cached route data
      */
@@ -294,16 +420,37 @@ class RoutePlanner {
             if ($originStop && $destStop && $originStop['stop_sequence'] < $destStop['stop_sequence']) {
                 // Check time
                 if ($originStop['departure_time'] >= $departureTime) {
+                    $shortName = $this->getRouteName($routeId, 'short');
+                    $longName = $this->getRouteName($routeId, 'long');
+                    $originName = $this->stops[$originId]['name'] ?? $originId;
+                    $destName = $this->stops[$destId]['name'] ?? $destId;
+                    $dep = $originStop['departure_time'];
+                    $arr = $destStop['arrival_time'];
+                    $stopsCount = $destStop['stop_sequence'] - $originStop['stop_sequence'];
+
                     $validTrips[] = [
                         'type' => 'direct',
                         'route_id' => $routeId,
                         'trip_id' => $tripId,
-                        'departure_time' => $originStop['departure_time'],
-                        'arrival_time' => $destStop['arrival_time'],
-                        'duration' => $this->calculateDuration($originStop['departure_time'], $destStop['arrival_time']),
-                        'stops_count' => $destStop['stop_sequence'] - $originStop['stop_sequence'],
-                        'route_short_name' => $this->routes[$routeId]['route_short_name'] ?? $routeId,
-                        'route_long_name' => $this->routes[$routeId]['route_long_name'] ?? ''
+                        'departure_time' => $dep,
+                        'arrival_time' => $arr,
+                        'duration' => $this->calculateDuration($dep, $arr),
+                        'stops_count' => $stopsCount,
+                        'route_short_name' => $shortName,
+                        'route_long_name' => $longName,
+                        'origin' => $originName,
+                        'destination' => $destName,
+                        // Una tratta diretta è composta da una singola "leg" (corsa bus)
+                        'legs' => [[
+                            'type' => 'bus',
+                            'route_short_name' => $shortName,
+                            'route_long_name' => $longName,
+                            'departure_time' => $dep,
+                            'arrival_time' => $arr,
+                            'stops_count' => $stopsCount,
+                            'origin' => $originName,
+                            'destination' => $destName,
+                        ]],
                     ];
                 }
             }
@@ -411,8 +558,8 @@ class RoutePlanner {
             if (!empty($departures)) {
                 $lines[] = [
                     'route_id' => $routeId,
-                    'route_short_name' => $routeInfo['route_short_name'] ?? $routeId,
-                    'route_long_name' => $routeInfo['route_long_name'] ?? '',
+                    'route_short_name' => $this->getRouteName($routeId, 'short'),
+                    'route_long_name' => $this->getRouteName($routeId, 'long'),
                     'departures' => array_slice($departures, 0, $limit)
                 ];
             }

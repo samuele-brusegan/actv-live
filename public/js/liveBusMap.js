@@ -314,14 +314,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (stopCache.has(stopId)) {
             const entry = stopCache.get(stopId);
             if (now - entry.ts < 30000) {
-                console.log("Using cached data for stop", stopId);
                 return findBestMatch(entry.data, lineName, tripHeadsign, gtfsStopSec);
             }
         }
 
         try {
             let url = `https://oraritemporeale.actv.it/aut/backend/passages/${stopId}-web-aut`;
-            console.log("getRealTimeDelay", url, `https://actv-live.test/aut/stops/stop?id=${stopId}`);
             
             const res = await fetch(url, { signal });
             if (!res.ok) return null;
@@ -388,7 +386,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const TIME_WEIGHT = 0.7;
         const DEST_WEIGHT = 0.3;
 
-        console.log("pre_candidates", candidates, lineName);
         
         candidates.forEach(cand => {
             // 1. Punteggio Tempo
@@ -443,14 +440,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        console.log(
-            {
-                "lineName": lineName,
-                "tripToMatch":{"lineName": lineName, "tripHeadsign": tripHeadsign, "gtfsStopSec": gtfsStopSec, "secToTime": secToTime(gtfsStopSec)},
-                "bestMatch":bestMatch, 
-                "candidates": candidates
-            }
-        );
         /* console.log('TripToMatch:', { tripHeadsign, lineName });
         console.log('Best match:', bestMatch);
         console.log('Candidates:', candidates);

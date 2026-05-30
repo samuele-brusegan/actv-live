@@ -9,38 +9,38 @@ class Logger
             if (!class_exists('databaseConnector')) {
                 require_once BASE_PATH . '/app/models/databaseConnector.php';
             }
-            self::$db = new databaseConnector();
-            // print_r(ENV);
+            self::$db = databaseConnector::getInstance();
             self::$db->connect(ENV['DB_USER'], ENV['DB_PASS'], ENV['DB_HOST'], ENV['DB_NAME']);
         }
         return self::$db;
     }
 
-    private static function getMysqli()
-    {
-        $db = self::getDb();
-        return Closure::bind(function ($db) {
-            return $db->db;
-        }, null, 'databaseConnector')($db);
-    }
-
     public static function log($type, $message, $file = null, $line = null, $stackTrace = null, $context = null)
     {
-        $mysqli = self::getMysqli();
+        // Logging must never throw: it is also wired as the global error/exception
+        // handler in bootstrap.php, so a failure here would cascade.
+        try {
+            $db = self::getDb();
 
-        $sql = "INSERT INTO `logs` (`type`, `message`, `file`, `line`, `stack_trace`, `context`) VALUES (?, ?, ?, ?, ?, ?)";
-        $stmt = $mysqli->prepare($sql);
+            $sql = "INSERT INTO `logs` (`type`, `message`, `file`, `line`, `stack_trace`, `context`) VALUES (?, ?, ?, ?, ?, ?)";
+            $contextJson = $context ? json_encode($context) : null;
 
-        $contextJson = $context ? json_encode($context) : null;
-
-        $stmt->bind_param("sssiss", $type, $message, $file, $line, $stackTrace, $contextJson);
-        $stmt->execute();
-        $stmt->close();
+            $db->query($sql, [
+                $type,
+                $message,
+                $file,
+                $line !== null ? (int) $line : null,
+                $stackTrace,
+                $contextJson,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('Logger::log failed: ' . $e->getMessage());
+        }
     }
 
     public static function phpErrorHandler($errno, $errstr, $errfile, $errline)
     {
-        if (!(error_reporting()& $errno))
+        if (!(error_reporting() & $errno))
             return false;
 
         $type = 'PHP_ERROR';
@@ -60,4 +60,3 @@ class Logger
         );
     }
 }
-?>

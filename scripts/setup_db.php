@@ -6,7 +6,7 @@ if (!class_exists('databaseConnector')) {
 }
 
 $db = new databaseConnector();
-$db->connect(ENV['DB_USERNAME'], ENV['DB_PASSWORD'], ENV['DB_HOST'], ENV['DB_NAME']);
+$db->connect(ENV['DB_USER'], ENV['DB_PASS'], ENV['DB_HOST'], ENV['DB_NAME']);
 
 // Since databaseConnector::query expects a result set, we'll use the raw mysqli object
 $mysqli = Closure::bind(function($db) { return $db->db; }, null, 'databaseConnector')($db);

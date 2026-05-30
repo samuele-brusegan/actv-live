@@ -223,3 +223,27 @@ body {
     font-size: 0.85rem;
     color: var(--text-secondary);
 }
+
+/* Progress bar primo caricamento */
+.dashboard-progress {
+    margin: 12px 0 20px;
+}
+.dashboard-progress-track {
+    width: 100%;
+    height: 8px;
+    background: rgba(127, 127, 127, 0.25);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.dashboard-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent-color);
+    border-radius: 6px;
+    transition: width 0.2s ease;
+}
+.dashboard-progress-label {
+    margin-top: 6px;
+    font-size: 13px;
+    opacity: 0.8;
+}

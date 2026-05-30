@@ -5,7 +5,7 @@
 require_once __DIR__ . '/app/bootstrap.php';
 
 // 2. Connect to DB
-$mysqli = new mysqli(ENV['DB_HOST'], ENV['DB_USERNAME'], ENV['DB_PASSWORD'], ENV['DB_NAME']);
+$mysqli = new mysqli(ENV['DB_HOST'], ENV['DB_USER'], ENV['DB_PASS'], ENV['DB_NAME']);
 if ($mysqli->connect_error) {
     die("Connection failed: " . $mysqli->connect_error);
 }

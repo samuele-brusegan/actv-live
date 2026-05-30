@@ -23,7 +23,48 @@ beforeEach(() => {
 });
 
 // 3. Carichiamo il modulo (ora stationId sarà "4825")
-const { getFavorites, isFavorite, createPassageCard, switchTab, renderStopLines } = require('../../public/js/stop');
+const { getFavorites, isFavorite, createPassageCard, switchTab, renderStopLines, mergePassages, isLikelyStrike, lineDestKey } = require('../../public/js/stop');
+
+describe('mergePassages (fallback previsti)', () => {
+    test('aggiunge i previsti per linee non coperte dal real-time', () => {
+        const rt = [{ line: '2_US', destination: 'Mestre', real: true }];
+        const sched = [
+            { line: '2', destination: 'Mestre', real: false, time: '10:05' },   // già coperto -> escluso
+            { line: '5E', destination: 'Marghera', real: false, time: '10:08' } // mancante -> incluso
+        ];
+        const merged = mergePassages(rt, sched);
+        expect(merged.length).toBe(2);
+        expect(merged.some(p => p.line === '5E')).toBe(true);
+    });
+
+    test('con real-time null usa solo i previsti', () => {
+        const sched = [{ line: '5E', destination: 'Marghera', real: false, time: '10:08' }];
+        expect(mergePassages(null, sched).length).toBe(1);
+    });
+
+    test('deduplica i previsti identici', () => {
+        const sched = [
+            { line: '5E', destination: 'Marghera', time: '10:08' },
+            { line: '5E', destination: 'Marghera', time: '10:08' }
+        ];
+        expect(mergePassages([], sched).length).toBe(1);
+    });
+});
+
+describe('isLikelyStrike', () => {
+    test('vero se real-time vuoto ma esistono corse previste', () => {
+        expect(isLikelyStrike([], [{ line: '2' }])).toBe(true);
+    });
+    test('falso se ci sono passaggi real-time', () => {
+        expect(isLikelyStrike([{ line: '2' }], [{ line: '2' }])).toBe(false);
+    });
+    test('falso se real-time è null (errore di rete)', () => {
+        expect(isLikelyStrike(null, [{ line: '2' }])).toBe(false);
+    });
+    test('falso se non ci sono nemmeno corse previste', () => {
+        expect(isLikelyStrike([], [])).toBe(false);
+    });
+});
 
 describe('getFavorites', () => {
     test('ritorna array vuoto se non ci sono preferiti', () => {

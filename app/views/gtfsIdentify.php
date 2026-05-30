@@ -26,7 +26,6 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
             header("Content-Type: application/json");
             echo json_encode([
                 "error" => "No trips found", 
-                "query" => queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop),
                 "params" => [
                     "time" => $time, 
                     "busTrack" => $busTrack, 
@@ -36,7 +35,6 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
                     "stop" => $stop,
                     "stopId" => $stopId
                 ],
-                "link" => $_SERVER["REQUEST_SCHEME"] . "://" . $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"]
             ]);
             exit;
         }
@@ -59,10 +57,10 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         }
 
     } catch (Exception $e) {
+        Logger::log('EXCEPTION', $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());
         header("Content-Type: application/json");
         echo json_encode([
-            "error" => $e->getMessage(), 
-            "query" => queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop),
+            "error" => "Errore interno", 
             "params" => [
                 "time" => $time, 
                 "busTrack" => $busTrack, 
@@ -72,7 +70,6 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
                 "stop" => $stop,
                 "stopId" => $stopId
             ],
-            "link" => $_SERVER["REQUEST_SCHEME"] . "://" . $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"]
         ]);
         exit;
     }

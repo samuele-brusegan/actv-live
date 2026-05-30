@@ -1,7 +1,7 @@
 <?php
 /*
  * Copyright (c) 2025. Brusegan Samuele, Davanzo Andrea
- * Questo file fa parte di GradeCraft ed è rilasciato
+ * Questo file fa parte di actv-live ed è rilasciato
  * sotto la licenza MIT. Vedere il file LICENSE per i dettagli.
  */
 
@@ -10,7 +10,6 @@
 require_once dirname(__DIR__) . '/app/bootstrap.php';
 
 session_start();
-checkSessionExpiration();
 
 
 // Inizializza il router

@@ -36,15 +36,19 @@ class Controller {
 
     private function fetchData($url, $timeout = 10) {
         $ch = curl_init($url);
+        $timeoutMs = max(1, (int) round($timeout * 1000));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Often needed for dev/test
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT_MS, $timeoutMs);
+        curl_setopt($ch, CURLOPT_TIMEOUT_MS, $timeoutMs);
         $response = curl_exec($ch);
-        if (curl_errno($ch)) {
-            // echo 'cURL Error:' . curl_error($ch);
+        if ($response === false || curl_errno($ch)) {
+            Logger::log('PHP_ERROR', 'fetchData cURL error: ' . curl_error($ch), $url);
+            curl_close($ch);
+            return [];
         }
-        //curl_close($ch);
+        curl_close($ch);
         return json_decode($response, true) ?? [];
     }
 
@@ -64,12 +68,37 @@ class Controller {
         require_once BASE_PATH . '/app/views/tripDetails.php';
     }
 
+    function adminLogin() {
+        $error = null;
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!AdminAuth::verifyCsrf($_POST['csrf'] ?? null)) {
+                $error = 'Sessione scaduta, riprova.';
+            } elseif (AdminAuth::attempt($_POST['password'] ?? '')) {
+                header('Location: ' . URL_PATH . '/admin/dashboard');
+                exit;
+            } else {
+                $error = 'Password non valida.';
+            }
+        }
+
+        $csrf = AdminAuth::csrfToken();
+        require_once BASE_PATH . '/app/views/admin/login.php';
+    }
+
+    function adminLogout() {
+        AdminAuth::logout();
+        header('Location: ' . URL_PATH . '/admin/login');
+        exit;
+    }
+
     function logs() {
+        AdminAuth::requireAuth();
         if (!class_exists('databaseConnector')) {
             require_once BASE_PATH . '/app/models/databaseConnector.php';
         }
-        $db = new databaseConnector();
-        $db->connect(ENV['DB_USERNAME'], ENV['DB_PASSWORD'], ENV['DB_HOST'], ENV['DB_NAME']);
+        $db = databaseConnector::getInstance();
+        $db->connect(ENV['DB_USER'], ENV['DB_PASS'], ENV['DB_HOST'], ENV['DB_NAME']);
         
         $type = $_GET['type'] ?? null;
         $query = "SELECT * FROM logs";
@@ -85,6 +114,7 @@ class Controller {
     }
 
     function adminDashboard() {
+        AdminAuth::requireAuth();
         require_once BASE_PATH . '/app/views/admin/dashboard.php';
     }
 

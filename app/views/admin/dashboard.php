@@ -10,6 +10,14 @@ require_once BASE_PATH . '/public/commons/head.php';
         <div class="last-update" id="last-update">In attesa di dati...</div>
     </div>
 
+    <!-- Progress bar primo caricamento -->
+    <div id="dashboard-progress" class="dashboard-progress" style="display:none;">
+        <div class="dashboard-progress-track">
+            <div class="dashboard-progress-fill" id="dashboard-progress-fill"></div>
+        </div>
+        <div class="dashboard-progress-label" id="dashboard-progress-label">Caricamento bus…</div>
+    </div>
+
     <!-- Big Numbers Grid -->
     <div class="stats-grid">
         <div class="stat-card">
@@ -71,6 +79,7 @@ require_once BASE_PATH . '/public/commons/head.php';
     </div>
 </div>
 
+<script src="/js/delayHistory.js"></script>
 <script src="/js/adminDashboard.js"></script>
 
 <?php

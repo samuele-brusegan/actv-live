@@ -28,6 +28,14 @@ let compareMode = false;
 let selectedRoutes = [];
 let allRoutes = [];
 
+// Stato viaggio di ritorno
+let returnTripEnabled = false;
+let returnTime = null;
+let outboundRoutes = [];
+let returnRoutes = [];
+let currentDirection = 'andata'; // 'andata' | 'ritorno'
+let activeDestName = '';
+
 /**
  * Inizializzazione della Pagina
  */
@@ -39,6 +47,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         departureDate = localStorage.getItem('route_departure_date') || new Date().toISOString().split('T')[0];
         departureTime = localStorage.getItem('route_departure_time') || new Date().toTimeString().slice(0, 5);
+
+        returnTripEnabled = localStorage.getItem('route_return_trip') === '1';
+        returnTime = localStorage.getItem('route_return_time') || departureTime;
 
         if (!originData || !destinationData) {
             showErrorState('Seleziona una partenza e una destinazione valide.');
@@ -66,45 +77,121 @@ function safeParseJSON(str) {
 }
 
 function updateHeaderUI() {
+    updateSummary(originData, destinationData, departureTime);
+}
+
+function updateSummary(fromData, toData, time) {
     const originEl = document.getElementById('origin-name');
     const destEl = document.getElementById('destination-name');
     const dateEl = document.getElementById('datetime-info');
 
-    if (originEl) originEl.textContent = originData.name;
-    if (destEl) destEl.textContent = destinationData.name;
-    if (dateEl) dateEl.textContent = `Partenza: ${formatItalianDate(departureDate)} alle ${departureTime}`;
+    if (originEl) originEl.textContent = fromData.name;
+    if (destEl) destEl.textContent = toData.name;
+    if (dateEl) dateEl.textContent = `Partenza: ${formatItalianDate(departureDate)} alle ${time}`;
 }
 
 /**
  * Logica di Ricerca
  */
+function getRouteParam(data) {
+    return (data.type === 'address') ? `${data.lat},${data.lng}` : data.id;
+}
+
+function getOptimizeParam() {
+    const optimize = localStorage.getItem('route_optimize');
+    return (optimize && ['time', 'transfers', 'walking'].includes(optimize)) ? optimize : null;
+}
+
+async function fetchRoutes(from, to, time, optimize) {
+    const params = new URLSearchParams({ from, to, time });
+    if (optimize) params.set('optimize', optimize);
+
+    const response = await fetch(`/api/plan-route?${params.toString()}`);
+    if (!response.ok) throw new Error(`Status HTTP: ${response.status}`);
+
+    const data = await response.json();
+    if (!data.success) throw new Error(data.error || 'Errore durante la ricerca.');
+    return data.routes || [];
+}
+
 async function performRouteSearch() {
     try {
-        // Parametri: se è un indirizzo usiamo le coordinate, altrimenti l'ID fermata
-        const from = (originData.type === 'address') ? `${originData.lat},${originData.lng}` : originData.id;
-        const to = (destinationData.type === 'address') ? `${destinationData.lat},${destinationData.lng}` : destinationData.id;
+        const optimize = getOptimizeParam();
+        const fromParam = getRouteParam(originData);
+        const toParam = getRouteParam(destinationData);
 
-        const optimize = localStorage.getItem('route_optimize');
-        const params = new URLSearchParams({ from, to, time: departureTime });
-        if (optimize && ['time', 'transfers', 'walking'].includes(optimize)) {
-            params.set('optimize', optimize);
+        outboundRoutes = await fetchRoutes(fromParam, toParam, departureTime, optimize);
+
+        if (returnTripEnabled) {
+            returnRoutes = await fetchRoutes(toParam, fromParam, returnTime, optimize);
+            setupDirectionTabs();
         }
-        const response = await fetch(`/api/plan-route?${params.toString()}`);
 
-        if (!response.ok) throw new Error(`Status HTTP: ${response.status}`);
-
-        const data = await response.json();
-
-        if (data.success && data.routes?.length > 0) {
-            allRoutes = data.routes;
-            renderRouteResults(data.routes);
+        if (outboundRoutes.length > 0) {
+            switchDirection('andata');
+        } else if (returnTripEnabled && returnRoutes.length > 0) {
+            switchDirection('ritorno');
         } else {
-            showErrorState(data.error || 'Nessun percorso trovato per i parametri specificati.');
+            showErrorState('Nessun percorso trovato per i parametri specificati.');
         }
     } catch (error) {
         console.error('Errore ricerca percorsi:', error);
         showErrorState(`Errore durante la ricerca: ${error.message}`);
     }
+}
+
+/**
+ * Gestione direzione (Andata / Ritorno)
+ */
+
+function setupDirectionTabs() {
+    const tabs = document.getElementById('direction-tabs');
+    if (tabs) tabs.style.display = 'flex';
+}
+
+function switchDirection(direction) {
+    currentDirection = direction;
+
+    const tabAndata = document.getElementById('tab-andata');
+    const tabRitorno = document.getElementById('tab-ritorno');
+    if (tabAndata) tabAndata.classList.toggle('active', direction === 'andata');
+    if (tabRitorno) tabRitorno.classList.toggle('active', direction === 'ritorno');
+
+    // Reset stato confronto al cambio direzione
+    compareMode = false;
+    selectedRoutes = [];
+    const toggleBtn = document.getElementById('btn-compare-toggle');
+    if (toggleBtn) {
+        toggleBtn.classList.remove('active');
+        toggleBtn.textContent = 'Confronta';
+    }
+    const compareBar = document.getElementById('compare-bar');
+    if (compareBar) compareBar.style.display = 'none';
+
+    if (direction === 'ritorno') {
+        allRoutes = returnRoutes;
+        activeDestName = originData.name;
+        updateSummary(destinationData, originData, returnTime);
+    } else {
+        allRoutes = outboundRoutes;
+        activeDestName = destinationData.name;
+        updateSummary(originData, destinationData, departureTime);
+    }
+
+    const loadingEl = document.getElementById('loading');
+    const containerEl = document.getElementById('routes-container');
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (containerEl) containerEl.style.display = 'block';
+
+    if (!allRoutes || allRoutes.length === 0) {
+        const listEl = document.getElementById('routes-list');
+        if (listEl) {
+            listEl.innerHTML = `<div class="no-routes-text" style="text-align:center; padding:1.5rem;">Nessun percorso trovato per questa direzione.</div>`;
+        }
+        return;
+    }
+
+    renderRouteResults(allRoutes);
 }
 
 /**
@@ -115,11 +202,13 @@ function getLineBadgeDetails(lineRaw) {
     if (!lineRaw) return { name: '?', class: 'badge-red' };
     if (lineRaw === 'Cammina') return { name: '\u{1F6B6}', class: 'badge-walking' };
 
-    const [lineName, lineTag] = lineRaw.split("_");
+    const [lineName, lineTag] = String(lineRaw).split("_");
 
     let badgeClass = "badge-red";
-    if (["US", "UN", "EN"].includes(lineTag)) badgeClass = "badge-blue";
-    if (lineName.startsWith("N")) badgeClass = "badge-night";
+    // Extraurbano (blu/azzurro): tag US/UN/EN oppure nome che termina con 'E' (es. 5E)
+    if (["US", "UN", "EN"].includes(lineTag) || /E$/i.test(lineName)) badgeClass = "badge-blue";
+    // Notturne
+    if (/^N/i.test(lineName)) badgeClass = "badge-night";
 
     return { name: lineName, class: badgeClass };
 }
@@ -190,7 +279,7 @@ function renderLegHTML(leg, route, index) {
     const markerClass = isLast ? 'end' : 'transfer';
     const arrivalName = isWalking
         ? leg.destination
-        : (isLast ? destinationData.name : (route.transfer_stop || 'Cambio'));
+        : (isLast ? (activeDestName || destinationData.name) : (route.transfer_stop || 'Cambio'));
 
     html += `
         <div class="timeline-item">

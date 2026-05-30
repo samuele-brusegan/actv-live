@@ -1,5 +1,5 @@
 <?php
-define('BASE_PATH', __DIR__);
+define('BASE_PATH', dirname(__DIR__));
 require_once BASE_PATH . '/app/services/RoutePlanner.php';
 
 try {

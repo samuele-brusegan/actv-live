@@ -70,8 +70,8 @@ async function initHomeMap() {
     let userMarker = null;
 
     // Stili icone mappa
-    const stopStyle = { color: '#0078A8', fillColor: '#0078A8', fillOpacity: 0.3, radius: 6 };
-    const nearStopStyle = { color: '#E60000', fillColor: '#E60000', fillOpacity: 0.7, radius: 6 };
+    const stopStyle = { color: '#0078A8', fillColor: '#0078A8', fillOpacity: 0.3, radius: 3, weight: 1 };
+    const nearStopStyle = { color: '#E60000', fillColor: '#E60000', fillOpacity: 0.7, radius: 4, weight: 1 };
 
     // Disegna tutte le stazioni
     stations.forEach(s => {
@@ -79,6 +79,16 @@ async function initHomeMap() {
             .bindPopup(createPopupContent(s))
             .addTo(map);
     });
+
+    // Adatta il raggio dei pallini al livello di zoom (più grandi in zoom-in)
+    const updateMarkerRadii = () => {
+        const r = radiusForZoom(map.getZoom());
+        stations.forEach(s => {
+            if (s.marker) s.marker.setRadius((s.marker._isNear ? 1 : 0) + r);
+        });
+    };
+    map.on('zoomend', updateMarkerRadii);
+    updateMarkerRadii();
 
     // Localizzazione utente
     map.locate({ setView: true, maxZoom: 15 });
@@ -99,7 +109,11 @@ async function initHomeMap() {
         updateNearbyUI(near, map, e.latlng);
 
         // Evidenzia sulla mappa
-        near.forEach(s => s.marker.setStyle(nearStopStyle).setPopupContent(createPopupContent(s, true)));
+        near.forEach(s => {
+            s.marker._isNear = true;
+            s.marker.setStyle(nearStopStyle).setPopupContent(createPopupContent(s, true));
+        });
+        updateMarkerRadii();
 
         // Mostra banner successo temporaneo
         showStatusBanner("Posizione trovata. Ecco le stazioni più vicine.");
@@ -169,6 +183,12 @@ function createPopupContent(station, includeDist = false) {
     `;
 }
 
+/** Raggio (px) dei pallini fermata in funzione dello zoom della mappa. */
+function radiusForZoom(zoom) {
+    // Cresce con lo zoom, con limiti min/max sensati
+    return Math.max(2, Math.min(12, Math.round(zoom - 9)));
+}
+
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; // km
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -234,5 +254,5 @@ window.onload = () => {
 
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { calculateDistance, createFavoriteCardHTML, createPopupContent, showStatusBanner };
+    module.exports = { calculateDistance, createFavoriteCardHTML, createPopupContent, showStatusBanner, radiusForZoom };
 }

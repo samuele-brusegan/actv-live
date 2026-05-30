@@ -1,7 +1,7 @@
 <?php
 /*
  * Copyright (c) 2025. Brusegan Samuele, Davanzo Andrea
- * Questo file fa parte di GradeCraft ed è rilasciato
+ * Questo file fa parte di actv-live ed è rilasciato
  * sotto la licenza MIT. Vedere il file LICENSE per i dettagli.
  */
 global $router;
@@ -19,11 +19,12 @@ $router->add('/live-map'                , 'Controller', 'liveMap');
 $router->add('/trip-details'            , 'Controller', 'tripDetails');
 $router->add('/widget'                  , 'Controller', 'widget');
 $router->add('/delay-stats'             , 'Controller', 'delayStats');
+$router->add('/admin/login'             , 'Controller', 'adminLogin');
+$router->add('/admin/logout'            , 'Controller', 'adminLogout');
 $router->add('/admin/logs'              , 'Controller', 'logs');
 $router->add('/admin/dashboard'         , 'Controller', 'adminDashboard');
 
 // === API ===
-$router->add('/api/addFavorite'         , 'ApiController', 'favorite');
 $router->add('/api/plan-route'          , 'ApiController', 'planRoute');
 $router->add('/api/stops'               , 'ApiController', 'stops');
 $router->add('/api/stop-lines'          , 'ApiController', 'stopLines');

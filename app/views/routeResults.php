@@ -46,6 +46,11 @@
 
             <!-- Routes List -->
             <div id="routes-container" style="display: none;">
+                <!-- Direction Tabs (solo viaggio di ritorno) -->
+                <div id="direction-tabs" class="direction-tabs" style="display: none;">
+                    <button class="direction-tab active" id="tab-andata" onclick="switchDirection('andata')">Andata</button>
+                    <button class="direction-tab" id="tab-ritorno" onclick="switchDirection('ritorno')">Ritorno</button>
+                </div>
                 <div class="section-title-row">
                     <div class="section-title">percorsi disponibili</div>
                     <button class="btn-compare-toggle" id="btn-compare-toggle" onclick="toggleCompareMode()">Confronta</button>

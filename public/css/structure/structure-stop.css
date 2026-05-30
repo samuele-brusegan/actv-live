@@ -4,13 +4,6 @@
     position: relative;
 }
 
-.favorite-button {
-    position: absolute;
-    top: var(--spacing-lg);
-    right: var(--spacing-md);
-    padding: 0;
-}
-
 .passage-card {
     padding: var(--spacing-sm);
     margin: var(--spacing-xs) 0;

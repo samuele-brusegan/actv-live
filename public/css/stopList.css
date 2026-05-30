@@ -122,3 +122,69 @@ body {
     color: var(--color-text-gray);
     font-family: var(--font-primary);
 }
+
+/* Tabs vista (Elenco / Per zona) */
+.list-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 0 var(--spacing-md);
+    margin: var(--spacing-sm) 0;
+}
+.list-tab {
+    flex: 1;
+    border: none;
+    background: var(--color-white);
+    color: var(--color-text-gray);
+    font-family: var(--font-primary);
+    font-weight: 600;
+    font-size: 15px;
+    padding: 10px 0;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    box-shadow: var(--shadow-card-alt);
+}
+.list-tab.active {
+    background: var(--color-primary-green);
+    color: var(--color-white);
+}
+
+/* Vista a zone */
+.zone-row, .zone-back {
+    border: none;
+    font-family: var(--font-primary);
+    cursor: pointer;
+    text-align: left;
+    width: calc(100% - 2 * var(--spacing-md));
+    box-sizing: border-box;
+}
+.zone-name {
+    font-family: var(--font-secondary);
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--color-black);
+}
+.zone-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.zone-count {
+    background: var(--color-primary-blue);
+    color: var(--color-white);
+    border-radius: 12px;
+    padding: 2px 10px;
+    font-size: 13px;
+    font-weight: 700;
+}
+.zone-row .chevron {
+    font-size: 20px;
+    color: #ccc;
+}
+.zone-back {
+    color: var(--color-primary-green);
+    font-weight: 600;
+    font-size: 16px;
+}
+.zone-back .chevron-back {
+    font-size: 22px;
+}

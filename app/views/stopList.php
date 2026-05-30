@@ -25,10 +25,16 @@
         <!-- Contenuto Principale -->
         <div class="main-content pb-5">
             
-            <div class="search-container">
+            <div class="list-tabs">
+                <button type="button" class="list-tab active" id="tab-list" onclick="showListView()">Elenco</button>
+                <button type="button" class="list-tab" id="tab-zones" onclick="showZonesView()">Per zona</button>
+            </div>
+
+            <div class="search-container" id="search-container">
                 <input type="text" id="search-input" class="search-input" placeholder="Cerca stazione..." onkeyup="filterStations()">
             </div>
 
+            <div id="list-view">
             <div class="section-title">Elenco Stazioni</div>
             
             <div id="stations-list">
@@ -130,6 +136,9 @@
                     <?php endforeach; ?>
                 <?php endif; ?>
             </div>
+            </div><!-- /#list-view -->
+
+            <div id="zones-view" style="display:none;"></div>
 
         </div>
 
@@ -150,7 +159,7 @@
                 }
             }
             async function getStopsFromGTFS() {
-                if (document.querySelectorAll('.stations-item').length != 0) return;
+                if (document.querySelectorAll('.station-item').length != 0) return;
 
                 try {
                     let res = await fetch('/api/gtfs-stops?return=true');
@@ -197,7 +206,97 @@
                     });
                     stationsList.appendChild(card);
                 });
+                if (currentView === 'zones') renderZonesIndex();
             }
+            // ===== Vista alternativa: navigazione per zone =====
+            let currentView = 'list';
+            let zonesIndex = null;
+
+            function showListView() {
+                currentView = 'list';
+                document.getElementById('list-view').style.display = '';
+                document.getElementById('zones-view').style.display = 'none';
+                const sc = document.getElementById('search-container'); if (sc) sc.style.display = '';
+                document.getElementById('tab-list').classList.add('active');
+                document.getElementById('tab-zones').classList.remove('active');
+            }
+
+            function showZonesView() {
+                currentView = 'zones';
+                document.getElementById('list-view').style.display = 'none';
+                const sc = document.getElementById('search-container'); if (sc) sc.style.display = 'none';
+                document.getElementById('zones-view').style.display = '';
+                document.getElementById('tab-zones').classList.add('active');
+                document.getElementById('tab-list').classList.remove('active');
+                renderZonesIndex();
+            }
+
+            function buildZonesIndex() {
+                const cards = Array.from(document.querySelectorAll('#stations-list .station-item'));
+                const map = {};
+                const seen = new Set();
+                cards.forEach(card => {
+                    const nameEl = card.querySelector('.stop-name');
+                    const name = (nameEl ? nameEl.textContent : (card.getAttribute('data-name') || '')).trim();
+                    if (!name) return;
+                    const dedupeKey = name.toUpperCase();
+                    if (seen.has(dedupeKey)) return;
+                    seen.add(dedupeKey);
+                    const firstWord = name.split(/\s+/)[0];
+                    const key = firstWord.toUpperCase();
+                    if (!map[key]) map[key] = { label: firstWord, cards: [] };
+                    map[key].cards.push(card);
+                });
+                zonesIndex = map;
+            }
+
+            function renderZonesIndex() {
+                const container = document.getElementById('zones-view');
+                if (!container) return;
+                buildZonesIndex();
+                const keys = Object.keys(zonesIndex).sort((a, b) => a.localeCompare(b, 'it'));
+                if (keys.length === 0) { container.innerHTML = "<p class='no-results'>Nessuna zona disponibile.</p>"; return; }
+                container.innerHTML = '<div class="section-title">Zone</div>' + keys.map(k => {
+                    const z = zonesIndex[k];
+                    const safe = k.replace(/"/g, '&quot;');
+                    return '<button type="button" class="zone-row stop-card" data-zone="' + safe + '">' +
+                           '<span class="zone-name">' + z.label + '</span>' +
+                           '<span class="zone-meta"><span class="zone-count">' + z.cards.length + '</span><span class="chevron">&rsaquo;</span></span>' +
+                           '</button>';
+                }).join('');
+                container.querySelectorAll('.zone-row').forEach(btn => {
+                    btn.addEventListener('click', () => openZone(btn.getAttribute('data-zone')));
+                });
+                // Ripristina il focus per la navigazione da tastiera
+                const firstZone = container.querySelector('.zone-row');
+                if (firstZone) firstZone.focus();
+            }
+
+            function openZone(key) {
+                const container = document.getElementById('zones-view');
+                if (!container || !zonesIndex || !zonesIndex[key]) return;
+                const z = zonesIndex[key];
+                container.innerHTML =
+                    '<button type="button" class="zone-back stop-card" onclick="renderZonesIndex()"><span><span class="chevron-back">&lsaquo;</span> Tutte le zone</span></button>' +
+                    '<div class="section-title">' + z.label + '</div><div id="zone-stations"></div>';
+                const list = document.getElementById('zone-stations');
+                z.cards.forEach(card => {
+                    const clone = card.cloneNode(true);
+                    if (clone.tagName !== 'A') {
+                        const ids = clone.getAttribute('data-all-ids');
+                        const nm = (clone.querySelector('.stop-name')?.textContent || '').trim();
+                        clone.style.cursor = 'pointer';
+                        clone.addEventListener('click', () => {
+                            try { window.location.href = '/aut/stops/stop?id=' + JSON.parse(ids).join('-') + '&name=' + encodeURIComponent(nm); } catch (e) {}
+                        });
+                    }
+                    list.appendChild(clone);
+                });
+                // Sposta il focus sul pulsante 'indietro' per continuare da tastiera
+                const backBtn = container.querySelector('.zone-back');
+                if (backBtn) backBtn.focus();
+            }
+
             document.addEventListener('DOMContentLoaded', getStopsFromGTFS);
         </script>
 

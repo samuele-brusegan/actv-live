@@ -246,6 +246,23 @@ body {
     z-index: 2;
 }
 
+/* Linea verticale continua che collega i cerchietti (parte dal centro del
+   marker e prosegue verso il basso, dietro al marker successivo). */
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 8px;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-primary-green);
+    z-index: 1;
+}
+
+.timeline-item:last-child::before {
+    display: none;
+}
+
 .timeline-marker {
     width: 16px;
     height: 16px;
@@ -255,6 +272,8 @@ body {
     background: var(--color-white);
     margin-right: 15px;
     flex-shrink: 0;
+    position: relative;
+    z-index: 2;
 }
 
 .timeline-marker.start {
@@ -659,4 +678,34 @@ body {
 .btn-select-compare:active {
     transform: scale(0.98);
     background: #008552;
+}
+
+/* Direction Tabs (Andata / Ritorno) */
+.direction-tabs {
+    display: flex;
+    gap: 8px;
+    background: var(--color-white);
+    padding: 6px;
+    border-radius: 14px;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.direction-tab {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--color-text-gray);
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    padding: 10px 0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.direction-tab.active {
+    background: var(--color-primary-green);
+    color: var(--color-white);
 }

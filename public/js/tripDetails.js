@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
 
     state.tripId = urlParams.get('tripId');
-    console.log(sessionStorage.getItem('tripDetails_url'));
 
 
     /* state.lineFull = urlParams.get('line');
@@ -59,7 +58,6 @@ async function init() {
     const lineId = sessionStorage.getItem('lineId');
 
     let initUnpackTripId = async () => {
-        console.log("Start Unpacking TripID");
 
         let data = await unpackTripId(state.tripId);
         state.line = data.bus_track;
@@ -67,17 +65,14 @@ async function init() {
         state.tag = data.line_tag;
         state.lineFull = state.line + "_" + state.tag;
 
-        console.log("Unpacked TripID");
 
         let loadingBox = document.querySelector('.loading-state');
         if (loadingBox) loadingBox.innerHTML += '<br>Info corsa caricate';
         updateHeader();
     }
     let initStopsGTFS = async () => {
-        console.log("Start Fetching GTFS Stops");
         state.stopsGTFS = await fetchGTFSStops(state.tripId);
 
-        console.log("Fetched GTFS Stops");
 
         let loadingBox = document.querySelector('.loading-state');
         if (loadingBox) loadingBox.innerHTML += '<br>Percorso caricato';
@@ -86,11 +81,9 @@ async function init() {
     await Promise.all([initUnpackTripId(), initStopsGTFS()]);
 
     let initStopsJSON = async () => {
-        console.log("Start Fetching Real Time Info");
         state.currentStopId = sessionStorage.getItem('tripDetails_selectedStop');
         state.stopsJSON = await fetchRealTimeInfo(state.currentStopId, state.line, state.today);
 
-        console.log("Fetched Real Time Info", "stopsJSON", state.stopsJSON);
 
         let loadingBox = document.querySelector('.loading-state');
         if (loadingBox) loadingBox.innerHTML += '<br>Fermate caricate';
@@ -99,7 +92,6 @@ async function init() {
 
     //set stopId from url
     state.currentStopId = sessionStorage.getItem('tripDetails_selectedStop');
-    console.log("State", state);
 
     // Destination e last stop non matchano lancio un warn in console
     if (state.destination != lastStop) {
@@ -150,7 +142,6 @@ async function unpackTripId(tripId) {
             console.warn("Errore fetchTripId:", data);
             // errorPopup(data.error);
         }
-        console.log(data);
 
         return data;
 
@@ -257,7 +248,6 @@ async function refreshData() {
         const selectedStopInGTFS = state.stopsGTFS.find(s =>
             state.currentStopId.split('-').includes(s.stop_id.toString())
         );
-        console.log("selectedStopInGTFS", selectedStopInGTFS);
 
         if (selectedStopInGTFS) {
             const rtStop = state.stopsJSON.find(s => s.stop === selectedStopInGTFS.stop_name);
@@ -342,7 +332,6 @@ async function fetchRealTimeInfo(currentStopId, line, today) {
             const tripLine = trip.line?.split('_')[0];
             return tripLine === line;
         });
-        console.log(plausibleTrips);
         const matchPromises = plausibleTrips.map(async trip => {
             const stop = trip.timingPoints[trip.timingPoints.length - 1];
             const tid = await fetchTripId(
@@ -358,7 +347,6 @@ async function fetchRealTimeInfo(currentStopId, line, today) {
         });
 
         const results = await Promise.all(matchPromises);
-        console.log("Fetched Real Time Info", "results", results);
         const interestingTrip = results.find(t => t.calculatedTripId == state.tripId);
         if (interestingTrip) return interestingTrip.timingPoints;
 
@@ -548,14 +536,12 @@ async function getPreviousStopsRealTime_block() {
     // 4. Aspettiamo che TUTTE le fermate siano state elaborate
     await Promise.all(stopPromises);
 
-    console.log("Ho finito");
 
     // 5. Ora puoi renderizzare in sicurezza
     renderTimeline();
 }
 
 function getPreviousStopsRealTime() {
-    console.log("Previous Stop Matching");
 
     // Find the index of the current stop
     let currentStopIdSplitted = state.currentStopId.split("-");
@@ -609,7 +595,6 @@ function getPreviousStopsRealTime() {
 
                 // Se c'è il MATCH
                 if (tid == state.tripId) {
-                    console.log("Previous Stop Mached", stopName, tid, state.tripId, trip.time);
 
                     stop.arrival_time = trip.time;
                     stop.departure_time = trip.time;
@@ -637,7 +622,6 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl = null) {
     let stopEl;
     if (!domEl) {
         stopEl = document.querySelector(`.stop-item[data-stop-id="${stop.stop_id}"]`);
-        console.log(stop.stop_id);
 
     } else {
         stopEl = domEl;

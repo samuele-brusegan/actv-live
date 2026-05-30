@@ -18,7 +18,10 @@
     <nav class="navbar navbar-dark bg-dark">
         <div class="container-fluid">
             <span class="navbar-brand mb-0 h1">Log ed Eccezioni</span>
-            <a href="/" class="btn btn-outline-light btn-sm">Torna alla Home</a>
+            <div class="d-flex gap-2">
+                <a href="/" class="btn btn-outline-light btn-sm">Torna alla Home</a>
+                <a href="/admin/logout" class="btn btn-outline-warning btn-sm">Logout</a>
+            </div>
         </div>
     </nav>
 

@@ -53,3 +53,30 @@
     }
 }
 
+/* Bottoni di navigazione in fondo alla home (stile unificato) */
+.home-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 2rem 0 1.5rem;
+}
+
+.home-action-btn {
+    width: 100%;
+    margin: 4px 0;
+    background-color: var(--color-primary-blue);
+    border: 1px solid var(--color-primary-blue);
+    color: var(--color-white);
+    font-weight: 600;
+}
+
+.home-action-btn:hover,
+.home-action-btn:focus {
+    background-color: var(--color-primary-blue-dark);
+    border-color: var(--color-primary-blue-dark);
+    color: var(--color-white);
+}
+
+.home-action-btn:active {
+    transform: scale(0.99);
+}

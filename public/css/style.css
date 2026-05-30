@@ -267,6 +267,9 @@ body {
 .line-badge.badge-night {
     background: var(--color-night-blue);
 }
+.line-badge.badge-walking {
+    background: var(--color-text-gray, #6c757d);
+}
 
 .line-badge.large {
     font-size: 18px;

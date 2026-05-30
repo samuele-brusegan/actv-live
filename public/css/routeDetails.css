@@ -1,54 +1,110 @@
-/* Page specific overrides */
-.timeline-connector {
-    border-left: 3px solid var(--color-primary-green);
-    display: block;
+/* Route Details - timeline coerente con la pagina dei risultati */
+
+.details-card {
+    background: var(--color-white);
+    box-shadow: var(--shadow-card);
+    border-radius: var(--radius-lg);
 }
 
-.timeline-connector.dashed {
-    border-left-style: dashed;
-    border-color: var(--color-text-muted);
+.header-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
-
-
-
-
-
-
 
 .header-date {
     font-weight: 700;
     font-size: 18px;
 }
 
-/* Route Details Timeline Specifics */
-.timeline-icon {
-    z-index: 2;
-    background: var(--color-white);
+.header-time {
+    font-weight: 600;
+    color: var(--color-text-gray);
 }
 
-.icon-circle {
-    border-radius: var(--radius-round);
+/* Timeline */
+.route-timeline {
+    position: relative;
+    padding-left: 4px;
+}
+
+.timeline-item {
+    display: flex;
+    align-items: flex-start;
+    position: relative;
+    z-index: 2;
+}
+
+/* Linea verticale continua che collega i cerchietti */
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 8px;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-primary-green);
+    z-index: 1;
+}
+
+.timeline-item:last-child::before {
+    display: none;
+}
+
+.timeline-marker {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
     border: 3px solid var(--color-primary-green);
     background: var(--color-white);
+    margin-right: 15px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    position: relative;
+    z-index: 2;
 }
 
-.icon-walk {
-    font-size: 20px;
+.timeline-marker.start {
+    border-color: var(--color-primary-blue);
+}
+
+.timeline-marker.transfer {
+    border-color: var(--color-orange);
+}
+
+.timeline-marker.end {
+    border-color: var(--color-primary-green);
+}
+
+.timeline-content {
+    padding-bottom: 0;
+}
+
+.stop-name {
+    font-weight: 700;
+    font-size: 16px;
     color: var(--color-black);
 }
 
-.icon-location {
-    border-radius: var(--radius-round);
-    border: 2px solid var(--color-primary-green);
-    color: var(--color-primary-green);
-    font-size: 12px;
-    font-weight: bold;
+.stop-time {
+    font-size: 14px;
+    color: var(--color-text-gray);
 }
 
-.details-card {
-    background: var(--color-white);
-    box-shadow: var(--shadow-card);
-    border-radius: var(--radius-lg);
+.timeline-connector {
+    margin-left: 7px;
+    border-left: 2px solid var(--color-primary-green);
+    padding-left: 22px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.connector-info {
+    font-size: 13px;
+    color: var(--color-text-gray);
 }
 
 .btn-map {
@@ -61,4 +117,87 @@
     font-size: 18px;
     cursor: pointer;
     box-shadow: 0 4px 10px rgba(1, 82, 187, 0.3);
+}
+
+/* Pannello "parti da qui" */
+.leave-info {
+    background: var(--color-white);
+    box-shadow: var(--shadow-card);
+    border-radius: var(--radius-lg);
+    border-left: 5px solid var(--color-primary-blue);
+    padding: 14px 16px;
+    margin-bottom: var(--spacing-md);
+}
+
+.leave-info-title {
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-gray);
+    margin-bottom: 8px;
+}
+
+.leave-info-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 15px;
+    color: var(--color-black);
+    margin: 4px 0;
+}
+
+.leave-info-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+/* Modale mappa */
+.map-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+}
+
+.map-modal-overlay.active {
+    display: flex;
+}
+
+.map-modal-content {
+    background: var(--color-white);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 600px;
+    height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.map-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    font-weight: 700;
+    border-bottom: 1px solid #eee;
+}
+
+.map-modal-close {
+    background: none;
+    border: none;
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--color-text-gray);
+}
+
+#route-map {
+    flex: 1;
+    width: 100%;
 }

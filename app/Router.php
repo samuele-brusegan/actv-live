@@ -1,7 +1,7 @@
 <?php
 /*
  * Copyright (c) 2025. Brusegan Samuele, Davanzo Andrea
- * Questo file fa parte di GradeCraft ed è rilasciato
+ * Questo file fa parte di actv-live ed è rilasciato
  * sotto la licenza MIT. Vedere il file LICENSE per i dettagli.
  */
 
@@ -39,9 +39,6 @@ class Router {
             header("HTTP/1.0 404 Not Found");
             echo "<pre>";
             echo "Pagina non trovata!";
-            echo $path; echo "<br>";
-            echo $url; echo "<br>";
-            echo PHP_URL_PATH; echo "<br>";
             echo "</pre>";
             
         }

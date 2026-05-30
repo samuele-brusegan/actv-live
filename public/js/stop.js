@@ -78,8 +78,9 @@ function updateFavoriteButton() {
  * Recupero Dati API
  */
 
-/** Recupera i passaggi in tempo reale dal backend ACTV */
-async function fetchPassages() {
+/** Recupera i passaggi in tempo reale dal backend ACTV.
+ *  Ritorna un array (anche vuoto) oppure null in caso di errore di rete. */
+async function fetchRealtimePassages() {
     if (!stationId) return [];
 
     try {
@@ -95,27 +96,61 @@ async function fetchPassages() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
-        return data || [];
+        return Array.isArray(data) ? data : [];
     } catch (error) {
-        console.warn("Errore fetch passaggi:", error);
-        try {
-            
-            const response = await fetch(`/api/gtfs-passages?stop=${stationId}&return=true`, {
-                cache: 'no-cache',
-            });
-
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-            const data = await response.json();
-
-            //todo:correct format
-
-            return data || [];
-        } catch (error) {
-            console.warn("Errore fetch passaggi:", error);
-        }
+        console.warn("Errore fetch passaggi real-time:", error);
         return null;
     }
+}
+
+/** Recupera i passaggi PREVISTI (orari GTFS dal DB). Ritorna sempre un array. */
+async function fetchScheduledPassages() {
+    if (!stationId) return [];
+
+    try {
+        const response = await fetch(`/api/gtfs-passages?stop=${encodeURIComponent(stationId)}&return=true`, {
+            cache: 'no-cache',
+        });
+        if (!response.ok) return [];
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.warn("Errore fetch passaggi previsti:", error);
+        return [];
+    }
+}
+
+/** Chiave linea+destinazione per individuare i passaggi già coperti dal real-time */
+function lineDestKey(p) {
+    const line = (p.line || '').split('_')[0];
+    const dest = (p.destination || '').trim().toLowerCase();
+    return `${line}|${dest}`;
+}
+
+/** Unisce real-time e previsti: aggiunge i previsti per le combinazioni
+ *  linea+destinazione NON già presenti nel real-time (dati mancanti). */
+function mergePassages(realtime, scheduled) {
+    const result = Array.isArray(realtime) ? realtime.slice() : [];
+    const covered = new Set(result.map(lineDestKey));
+    const added = new Set();
+
+    (Array.isArray(scheduled) ? scheduled : []).forEach(p => {
+        const ld = lineDestKey(p);
+        if (covered.has(ld)) return; // già coperto dal real-time
+        const full = ld + '|' + (p.time || '');
+        if (added.has(full)) return; // evita duplicati tra i previsti
+        added.add(full);
+        result.push(p);
+    });
+
+    return result;
+}
+
+/** Sciopero/servizio non monitorato: real-time vuoto ma corse previste esistono. */
+function isLikelyStrike(realtime, scheduled) {
+    const rtEmpty = Array.isArray(realtime) && realtime.length === 0;
+    const schedHas = Array.isArray(scheduled) && scheduled.length > 0;
+    return rtEmpty && schedHas;
 }
 
 /** Recupera eventuali avvisi/comunicazioni per la fermata */
@@ -137,24 +172,53 @@ async function fetchNoticeboard() {
  * Rendering e UI
  */
 
-/** Carica e visualizza i passaggi */
+/** Carica e visualizza i passaggi (real-time + previsti uniti) e la bacheca */
 async function loadPassages() {
     if (!stationId) return;
 
-    const passages = await fetchPassages();
+    // Real-time + previsti + avvisi in parallelo
+    const [realtime, scheduled, noticeText] = await Promise.all([
+        fetchRealtimePassages(),
+        fetchScheduledPassages(),
+        fetchNoticeboard()
+    ]);
+
     const loadingEl = document.getElementById('loading');
     const listContainer = document.getElementById('passages-list');
 
     if (loadingEl) loadingEl.style.display = 'none';
+
+    const strike = isLikelyStrike(realtime, scheduled);
+
+    // ── Bacheca (avvisi + eventuale news sciopero) ──
+    const notes = [];
+    if (strike) {
+        notes.push({
+            type: 'strike',
+            html: '<strong>&#9888;&#65039; Possibile sciopero o servizio non monitorato.</strong><br>' +
+                  'I passaggi in tempo reale non sono disponibili: gli orari mostrati sono quelli <em>previsti</em> ' +
+                  'e i bus potrebbero non passare.'
+        });
+    }
+    if (noticeText) {
+        notes.push({ type: 'notice', html: noticeText });
+    }
+    renderBoard(notes);
+
     if (!listContainer) return;
 
-    if (passages === null) {
+    // Errore di rete reale (real-time null) e nessun dato previsto
+    if (realtime === null && (!scheduled || scheduled.length === 0)) {
         listContainer.innerHTML = "<p class='text-center text-danger'>Errore nel caricamento dei dati.</p>";
         return;
     }
 
+    const passages = mergePassages(realtime, scheduled);
+
     if (passages.length === 0) {
-        const message = passages.message || "Nessun passaggio previsto.";
+        const message = strike
+            ? "Nessun passaggio in tempo reale (possibile sciopero). Vedi la bacheca."
+            : "Nessun passaggio previsto.";
         listContainer.innerHTML = `<p class='text-center text-muted'>${message}</p>`;
         return;
     }
@@ -165,12 +229,87 @@ async function loadPassages() {
         listContainer.appendChild(card);
     });
 
-    // Registra ritardi nello storico
+    // Registra ritardi nello storico (solo i passaggi real-time: real:false vengono ignorati)
     if (typeof recordPassageDelays !== 'undefined') {
         recordPassageDelays(passages, stationId, stationName);
     }
 
     updateFilter();
+}
+
+/**
+ * Bacheca: avvisi della fermata + eventuale news sciopero.
+ * Collassabile in una bolla in basso a destra. Se non ci sono note, non
+ * compare né la bacheca né la bolla.
+ */
+function ensureBoardBubble() {
+    let bubble = document.getElementById('board-bubble');
+    if (!bubble) {
+        bubble = document.createElement('div');
+        bubble.id = 'board-bubble';
+        bubble.className = 'board-bubble';
+        bubble.style.display = 'none';
+        bubble.setAttribute('title', 'Apri bacheca');
+        bubble.onclick = expandBoard;
+        bubble.innerHTML = '<span class="board-bubble-icon">&#128203;</span><span class="board-bubble-count"></span>';
+        document.body.appendChild(bubble);
+    }
+    return bubble;
+}
+
+function renderBoard(notes) {
+    const container = document.getElementById('noticeboard');
+    const bubble = ensureBoardBubble();
+    if (!container) return;
+
+    if (!notes || notes.length === 0) {
+        container.innerHTML = '';
+        bubble.style.display = 'none';
+        return;
+    }
+
+    const notesHtml = notes.map(n =>
+        `<div class="board-note board-note-${n.type || 'notice'}">${n.html}</div>`
+    ).join('');
+
+    container.innerHTML = `
+        <div class="board-card" id="board-card">
+            <div class="board-header">
+                <span class="board-title">&#128203; Bacheca</span>
+                <button class="board-collapse" onclick="collapseBoard()" title="Riduci">&minus;</button>
+            </div>
+            <div class="board-body">${notesHtml}</div>
+        </div>`;
+
+    const countEl = bubble.querySelector('.board-bubble-count');
+    if (countEl) countEl.textContent = notes.length;
+
+    // Rispetta lo stato collassato scelto dall'utente (persiste tra i refresh)
+    const collapsed = sessionStorage.getItem('board_collapsed') === '1';
+    const card = document.getElementById('board-card');
+    if (collapsed) {
+        if (card) card.style.display = 'none';
+        bubble.style.display = 'flex';
+    } else {
+        if (card) card.style.display = '';
+        bubble.style.display = 'none';
+    }
+}
+
+function collapseBoard() {
+    sessionStorage.setItem('board_collapsed', '1');
+    const card = document.getElementById('board-card');
+    const bubble = ensureBoardBubble();
+    if (card) card.style.display = 'none';
+    bubble.style.display = 'flex';
+}
+
+function expandBoard() {
+    sessionStorage.setItem('board_collapsed', '0');
+    const card = document.getElementById('board-card');
+    const bubble = document.getElementById('board-bubble');
+    if (card) card.style.display = '';
+    if (bubble) bubble.style.display = 'none';
 }
 
 /** Crea l'elemento DOM per un singolo passaggio */
@@ -234,7 +373,6 @@ function createPassageCard(p) {
 
 
         const tripId = await fetchTripId(lineName, destination, day, timingPoint.time, timingPoint.stop, lineId);
-        console.log(tripId);
 
         const params = new URLSearchParams({
             /* line: `${lineName}_${lineTag}`,
@@ -539,5 +677,5 @@ window.onload = init;
 
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { getFavorites, isFavorite, toggleFavorite, updateFavoriteButton, createPassageCard, updateNotifyButton, switchTab, renderStopLines };
+    module.exports = { getFavorites, isFavorite, toggleFavorite, updateFavoriteButton, createPassageCard, updateNotifyButton, switchTab, renderStopLines, mergePassages, isLikelyStrike, lineDestKey };
 }

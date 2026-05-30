@@ -27,14 +27,14 @@
             <div class="header-title" id="station-name">Caricamento...</div>
             <div class="header-subtitle" id="station-id"></div>
             <div class="header-actions">
-                <button class="favorite-button" id="favorite-btn" onclick="toggleFavorite()" title="Aggiungi ai preferiti">
-                    ★
+                <button class="favorite-button" id="favorite-btn" onclick="toggleFavorite()" title="Aggiungi ai preferiti" aria-label="Aggiungi ai preferiti">
+                    <?= getIcon('star', 24) ?>
                 </button>
-                <button class="notify-button" id="notify-btn" onclick="toggleStopNotifications()" title="Notifiche ritardi">
-                    &#128276;
+                <button class="notify-button" id="notify-btn" onclick="toggleStopNotifications()" title="Attiva notifiche ritardi" aria-label="Attiva notifiche ritardi">
+                    <?= getIcon('notifications', 24) ?>
                 </button>
-                <button class="share-button" id="share-btn" onclick="shareWidget()" title="Condividi widget">
-                    &#x1F517;
+                <button class="share-button" id="share-btn" onclick="shareWidget()" title="Condividi questa fermata" aria-label="Condividi questa fermata">
+                    <?= getIcon('share', 24) ?>
                 </button>
             </div>
         </div>
@@ -65,9 +65,10 @@
         <!-- Contenuto Principale -->
         <div class="main-content pb-5">
 
-            <div class="section-title">Prossimi Passaggi</div>
-
+            <!-- Bacheca avvisi (popolata via JS, nascosta se vuota) -->
             <div id="noticeboard"></div>
+
+            <div class="section-title">Prossimi Passaggi</div>
 
             <div id="loading">Caricamento passaggi...</div>
 

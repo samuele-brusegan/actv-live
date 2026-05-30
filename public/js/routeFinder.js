@@ -10,8 +10,14 @@ const searchState = {
     selectedDate: new Date(),
     selectedHour: new Date().getHours(),
     selectedMinute: Math.floor(new Date().getMinutes() / 5) * 5,
-    optimize: 'time' // 'time' | 'transfers' | 'walking'
+    optimize: 'time', // 'time' | 'transfers' | 'walking'
+    returnTrip: false,
+    returnHour: (new Date().getHours() + 1) % 24,
+    returnMinute: Math.floor(new Date().getMinutes() / 5) * 5
 };
+
+// Quale orario sta modificando il time-picker: 'departure' | 'return'
+let timeModalTarget = 'departure';
 
 /**
  * Gestione Modali (Data e Ora)
@@ -31,7 +37,8 @@ function confirmDate() {
     closeDateModal();
 }
 
-function openTimeModal() {
+function openTimeModal(target = 'departure') {
+    timeModalTarget = target;
     document.getElementById('time-modal').style.display = 'flex';
     renderTimePicker();
 }
@@ -41,6 +48,10 @@ function closeTimeModal() {
 }
 
 function confirmTime() {
+    // Salva il valore attualmente centrato nelle ruote (utile se l'utente
+    // conferma prima che lo scroll si sia stabilizzato)
+    commitWheelValue(document.getElementById('hour-wheel'));
+    commitWheelValue(document.getElementById('minute-wheel'));
     updateDisplayDateTime();
     closeTimeModal();
 }
@@ -54,6 +65,13 @@ function updateDisplayDateTime() {
 
     if (dateEl) dateEl.textContent = searchState.selectedDate.toLocaleDateString('it-IT');
     if (timeEl) timeEl.textContent = `${h}:${m}`;
+
+    const returnEl = document.getElementById('display-return-time');
+    if (returnEl) {
+        const rh = searchState.returnHour.toString().padStart(2, '0');
+        const rm = searchState.returnMinute.toString().padStart(2, '0');
+        returnEl.textContent = `${rh}:${rm}`;
+    }
 }
 
 /**
@@ -113,53 +131,110 @@ function changeMonth(delta) {
  * Logica Time Picker
  */
 
+// Altezza di un singolo elemento della ruota (deve combaciare con .time-item in CSS)
+const ITEM_HEIGHT = 40;
+// La lista viene ripetuta più volte per simulare lo scorrimento "a riporto"
+// (es. minuti: ... 50 -> 55 -> 00 -> 05 ...). Si resta sempre nella copia centrale.
+const WHEEL_REPEATS = 9;
+const WHEEL_MIDDLE = 4; // Math.floor(WHEEL_REPEATS / 2)
+
+/** Restituisce step e chiave di stato per la ruota indicata */
+function wheelConfig(wheel) {
+    const isHour = wheel.id === 'hour-wheel';
+    const step = isHour ? 1 : 5;
+    const key = isHour
+        ? (timeModalTarget === 'return' ? 'returnHour' : 'selectedHour')
+        : (timeModalTarget === 'return' ? 'returnMinute' : 'selectedMinute');
+    return { step, key };
+}
+
 function renderTimePicker() {
     const hWheel = document.getElementById('hour-wheel');
     const mWheel = document.getElementById('minute-wheel');
     if (!hWheel || !mWheel) return;
 
-    hWheel.innerHTML = '';
-    mWheel.innerHTML = '';
+    buildWheel(hWheel, 24, 1);   // Ore 00-23
+    buildWheel(mWheel, 60, 5);   // Minuti 00-55 (intervalli di 5m)
 
-    // Ore (00-23)
-    for (let i = 0; i < 24; i++) {
-        const el = createTimeItem(i.toString().padStart(2, '0'), i === searchState.selectedHour, () => {
-            searchState.selectedHour = i;
-            renderTimePicker();
-        });
-        hWheel.appendChild(el);
-    }
-
-    // Minuti (intervalli di 5m)
-    for (let i = 0; i < 60; i += 5) {
-        const el = createTimeItem(i.toString().padStart(2, '0'), i === searchState.selectedMinute, () => {
-            searchState.selectedMinute = i;
-            renderTimePicker();
-        });
-        mWheel.appendChild(el);
-    }
-
-    // Scroll automatico alla posizione corretta
     scrollToSelectedTime();
 }
 
-function createTimeItem(text, isActive, onClick) {
-    const el = document.createElement('div');
-    el.className = `time-item ${isActive ? 'active' : ''}`;
-    el.textContent = text;
-    el.onclick = onClick;
-    return el;
+function buildWheel(wheel, count, step) {
+    wheel.innerHTML = '';
+    const valuesCount = count / step;
+    wheel.dataset.valuesCount = valuesCount;
+    wheel.dataset.step = step;
+
+    // Ripetiamo la lista WHEEL_REPEATS volte per ottenere lo scorrimento circolare
+    for (let c = 0; c < WHEEL_REPEATS; c++) {
+        for (let i = 0; i < valuesCount; i++) {
+            const value = i * step;
+            const domIndex = c * valuesCount + i;
+            const el = document.createElement('div');
+            el.className = 'time-item';
+            el.dataset.value = value;
+            el.textContent = value.toString().padStart(2, '0');
+            // Il tap su un valore lo porta al centro (lo scroll aggiorna lo stato)
+            el.addEventListener('click', () => {
+                wheel.scrollTo({ top: domIndex * ITEM_HEIGHT, behavior: 'smooth' });
+            });
+            wheel.appendChild(el);
+        }
+    }
+    updateActiveItem(wheel);
+}
+
+/** Evidenzia l'elemento attualmente al centro della ruota */
+function updateActiveItem(wheel) {
+    if (!wheel) return;
+    const index = Math.round(wheel.scrollTop / ITEM_HEIGHT);
+    wheel.querySelectorAll('.time-item').forEach((el, idx) => {
+        el.classList.toggle('active', idx === index);
+    });
+}
+
+/** Legge il valore centrato nella ruota e lo salva nello stato (con riporto) */
+function commitWheelValue(wheel) {
+    if (!wheel) return;
+    const { step, key } = wheelConfig(wheel);
+    const valuesCount = parseInt(wheel.dataset.valuesCount, 10) || 1;
+    const domIndex = Math.round(wheel.scrollTop / ITEM_HEIGHT);
+    const valueIndex = ((domIndex % valuesCount) + valuesCount) % valuesCount;
+    searchState[key] = valueIndex * step;
+}
+
+/** Riporta lo scroll nella copia centrale mantenendo il valore (loop infinito). */
+function recenterWheel(wheel) {
+    if (!wheel) return;
+    const valuesCount = parseInt(wheel.dataset.valuesCount, 10) || 1;
+    const domIndex = Math.round(wheel.scrollTop / ITEM_HEIGHT);
+    const valueIndex = ((domIndex % valuesCount) + valuesCount) % valuesCount;
+    const target = (WHEEL_MIDDLE * valuesCount + valueIndex) * ITEM_HEIGHT;
+    if (Math.abs(target - wheel.scrollTop) > 1) {
+        wheel.scrollTop = target; // reposizionamento istantaneo e invisibile
+        updateActiveItem(wheel);
+    }
 }
 
 function scrollToSelectedTime() {
     const hWheel = document.getElementById('hour-wheel');
     const mWheel = document.getElementById('minute-wheel');
-    const itemHeight = 40;
+
+    const hour = timeModalTarget === 'return' ? searchState.returnHour : searchState.selectedHour;
+    const minute = timeModalTarget === 'return' ? searchState.returnMinute : searchState.selectedMinute;
 
     setTimeout(() => {
-        if (hWheel) hWheel.scrollTop = (searchState.selectedHour * itemHeight) - (hWheel.clientHeight / 2) + (itemHeight / 2);
-        if (mWheel) mWheel.scrollTop = (searchState.selectedMinute / 5 * itemHeight) - (mWheel.clientHeight / 2) + (itemHeight / 2);
-    }, 10);
+        if (hWheel) {
+            const vc = parseInt(hWheel.dataset.valuesCount, 10) || 24;
+            hWheel.scrollTop = (WHEEL_MIDDLE * vc + hour) * ITEM_HEIGHT;
+            updateActiveItem(hWheel);
+        }
+        if (mWheel) {
+            const vc = parseInt(mWheel.dataset.valuesCount, 10) || 12;
+            mWheel.scrollTop = (WHEEL_MIDDLE * vc + (minute / 5)) * ITEM_HEIGHT;
+            updateActiveItem(mWheel);
+        }
+    }, 50);
 }
 
 /**
@@ -242,6 +317,10 @@ function updateOptimizeUI() {
     });
 }
 
+function returnTimeString() {
+    return `${searchState.returnHour.toString().padStart(2, '0')}:${searchState.returnMinute.toString().padStart(2, '0')}`;
+}
+
 function persistState() {
     if (searchState.origin) localStorage.setItem('route_origin', JSON.stringify(searchState.origin));
     else localStorage.removeItem('route_origin');
@@ -250,6 +329,8 @@ function persistState() {
     else localStorage.removeItem('route_destination');
 
     localStorage.setItem('route_optimize', searchState.optimize);
+    localStorage.setItem('route_return_trip', searchState.returnTrip ? '1' : '0');
+    localStorage.setItem('route_return_time', returnTimeString());
 }
 
 /** Avvia la ricerca percorsi */
@@ -265,16 +346,20 @@ function searchRoutes() {
     localStorage.setItem('route_departure_date', dateStr);
     localStorage.setItem('route_departure_time', timeStr);
     localStorage.setItem('route_optimize', searchState.optimize);
+    localStorage.setItem('route_return_trip', searchState.returnTrip ? '1' : '0');
+    localStorage.setItem('route_return_time', returnTimeString());
 
     window.location.href = '/route-results';
 }
 
 function toggleReturn() {
-    // Funzionalità per il viaggio di ritorno (non ancora implementata)
-    setTimeout(() => {
-        const toggle = document.getElementById('return-toggle');
-        if (toggle) toggle.checked = false;
-    }, 400);
+    const toggle = document.getElementById('return-toggle');
+    searchState.returnTrip = toggle ? toggle.checked : false;
+
+    const section = document.getElementById('return-section');
+    if (section) section.style.display = searchState.returnTrip ? 'block' : 'none';
+
+    persistState();
 }
 
 // Inizializzazione al caricamento
@@ -290,9 +375,26 @@ window.addEventListener('DOMContentLoaded', () => {
         searchState.optimize = savedOptimize;
     }
 
+    // Ripristina stato "ritorno"
+    if (localStorage.getItem('route_return_trip') === '1') {
+        searchState.returnTrip = true;
+    }
+    const savedReturnTime = localStorage.getItem('route_return_time');
+    if (savedReturnTime && /^\d{2}:\d{2}$/.test(savedReturnTime)) {
+        const [rh, rm] = savedReturnTime.split(':').map(Number);
+        searchState.returnHour = rh;
+        searchState.returnMinute = rm;
+    }
+
     updateUI();
     updateDisplayDateTime();
     updateOptimizeUI();
+
+    // Sincronizza UI del toggle ritorno
+    const returnToggle = document.getElementById('return-toggle');
+    if (returnToggle) returnToggle.checked = searchState.returnTrip;
+    const returnSection = document.getElementById('return-section');
+    if (returnSection) returnSection.style.display = searchState.returnTrip ? 'block' : 'none';
 
     // Optimization pills
     document.querySelectorAll('.optimize-pill').forEach(btn => {
@@ -305,9 +407,35 @@ window.addEventListener('DOMContentLoaded', () => {
 
     initPullToCancel('date-modal', closeDateModal);
     initPullToCancel('time-modal', closeTimeModal);
+
+    // Selezione dell'orario tramite scroll della ruota (aggiorna lo stato
+    // quando lo scroll si stabilizza, evidenziando l'elemento al centro)
+    ['hour-wheel', 'minute-wheel'].forEach(id => {
+        const wheel = document.getElementById(id);
+        if (!wheel) return;
+        let settleTimer = null;
+        wheel.addEventListener('scroll', () => {
+            updateActiveItem(wheel);
+            clearTimeout(settleTimer);
+            settleTimer = setTimeout(() => {
+                commitWheelValue(wheel);
+                recenterWheel(wheel);
+            }, 120);
+        });
+        // Su desktop un singolo scatto della rotellina copre più elementi:
+        // lo normalizziamo a un solo elemento per scatto.
+        wheel.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const dir = e.deltaY > 0 ? 1 : -1;
+            const maxIndex = wheel.children.length - 1;
+            const currentIndex = Math.round(wheel.scrollTop / ITEM_HEIGHT);
+            const targetIndex = Math.min(Math.max(currentIndex + dir, 0), maxIndex);
+            wheel.scrollTo({ top: targetIndex * ITEM_HEIGHT, behavior: 'smooth' });
+        }, { passive: false });
+    });
 });
 
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { searchState, swapStations, updateDisplayDateTime, searchRoutes, updateOptimizeUI };
+    module.exports = { searchState, swapStations, updateDisplayDateTime, searchRoutes, updateOptimizeUI, toggleReturn };
 }

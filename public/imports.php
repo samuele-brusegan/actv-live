@@ -7,4 +7,6 @@ require_once BASE_PATH . '/app/controllers/Controller.php';
 require_once BASE_PATH . '/app/controllers/ApiController.php';
 //Models
 require_once BASE_PATH . '/app/models/databaseConnector.php';
+//Services
+require_once BASE_PATH . '/app/services/AdminAuth.php';
 ?>

@@ -8,7 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // ── Constants ──────────────────────────────────────────────
     const REFRESH_INTERVAL = 30000;
-    const MAX_CONCURRENT = 10;
+    const MAX_CONCURRENT = 5;
+    const MAX_PLAUSIBLE_DELAY_SEC = 35 * 60; // oltre ~35 min il match è quasi certamente errato
     
     // ── DOM Elements ───────────────────────────────────────────
     const els = {
@@ -20,10 +21,16 @@ document.addEventListener('DOMContentLoaded', () => {
         linesStats: document.getElementById('lines-stats-container'),
         tableBody: document.getElementById('buses-table-body'),
         lastUpdate: document.getElementById('last-update'),
-        filterInput: document.getElementById('table-filter')
+        filterInput: document.getElementById('table-filter'),
+        progress: document.getElementById('dashboard-progress'),
+        progressFill: document.getElementById('dashboard-progress-fill'),
+        progressLabel: document.getElementById('dashboard-progress-label')
     };
 
     let allBusesData = []; // Store current cycle data for filtering
+    const recordedTrips = new Set(); // Evita di registrare più volte lo stesso viaggio
+    let isLoading = false;           // Evita cicli di aggiornamento sovrapposti
+    let firstLoad = true;            // La progress bar si mostra solo al primo ciclo
 
     // ── Helpers (Copied/Adapted from liveBusMap.js) ───────────
     
@@ -54,6 +61,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (rtStr.includes(":")) return timeToSec(rtStr + ":00");
         return null;
+    }
+
+    // Parsing JSON resiliente: ritorna null se il corpo è vuoto o non valido
+    async function safeJson(res) {
+        try {
+            const text = await res.text();
+            if (!text) return null;
+            return JSON.parse(text);
+        } catch (e) {
+            return null;
+        }
     }
 
     // Simplified version of interpolateWithShape for just finding next stop
@@ -117,7 +135,8 @@ document.addEventListener('DOMContentLoaded', () => {
              let url = `https://oraritemporeale.actv.it/aut/backend/passages/${stopId}-web-aut`;
              const res = await fetch(url);
              if (!res.ok) return null;
-             const data = await res.json();
+             const data = await safeJson(res);
+             if (!data) return null;
              stopCache.set(stopId, { ts: now, data });
              return findBestMatch(data, lineName, tripHeadsign, gtfsStopSec);
          } catch (e) {
@@ -138,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let bestMatch = null;
         let bestScore = -Infinity;
         const now = Date.now();
-        const MAX_TIME_DIFF = 3600;
+        const MAX_TIME_DIFF = 1800; // 30 min: oltre è quasi certamente un'altra corsa
 
         candidates.forEach(cand => {
             const candSec = parseRealTime(cand.time, now);
@@ -156,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (normCandDest === normGtfsDest) destScore = 1;
             else if (normGtfsDest.includes(normCandDest) || normCandDest.includes(normGtfsDest)) destScore = 0.8;
 
-            let totalScore = (timeScore >= 0) ? (timeScore * 0.7 + destScore * 0.3) : -1;
+            let totalScore = (timeScore >= 0) ? (timeScore * 0.6 + destScore * 0.4) : -1;
 
             if (totalScore > bestScore) {
                 bestScore = totalScore;
@@ -164,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        if (bestMatch && bestMatch.score >= 0.3) {
+        if (bestMatch && bestMatch.score >= 0.4) {
             return {
                 status: bestMatch.candidate.real ? 'REALTIME' : 'SCHEDULED_API_FLAG',
                 rtTime: bestMatch.candSec,
@@ -178,12 +197,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Main Logic ─────────────────────────────────────────────
 
     async function loadDashboard() {
+        if (isLoading) return; // un ciclo è già in corso: evita di sovraccaricare il server
+        isLoading = true;
         els.lastUpdate.textContent = 'Aggiornamento in corso...';
         
         try {
             // 1. Get Active Trips
             const res = await fetch('/api/gtfs-bnr');
-            const data = await res.json();
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await safeJson(res);
+            if (!data) throw new Error('Risposta vuota da /api/gtfs-bnr');
             const buses = data.buses || [];
             const nowSec = timeToSec(data.time);
 
@@ -194,12 +217,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 2. Fetch Details Concurrently
             let processedBuses = [];
+            let failedCount = 0;
             let tasks = buses.map(bus => async () => {
                 try {
                     // Fetch stops/shape
                     const posRes = await fetch(`/api/bus-position?tripId=${encodeURIComponent(bus.trip_id)}`);
                     if (!posRes.ok) return;
-                    const posData = await posRes.json();
+                    const posData = await safeJson(posRes);
+                    if (!posData || !posData.stops) return;
                     
                     // GTFS Position calculation
                     let pos = findNextStopWithDelay(posData.stops, nowSec);
@@ -218,11 +243,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         );
                         
                         if (fetched && fetched.rtTime) {
-                            delayInfo = fetched;
                             let diff = fetched.rtTime - gtfsStopSec;
                             if (diff > 43200) diff -= 86400;
                             else if (diff < -43200) diff += 86400;
-                            delayInfo.delaySec = diff;
+                            if (Math.abs(diff) > MAX_PLAUSIBLE_DELAY_SEC) {
+                                // Scarto improbabile: match poco affidabile -> trattato come senza dati real-time
+                                delayInfo = { status: 'SCHEDULED_NO_DATA', delaySec: 0 };
+                            } else {
+                                delayInfo = fetched;
+                                delayInfo.delaySec = diff;
+                            }
                             // Re-calculate pos with delay
                             // (Optional: simply update next stop time, but simpler to just keep next stop)
                         } else if (fetched) {
@@ -237,28 +267,55 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
 
                 } catch (e) {
-                    console.error("Error processing bus", bus.trip_id, e);
+                    // Errori di rete/API transitori: li contiamo soltanto, senza intasare la console
+                    failedCount++;
                 }
             });
 
+            // Progress bar solo al primo caricamento
+            const showProgress = firstLoad && els.progress;
+            if (showProgress) {
+                els.progress.style.display = 'block';
+                if (els.progressFill) els.progressFill.style.width = '0%';
+                if (els.progressLabel) els.progressLabel.textContent = `Caricamento bus 0/${buses.length}\u2026`;
+            }
+
             // Run pool
-            await parallelPool(tasks, MAX_CONCURRENT);
+            await parallelPool(tasks, MAX_CONCURRENT, showProgress ? (d, tot) => {
+                if (els.progressFill) els.progressFill.style.width = Math.round((d / tot) * 100) + '%';
+                if (els.progressLabel) els.progressLabel.textContent = `Caricamento bus ${d}/${tot}\u2026`;
+            } : null);
+
+            if (showProgress) els.progress.style.display = 'none';
+            firstLoad = false;
 
             allBusesData = processedBuses;
+            recordDashboardDelays(processedBuses);
             renderDashboard();
 
+            if (failedCount > 0) {
+                console.warn(`Dashboard: ${failedCount} bus non aggiornati (rete/API non disponibile).`);
+                els.lastUpdate.textContent += ` \u00B7 ${failedCount} non aggiornati`;
+            }
+
         } catch (e) {
-            console.error("Dashboard load error", e);
-            els.lastUpdate.textContent = 'Errore aggiornamento';
+            // Errore di rete/server (spesso transitorio): non azzeriamo i dati già mostrati
+            console.warn('Dashboard: aggiornamento non riuscito, riprovo al prossimo ciclo.', e && e.message ? e.message : e);
+            els.lastUpdate.textContent = 'Errore di rete, nuovo tentativo a breve\u2026';
+        } finally {
+            isLoading = false;
         }
     }
 
-    async function parallelPool(tasks, concurrency) {
+    async function parallelPool(tasks, concurrency, onProgress) {
         let idx = 0;
+        let done = 0;
         async function worker() {
             while (idx < tasks.length) {
                 const fn = tasks[idx++];
                 try { await fn(); } catch(e){}
+                done++;
+                if (onProgress) onProgress(done, tasks.length);
             }
         }
         const workers = Array(concurrency).fill(null).map(worker);
@@ -376,6 +433,29 @@ document.addEventListener('DOMContentLoaded', () => {
         els.lastUpdate.textContent = 'Aggiornato: ' + new Date().toLocaleTimeString();
     }
 
+
+    // ── Storico ritardi ────────────────────────────────────────
+    // Registra nello storico (localStorage) i ritardi reali osservati dalla
+    // dashboard, deduplicando per trip_id per evitare spam ad ogni refresh.
+    function recordDashboardDelays(buses) {
+        if (typeof recordDelay === 'undefined') return;
+        const now = Date.now();
+        buses.forEach(b => {
+            if (b.status !== 'REALTIME' || typeof b.delaySec !== 'number') return;
+            const delayMin = Math.round(b.delaySec / 60);
+            if (delayMin < 1) return; // solo ritardi effettivi (>= 1 min)
+            if (recordedTrips.has(b.trip_id)) return;
+            recordedTrips.add(b.trip_id);
+            recordDelay({
+                line: b.route_short_name || '',
+                destination: b.trip_headsign || '',
+                stop: b.nextStopId || '',
+                stopName: b.nextStop || '',
+                delay: delayMin,
+                timestamp: now
+            });
+        });
+    }
 
     // ── Init ───────────────────────────────────────────────────
     loadDashboard();

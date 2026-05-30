@@ -7,7 +7,7 @@
  */
 
 // Define BASE_PATH
-define('BASE_PATH', __DIR__);
+define('BASE_PATH', dirname(__DIR__));
 
 // Load GTFSParser
 require_once BASE_PATH . '/app/services/GTFSParser.php';

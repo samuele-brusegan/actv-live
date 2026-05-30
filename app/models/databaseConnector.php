@@ -38,6 +38,9 @@ class databaseConnector {
     }
 
     public function query(string $query, array $params = []): array {
+        if ($this->db === null) {
+            throw new RuntimeException("Database connection not established (connect() failed or was not called).");
+        }
         $stmt = $this->db->prepare($query);
         $stmt->execute($params);
         return $stmt->fetchAll();
@@ -49,20 +52,5 @@ class databaseConnector {
 
     public function getJoins(): string {
         return $this->tableJoins;
-    }
-
-    /**
-     * Checks if the query is a valid SQL query
-     * @param string $query
-     * @return bool True if the query is a valid SQL query, false otherwise
-     */
-    public function seamsValidSQL(string $query): bool {
-        $query = strtoupper(trim($query));
-        return (
-            str_starts_with($query, "SELECT") ||
-            str_starts_with($query, "UPDATE") ||
-            str_starts_with($query, "DELETE") ||
-            str_starts_with($query, "INSERT")
-        );
     }
 }

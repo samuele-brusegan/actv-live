@@ -28,12 +28,3 @@ if (php_sapi_name() === 'cli' || !headers_sent()) {
     set_exception_handler(['Logger', 'exceptionHandler']);
 }
 
-// Helper to check session (only for web)
-function checkSessionExpirationCLI() {
-    if (php_sapi_name() !== 'cli' && session_status() === PHP_SESSION_NONE) {
-        session_start();
-        if (function_exists('checkSessionExpiration')) {
-            checkSessionExpiration();
-        }
-    }
-}

@@ -67,23 +67,15 @@
             </div>
 
             
-            <!-- Pulsante Lista Completa -->
-            <div class="text-center mt-4 mb-3">
-                <button class="btn btn-outline-primary rounded-pill px-4 py-2" onclick="window.location.href='/stopList'" style="width: 100%;">
+            <!-- Pulsanti di navigazione -->
+            <div class="home-actions">
+                <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/stopList'">
                     Vedi tutte le stazioni
                 </button>
-            </div>
-
-            <!-- Pulsante Trova Percorso -->
-            <div class="text-center mt-4 mb-3">
-                <button class="btn btn-primary rounded-pill px-4 py-2" onclick="window.location.href='/route-finder'">
-                    Trova percorso (Ancora in sviluppo!)
+                <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/route-finder'">
+                    Trova percorso
                 </button>
-            </div>
-
-            <!-- Pulsante Storico Ritardi -->
-            <div class="text-center mt-4 mb-3">
-                <button class="btn btn-outline-secondary rounded-pill px-4 py-2" onclick="window.location.href='/delay-stats'" style="width: 100%;">
+                <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/delay-stats'">
                     Storico ritardi e statistiche
                 </button>
             </div>
