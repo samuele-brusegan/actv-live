@@ -10,13 +10,13 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         $lineId = $_GET['lineId']; //29387
         $limit = $_GET['limit'] ?? 1; */
 
-        $time = $_GET['time'] ?? null; //07:07
-        $busTrack = $_GET['busTrack'] ?? null; //21
-        $busDirection = $_GET['busDirection'] ?? null; //Camporese Gritti
-        $day = $_GET['day'] ?? null; //monday
-        $stop = $_GET['stop'] ?? null; //Martellago delle Motte
-        $lineId = $_GET['lineId'] ?? null; //29387
-        $stopId = $_GET['stopId'] ?? null; //337-web-aut
+        $time = $_GET['time'] ?? null;                  //07:07
+        $busTrack = $_GET['busTrack'] ?? null;          //21
+        $busDirection = $_GET['busDirection'] ?? null;  //Camporese Gritti
+        $day = $_GET['day'] ?? null;                    //monday
+        $stop = $_GET['stop'] ?? null;                  //Martellago delle Motte
+        $lineId = $_GET['lineId'] ?? null;              //29387
+        $stopId = $_GET['stopId'] ?? null;              //337-web-aut
         $limit = $_GET['limit'] ?? 1;
         
         $pdo = getPDOConnection();
