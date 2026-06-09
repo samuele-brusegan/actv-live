@@ -11,13 +11,13 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         $lineId = $_GET['lineId']; //29387
         $limit = $_GET['limit'] ?? 1; */
 
-        $time = $_GET['time'] ?? null; //07:07
-        $busTrack = $_GET['busTrack'] ?? null; //21
-        $busDirection = $_GET['busDirection'] ?? null; //Camporese Gritti
-        $day = $_GET['day'] ?? null; //monday
-        $stop = $_GET['stop'] ?? null; //Martellago delle Motte
-        $lineId = $_GET['lineId'] ?? null; //29387
-        $stopId = $_GET['stopId'] ?? null; //337-web-aut
+        $time = $_GET['time'] ?? null;                  //07:07
+        $busTrack = $_GET['busTrack'] ?? null;          //21
+        $busDirection = $_GET['busDirection'] ?? null;  //Camporese Gritti
+        $day = $_GET['day'] ?? null;                    //monday
+        $stop = $_GET['stop'] ?? null;                  //Martellago delle Motte
+        $lineId = $_GET['lineId'] ?? null;              //29387
+        $stopId = $_GET['stopId'] ?? null;              //337-web-aut
         $limit = $_GET['limit'] ?? 1;
         
         $pdo = getPDOConnection();
@@ -89,21 +89,28 @@ function getPDOConnection() {
     return $pdo;
 }
 
-function queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId = null) {
-    if ($stopId && $stopId !== 'null' && $stopId !== 'undefined') {
-        $stopQuery = "s.data_url LIKE CONCAT('%', ?, '%')";
+function queryBuilder($day, $hasStopId, $hasTime) {
+    // Match fermata: se abbiamo lo stopId ACTV facciamo un match esatto sul
+    // "token" dentro data_url (es. data_url "4824-4825-web-aut" -> token 4824,
+    // 4825) per evitare i falsi positivi del LIKE a sottostringa (337 ~ 1337).
+    if ($hasStopId) {
+        $stopQuery = "CONCAT('-', s.data_url, '-') LIKE CONCAT('%-', ?, '-%')";
     } else {
         $stopQuery = "s.stop_name LIKE CONCAT('%', ?, '%')";
     }
 
-    $q = "SELECT t.*, st.arrival_time, st.departure_time, r.route_short_name,
-            -- Calcoliamo la differenza circolare in secondi (distanza minima su 24h)
-            SEC_TO_TIME(
-                LEAST(
-                    ABS((TIME_TO_SEC(st.arrival_time) % 86400) - (TIME_TO_SEC(?) % 86400)),
-                    86400 - ABS((TIME_TO_SEC(st.arrival_time) % 86400) - (TIME_TO_SEC(?) % 86400))
-                )
-            ) AS delay
+    // Pre-ordinamento solo per restringere il set: lo scoring definitivo
+    // (similarità destinazione + prossimità temporale) è calcolato in PHP.
+    if ($hasTime) {
+        $order = "ORDER BY LEAST(
+                ABS((TIME_TO_SEC(st.arrival_time) % 86400) - (TIME_TO_SEC(?) % 86400)),
+                86400 - ABS((TIME_TO_SEC(st.arrival_time) % 86400) - (TIME_TO_SEC(?) % 86400))
+            ) ASC";
+    } else {
+        $order = "ORDER BY st.arrival_time ASC";
+    }
+
+    $q = "SELECT t.*, st.arrival_time, st.departure_time, r.route_short_name
         FROM trips t
         JOIN routes r ON t.route_id = r.route_id
         JOIN stop_times st ON t.trip_id = st.trip_id
@@ -114,8 +121,8 @@ function queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop, $st
             AND $stopQuery
             AND c.{$day} = 1
             AND st.pickup_type IN (0, 1)
-        ORDER BY TIME_TO_SEC(delay) ASC
-        LIMIT 30";
+        $order
+        LIMIT 60";
     return $q;
 }
 
@@ -163,31 +170,62 @@ function get_actv_match_score($search, $target) {
     return $matches / count($tokensSearch);
 }
 
-function addSimilarityScores(array &$trips, string $busDirection) {
-    foreach ($trips as $i => $trip) {
-        $overlap = get_actv_match_score($busDirection, $trip['trip_headsign']);
-        $jaro = jaro_winkler(strtolower($busDirection), strtolower($trip['trip_headsign']));
-
-        // Il punteggio principale è l'overlap (0-1)
-        // Aggiungiamo il 10% del Jaro-Winkler per ordinare i risultati simili
-        $trips[$i]['match_score'] = $overlap + ($jaro * 0.1);
-    }
-
-    // Ordina per il nuovo match_score
-    usort($trips, function ($a, $b) {
-        return $b['match_score'] <=> $a['match_score'];
-    });
+// Converte un orario "HH:MM[:SS]" (anche GTFS 25:30:00) in secondi nel giorno.
+function timeStrToSec($t) {
+    if ($t === null || $t === '') return null;
+    $p = explode(':', $t);
+    if (count($p) < 2) return null;
+    $sec = ((int)$p[0]) * 3600 + ((int)$p[1]) * 60 + (isset($p[2]) ? (int)$p[2] : 0);
+    return $sec % 86400; // normalizza 24:xx / 25:xx a 00:xx
 }
 
-function addSimilarityScores_jaro(array &$trips, string $busDirection) {
-    //Per ogni trip, calcola la distanza di jaro_winkler tra busDirection e trip_headsign
+// Ritardo con segno (positivo = in ritardo, negativo = in anticipo) sul cerchio 24h.
+function signedDelaySec($realSec, $schedSec) {
+    if ($realSec === null || $schedSec === null) return null;
+    $d = $realSec - $schedSec;
+    if ($d > 43200)  $d -= 86400;
+    if ($d < -43200) $d += 86400;
+    return $d;
+}
+
+/**
+ * Calcola lo score finale di ogni candidato combinando:
+ *  - similarità della destinazione (overlap + 10% Jaro-Winkler), peso 0.6
+ *  - prossimità temporale rispetto all'orario reale, peso 0.4
+ * Aggiunge inoltre il ritardo con segno (delay_sec / delay).
+ * In questo modo il tempo non viene né scartato (come col vecchio re-sort
+ * per sola similarità) né reso dominante (come col vecchio ORDER BY delay).
+ */
+function addCombinedScores(array &$trips, string $busDirection, $realSec) {
+    $WINDOW = 1800; // 30 min: oltre questa distanza il match è poco affidabile
+
     foreach ($trips as $i => $trip) {
-        $trips[$i]['jaro_winkler'] = jaro_winkler(strtolower($busDirection), strtolower($trip['trip_headsign']));
+        $overlap = get_actv_match_score($busDirection, $trip['trip_headsign']);
+        $jaro = jaro_winkler(mb_strtolower($busDirection, 'UTF-8'), mb_strtolower($trip['trip_headsign'], 'UTF-8'));
+        $destScore = $overlap + ($jaro * 0.1);
+
+        $schedSec = timeStrToSec($trip['arrival_time']);
+        $delay = signedDelaySec($realSec, $schedSec);
+
+        if ($realSec !== null && $delay !== null) {
+            $dist = abs($delay);
+            $timeScore = ($dist <= $WINDOW) ? (1 - ($dist / $WINDOW)) : 0;
+            $trips[$i]['match_score'] = $destScore * 0.6 + $timeScore * 0.4;
+        } else {
+            // Nessun orario reale disponibile: ci basiamo solo sulla destinazione.
+            $trips[$i]['match_score'] = $destScore;
+        }
+
+        $trips[$i]['delay_sec'] = $delay;
+        $trips[$i]['delay'] = ($delay === null)
+            ? null
+            : sprintf('%s%02d:%02d:%02d', $delay < 0 ? '-' : '+', abs($delay) / 3600, (abs($delay) % 3600) / 60, abs($delay) % 60);
     }
 
-    //Ordina per jaro_winkler
+    // Ordina per score combinato (usort è stabile da PHP 8: a parità di score
+    // si conserva l'ordine SQL per prossimità temporale).
     usort($trips, function ($a, $b) {
-        return $b['jaro_winkler'] <=> $a['jaro_winkler'];
+        return $b['match_score'] <=> $a['match_score'];
     });
 }
 
@@ -197,18 +235,28 @@ function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop
         throw new Exception("Invalid day: $day");
     }
 
-    $query = queryBuilder($time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId);
-    $stmt = $pdo->prepare($query);
-    $paramStop = ($stopId && $stopId !== 'null' && $stopId !== 'undefined') ? $stopId : $stop;
-    //$stmt->execute([$time, $busTrack, $paramStop]);
-    $stmt->execute([$time, $time, $busTrack, $paramStop]);
-    $trips = $stmt->fetchAll();
+    $hasStopId = ($stopId && $stopId !== 'null' && $stopId !== 'undefined');
+    $hasTime   = ($time !== null && $time !== '');
+    $paramStop = $hasStopId ? $stopId : $stop;
 
-    addSimilarityScores($trips, $busDirection);
+    $query = queryBuilder($day, $hasStopId, $hasTime);
+    $stmt = $pdo->prepare($query);
+
+    // Ordine parametri: route_short_name, stop, [time, time per l'ORDER BY].
+    $params = [$busTrack, $paramStop];
+    if ($hasTime) {
+        $params[] = $time;
+        $params[] = $time;
+    }
+    $stmt->execute($params);
+    $trips = $stmt->fetchAll();
 
     if (count($trips) == 0) {
         return [];
     }
+
+    $realSec = timeStrToSec($time);
+    addCombinedScores($trips, $busDirection, $realSec);
 
     //Rimuovi tutte le chiavi vuote che non sono valorizzate per nessun trip
     $keys = array_keys($trips[0]);
@@ -370,16 +418,19 @@ function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop
 </html>
 <?php
 function jaro_winkler($str1, $str2) {
-    // 1. Normalizzazione (Minuscolo e rimozione punti)
-    $str1 = strtolower(str_replace('.', '', $str1));
-    $str2 = strtolower(str_replace('.', '', $str2));
+    // 1. Normalizzazione (Minuscolo e rimozione punti).
+    //    Lavoriamo su array di caratteri multibyte-safe: i nomi delle fermate
+    //    contengono accenti (à, è, ...) che con l'indicizzazione per byte
+    //    falserebbero il confronto.
+    $a1 = mb_str_split(str_replace('.', '', mb_strtolower($str1, 'UTF-8')));
+    $a2 = mb_str_split(str_replace('.', '', mb_strtolower($str2, 'UTF-8')));
 
-    $len1 = strlen($str1);
-    $len2 = strlen($str2);
+    $len1 = count($a1);
+    $len2 = count($a2);
 
     if ($len1 == 0 || $len2 == 0) return 0.0;
 
-    $max_dist = floor(max($len1, $len2) / 2) - 1;
+    $max_dist = (int) (floor(max($len1, $len2) / 2) - 1);
 
     $match1 = array_fill(0, $len1, false);
     $match2 = array_fill(0, $len2, false);
@@ -394,7 +445,7 @@ function jaro_winkler($str1, $str2) {
 
         for ($j = $start; $j < $end; $j++) {
             if ($match2[$j]) continue;
-            if ($str1[(int)$i] != $str2[(int)$j]) continue;
+            if ($a1[$i] != $a2[$j]) continue;
             $match1[$i] = true;
             $match2[$j] = true;
             $matches++;
@@ -409,7 +460,7 @@ function jaro_winkler($str1, $str2) {
     for ($i = 0; $i < $len1; $i++) {
         if (!$match1[$i]) continue;
         while (!$match2[$k]) $k++;
-        if ($str1[$i] != $str2[$k]) $transpositions++;
+        if ($a1[$i] != $a2[$k]) $transpositions++;
         $k++;
     }
 
@@ -419,7 +470,7 @@ function jaro_winkler($str1, $str2) {
     $prefix_len = 0;
     $max_prefix = 4; // Massimo 4 caratteri per il bonus
     for ($i = 0; $i < min($len1, $len2, $max_prefix); $i++) {
-        if ($str1[$i] == $str2[$i]) $prefix_len++;
+        if ($a1[$i] == $a2[$i]) $prefix_len++;
         else break;
     }
 
