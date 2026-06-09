@@ -56,7 +56,7 @@ require_once BASE_PATH . '/public/commons/head.php';
     <div class="panel-card full-width">
         <div class="panel-header">
             <h2>Dettaglio Flotta</h2>
-            <input type="text" id="table-filter" placeholder="Cerca bus, linea, destinazione...">
+            <input type="text" id="table-filter" placeholder="Cerca bus, linea, destinazione, operatore...">
         </div>
         <div class="table-responsive">
             <table class="admin-table">
@@ -69,6 +69,7 @@ require_once BASE_PATH . '/public/commons/head.php';
                         <th>Stato</th>
                         <th>Ritardo</th>
                         <th>Veicolo</th>
+                        <th>Operatore</th>
                     </tr>
                 </thead>
                 <tbody id="buses-table-body">

@@ -187,7 +187,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return {
                 status: bestMatch.candidate.real ? 'REALTIME' : 'SCHEDULED_API_FLAG',
                 rtTime: bestMatch.candSec,
-                vehicle: bestMatch.candidate.vehicle
+                vehicle: bestMatch.candidate.vehicle,
+                operator: bestMatch.candidate.operator
             };
         }
         return { status: 'SCHEDULED_NO_DATA' };
@@ -326,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderEmpty() {
         els.totalBuses.textContent = '0';
-        els.tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Nessun bus in servizio</td></tr>';
+        els.tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Nessun bus in servizio</td></tr>';
         els.lastUpdate.textContent = 'Aggiornato: ' + new Date().toLocaleTimeString();
     }
 
@@ -339,7 +340,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 b.route_short_name.toLowerCase().includes(filter) ||
                 b.trip_headsign.toLowerCase().includes(filter) ||
                 b.trip_id.toLowerCase().includes(filter) ||
-                (b.vehicle && b.vehicle.includes(filter))
+                (b.vehicle && b.vehicle.includes(filter)) ||
+                (b.operator && b.operator.toLowerCase().includes(filter))
             );
         }
 
@@ -426,6 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${statusBadge}</td>
                 <td>${delayDisplay}</td>
                 <td>${b.vehicle || '-'}</td>
+                <td>${b.operator || '-'}</td>
             `;
             els.tableBody.appendChild(tr);
         });
