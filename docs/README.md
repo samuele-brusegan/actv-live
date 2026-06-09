@@ -11,6 +11,7 @@ Benvenuto nella documentazione tecnica di **ACTV Live**. Questo manuale è proge
 5.  **[Frontend & UI](frontend.md)**: Design system, moduli JavaScript e integrazione con Leaflet.
 6.  **[Admin Tools & Logging](admin-tools.md)**: Gestione degli errori, logs centralizzati e la Time Machine.
 7.  **[Live Bus Tracking](live-tracker.md)**: Logica di interpolazione delle posizioni e caricamento asincrono sulla mappa.
+8.  **[Documentazione per Feature](features/README.md)**: Documentazione ad albero, una pagina per feature (le feature più grandi sono cartelle con un README e file dedicati ai sotto-problemi).
 
 ## Stack Tecnologico
 
