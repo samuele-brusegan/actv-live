@@ -43,4 +43,8 @@ class Router {
             
         }
     }
+
+    public function list() : array {
+        return $this->routes;
+    }
 }

@@ -19,6 +19,8 @@ $router->add('/live-map'                , 'Controller', 'liveMap');
 $router->add('/trip-details'            , 'Controller', 'tripDetails');
 $router->add('/widget'                  , 'Controller', 'widget');
 $router->add('/delay-stats'             , 'Controller', 'delayStats');
+$router->add('/routes'                  , 'Controller', 'routes');
+
 $router->add('/admin/login'             , 'Controller', 'adminLogin');
 $router->add('/admin/logout'            , 'Controller', 'adminLogout');
 $router->add('/admin/logs'              , 'Controller', 'logs');

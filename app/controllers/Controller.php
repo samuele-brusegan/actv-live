@@ -131,4 +131,10 @@ class Controller {
     function delayStats() {
         require_once BASE_PATH . '/app/views/delayStats.php';
     }
+
+    function routes() {
+        global $router;
+        $routes = $router -> list();
+        require_once BASE_PATH . '/app/views/routes.php';
+    }
 }
