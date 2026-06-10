@@ -143,4 +143,8 @@ class Controller {
         $routes = $router -> list();
         require_once BASE_PATH . '/app/views/routes.php';
     }
+
+    function lineSchedule() {
+        require_once BASE_PATH . '/app/views/lineSchedule.php';
+    }
 }

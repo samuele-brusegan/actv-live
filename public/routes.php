@@ -20,6 +20,7 @@ $router->add('/trip-details'            , 'Controller', 'tripDetails');
 $router->add('/widget'                  , 'Controller', 'widget');
 $router->add('/delay-stats'             , 'Controller', 'delayStats');
 $router->add('/routes'                  , 'Controller', 'routes');
+$router->add('/line-schedule'           , 'Controller', 'lineSchedule');
 
 $router->add('/admin/login'             , 'Controller', 'adminLogin');
 $router->add('/admin/logout'            , 'Controller', 'adminLogout');
@@ -35,6 +36,9 @@ $router->add('/api/lines-shapes'        , 'ApiController', 'linesShapes');
 $router->add('/api/trip-stops'          , 'ApiController', 'tripStops');
 $router->add('/api/bus-position'        , 'ApiController', 'busPosition');
 $router->add('/api/log-js-error'        , 'ApiController', 'logJsError');
+$router->add('/api/line-variants'       , 'ApiController', 'lineVariants');
+$router->add('/api/line-schedule'       , 'ApiController', 'lineSchedule');
+$router->add('/api/stop-upcoming'       , 'ApiController', 'stopUpcoming');
 $router->add('/api/admin/gtfs-update/status', 'ApiController', 'adminGtfsUpdateStatus');
 $router->add('/api/admin/gtfs-update/config', 'ApiController', 'adminGtfsUpdateConfig');
 $router->add('/api/admin/gtfs-update/start', 'ApiController', 'adminGtfsUpdateStart');

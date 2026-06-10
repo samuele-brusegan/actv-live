@@ -804,4 +804,431 @@ class ApiController {
             echo json_encode(['success' => false, 'error' => 'Errore durante il recupero delle linee']);
         }
     }
+
+    /**
+     * Whitelist del nome colonna giorno (per evitare SQL injection nel nome
+     * colonna, dato che non può essere parametrizzato).
+     * @return string|null Il nome colonna valido oppure null.
+     */
+    private function dayColumn($day) {
+        $allowedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        $day = strtolower((string) $day);
+        return in_array($day, $allowedDays, true) ? $day : null;
+    }
+
+    /**
+     * Restituisce gli id (route_id) di tutte le rotte con quel route_short_name.
+     */
+    private function routeIdsForShortName(DatabaseConnector $db, $shortName) {
+        $rows = $db->query("SELECT route_id FROM routes WHERE route_short_name = ?", [$shortName]);
+        return array_map(fn($r) => $r['route_id'], $rows);
+    }
+
+    /**
+     * API /api/line-variants
+     * Dato un route_short_name (param: line) ritorna le varianti di percorso
+     * raggruppate per (shape_id, trip_headsign). Per ogni variante: un trip
+     * rappresentativo (quello con più fermate), numero di corse e l'elenco
+     * ordinato delle fermate.
+     */
+    function lineVariants() {
+        header('Content-Type: application/json');
+
+        $line = trim($_GET['line'] ?? '');
+        $day = $this->dayColumn($_GET['day'] ?? date('l'));
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['date'] ?? '')
+            ? str_replace('-', '', $_GET['date'])
+            : date('Ymd');
+        if ($line === '') {
+            echo json_encode(['success' => false, 'error' => 'Parametro line mancante']);
+            return;
+        }
+        if ($day === null) {
+            echo json_encode(['success' => false, 'error' => 'Giorno non valido']);
+            return;
+        }
+
+        $db = $this->getDb();
+        $routeIds = $this->routeIdsForShortName($db, $line);
+        if (empty($routeIds)) {
+            echo json_encode(['success' => false, 'error' => 'Linea non trovata']);
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($routeIds), '?'));
+
+        // Un record per trip con shape, capolinea e numero di fermate.
+        $sql = "SELECT t.trip_id, t.shape_id, t.trip_headsign, t.direction_id,
+                       COUNT(st.stop_id) AS nstops
+                FROM trips t
+                JOIN stop_times st ON st.trip_id = t.trip_id
+                WHERE t.route_id IN ($placeholders)
+                  AND (
+                      t.service_id IN (
+                          SELECT c.service_id FROM calendar c
+                          WHERE c.{$day} = 1 AND c.start_date <= ? AND c.end_date >= ?
+                      )
+                      OR t.service_id IN (
+                          SELECT cd.service_id FROM calendar_dates cd
+                          WHERE cd.date = ? AND cd.exception_type = 1
+                      )
+                  )
+                  AND t.service_id NOT IN (
+                      SELECT cd.service_id FROM calendar_dates cd
+                      WHERE cd.date = ? AND cd.exception_type = 2
+                  )
+                GROUP BY t.trip_id, t.shape_id, t.trip_headsign, t.direction_id";
+        $trips = $db->query($sql, array_merge($routeIds, [$date, $date, $date, $date]));
+
+        // Raggruppa per (shape_id + headsign): scegli il trip con più fermate
+        // come rappresentativo e conta quante corse appartengono alla variante.
+        $variants = [];
+        foreach ($trips as $t) {
+            $key = ($t['shape_id'] ?? '') . '|' . ($t['trip_headsign'] ?? '');
+            if (!isset($variants[$key])) {
+                $variants[$key] = [
+                    'shape_id'      => $t['shape_id'],
+                    'headsign'      => $t['trip_headsign'],
+                    'direction_id'  => $t['direction_id'],
+                    'trip_id'       => $t['trip_id'],
+                    'stops_count'   => (int) $t['nstops'],
+                    'trips_count'   => 0,
+                ];
+            }
+            $variants[$key]['trips_count']++;
+            if ((int) $t['nstops'] > $variants[$key]['stops_count']) {
+                $variants[$key]['stops_count'] = (int) $t['nstops'];
+                $variants[$key]['trip_id'] = $t['trip_id'];
+            }
+        }
+
+        // Aggiungi l'elenco fermate del trip rappresentativo per ogni variante.
+        $result = [];
+        foreach ($variants as $v) {
+            $stops = $db->query(
+                "SELECT s.stop_id AS id, s.stop_name AS name, s.stop_lat AS lat, s.stop_lon AS lng,
+                        st.stop_sequence AS seq, st.departure_time AS time
+                 FROM stop_times st
+                 JOIN stops s ON st.stop_id = s.stop_id
+                 WHERE st.trip_id = ?
+                 ORDER BY st.stop_sequence ASC",
+                [$v['trip_id']]
+            );
+            $v['stops'] = $stops;
+            $v['origin'] = $stops[0]['name'] ?? null;
+            $v['terminus'] = end($stops)['name'] ?? null;
+            $result[] = $v;
+        }
+
+        // Ordina per numero di corse (le varianti più frequenti per prime).
+        usort($result, fn($a, $b) => $b['trips_count'] <=> $a['trips_count']);
+
+        echo json_encode([
+            'success'  => true,
+            'line'     => $line,
+            'variants' => $result,
+        ]);
+    }
+
+    /**
+     * API /api/line-schedule
+     * Per le varianti indicate (param: trips = trip_id rappresentativi) ritorna,
+     * per ogni fermata, TUTTI gli orari del giorno (param: day) della linea
+     * (param: line) a quella fermata.
+     */
+    function lineSchedule() {
+        header('Content-Type: application/json');
+
+        $line   = trim($_GET['line'] ?? '');
+        $representativeIds = array_values(array_unique(array_filter(array_map(
+            'trim',
+            explode(',', (string) ($_GET['trips'] ?? ($_GET['trip'] ?? '')))
+        ), fn($id) => $id !== '')));
+        $day    = $this->dayColumn($_GET['day'] ?? date('l'));
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['date'] ?? '')
+            ? str_replace('-', '', $_GET['date'])
+            : date('Ymd');
+
+        if ($line === '' || empty($representativeIds)) {
+            echo json_encode(['success' => false, 'error' => 'Parametri line/trips mancanti']);
+            return;
+        }
+        if ($day === null) {
+            echo json_encode(['success' => false, 'error' => 'Giorno non valido']);
+            return;
+        }
+
+        $db = $this->getDb();
+        $routeIds = $this->routeIdsForShortName($db, $line);
+        if (empty($routeIds)) {
+            echo json_encode(['success' => false, 'error' => 'Linea non trovata']);
+            return;
+        }
+
+        // Varianti = coppie (shape_id, trip_headsign) dei trip rappresentativi.
+        $repPh = implode(',', array_fill(0, count($representativeIds), '?'));
+        $repInfo = $db->query(
+            "SELECT trip_id, shape_id, trip_headsign FROM trips WHERE trip_id IN ($repPh)",
+            $representativeIds
+        );
+        if (empty($repInfo)) {
+            echo json_encode(['success' => false, 'error' => 'Variante non trovata']);
+            return;
+        }
+        $headsign = $repInfo[0]['trip_headsign'];
+
+        // Costruisce una sequenza unificata partendo dal percorso più lungo.
+        $stopsByRepresentative = [];
+        foreach ($representativeIds as $representativeId) {
+            $variantStops = $db->query(
+                "SELECT st.stop_sequence AS seq, s.stop_id AS id, s.stop_name AS name
+             FROM stop_times st
+             JOIN stops s ON st.stop_id = s.stop_id
+             WHERE st.trip_id = ?
+             ORDER BY st.stop_sequence ASC",
+                [$representativeId]
+            );
+            if (!empty($variantStops)) $stopsByRepresentative[] = $variantStops;
+        }
+        usort($stopsByRepresentative, fn($a, $b) => count($b) <=> count($a));
+        $stops = $stopsByRepresentative[0] ?? [];
+        if (empty($stops)) {
+            echo json_encode(['success' => false, 'error' => 'Variante senza fermate']);
+            return;
+        }
+
+        $normalizeStopName = function ($name) {
+            $name = trim((string) $name);
+            return function_exists('mb_strtolower')
+                ? mb_strtolower($name, 'UTF-8')
+                : strtolower($name);
+        };
+        $stopKey = fn($s) => $normalizeStopName($s['name']);
+
+        // Alcuni trip GTFS contengono la stessa fermata due volte consecutive
+        // con stop_id diversi (es. Maerne FS). In tabella deve comparire una
+        // sola riga, dato che nome e orario di passaggio coincidono.
+        $dedupeConsecutiveStops = function ($items) use ($stopKey) {
+            $result = [];
+            $previousKey = null;
+            foreach ($items as $item) {
+                $key = $stopKey($item);
+                if ($key === $previousKey) continue;
+                $result[] = $item;
+                $previousKey = $key;
+            }
+            return $result;
+        };
+        $stops = $dedupeConsecutiveStops($stops);
+
+        foreach (array_slice($stopsByRepresentative, 1) as $variantStops) {
+            $variantStops = $dedupeConsecutiveStops($variantStops);
+            $pending = [];
+            foreach ($variantStops as $stop) {
+                $keys = array_map($stopKey, $stops);
+                $matchIndex = array_search($stopKey($stop), $keys, true);
+                if ($matchIndex === false) {
+                    $pending[] = $stop;
+                    continue;
+                }
+                if (!empty($pending)) {
+                    array_splice($stops, $matchIndex, 0, $pending);
+                    $pending = [];
+                }
+            }
+            if (!empty($pending)) $stops = array_merge($stops, $pending);
+        }
+
+        $routePh = implode(',', array_fill(0, count($routeIds), '?'));
+
+        // Tutte le corse delle varianti del giro nel giorno.
+        $variantClauses = [];
+        $variantParams = [];
+        foreach ($repInfo as $representative) {
+            $variantClauses[] = '(t.shape_id = ? AND t.trip_headsign = ?)';
+            $variantParams[] = $representative['shape_id'];
+            $variantParams[] = $representative['trip_headsign'];
+        }
+        $tripsSql = "SELECT DISTINCT t.trip_id
+                     FROM trips t
+                     WHERE t.route_id IN ($routePh)
+                       AND (" . implode(' OR ', $variantClauses) . ")
+                       AND (
+                           t.service_id IN (
+                               SELECT c.service_id FROM calendar c
+                               WHERE c.{$day} = 1 AND c.start_date <= ? AND c.end_date >= ?
+                           )
+                           OR t.service_id IN (
+                               SELECT cd.service_id FROM calendar_dates cd
+                               WHERE cd.date = ? AND cd.exception_type = 1
+                           )
+                       )
+                       AND t.service_id NOT IN (
+                           SELECT cd.service_id FROM calendar_dates cd
+                           WHERE cd.date = ? AND cd.exception_type = 2
+                       )";
+        $params = array_merge($routeIds, $variantParams, [$date, $date, $date, $date]);
+        $tripRows = $db->query($tripsSql, $params);
+        $tripIds = array_map(fn($r) => $r['trip_id'], $tripRows);
+
+        $runs = [];
+        if (!empty($tripIds)) {
+            $tripPh = implode(',', array_fill(0, count($tripIds), '?'));
+            // Orari di ogni corsa a ogni fermata (allineati per stop_sequence).
+            $stRows = $db->query(
+                "SELECT st.trip_id, s.stop_name, st.departure_time
+                 FROM stop_times st
+                 JOIN stops s ON s.stop_id = st.stop_id
+                 WHERE st.trip_id IN ($tripPh)
+                 ORDER BY st.trip_id, st.stop_sequence ASC",
+                $tripIds
+            );
+
+            $rowIndexByName = [];
+            foreach ($stops as $i => $stop) $rowIndexByName[$stopKey($stop)] = $i;
+
+            // Allinea le corse alle righe tramite il nome fermata: le estensioni
+            // corte lasciano vuote le righe Venezia e usano MESTRE CENTRO B3.
+            $byTrip = [];
+            foreach ($stRows as $r) {
+                $key = $normalizeStopName($r['stop_name']);
+                if (!isset($rowIndexByName[$key])) continue;
+                $byTrip[$r['trip_id']][$rowIndexByName[$key]] = substr($r['departure_time'], 0, 5);
+            }
+
+            foreach ($byTrip as $tid => $timesByRow) {
+                $times = [];
+                for ($i = 0; $i < count($stops); $i++) {
+                    $times[] = $timesByRow[$i] ?? null;
+                }
+                // Orario di partenza = primo tempo non nullo (per ordinare le colonne).
+                $start = '99:99';
+                foreach ($times as $t) {
+                    if ($t !== null) { $start = $t; break; }
+                }
+                $runs[] = ['trip_id' => $tid, 'start' => $start, 'times' => $times];
+            }
+
+            // Ordina le colonne per orario di partenza.
+            usort($runs, fn($a, $b) => strcmp($a['start'], $b['start']));
+        }
+
+        // Le varianti merged possono non essere attive nel giorno selezionato.
+        // Non mostrare fermate appartenenti solo a varianti senza alcuna corsa,
+        // altrimenti la tabella contiene intere righe di punti.
+        if (!empty($runs)) {
+            $activeRows = [];
+            for ($i = 0; $i < count($stops); $i++) {
+                foreach ($runs as $run) {
+                    if (($run['times'][$i] ?? null) !== null) {
+                        $activeRows[] = $i;
+                        break;
+                    }
+                }
+            }
+
+            $stops = array_values(array_map(fn($i) => $stops[$i], $activeRows));
+            foreach ($runs as &$run) {
+                $run['times'] = array_values(array_map(fn($i) => $run['times'][$i] ?? null, $activeRows));
+            }
+            unset($run);
+        }
+
+        $stopsOut = array_map(fn($s) => ['id' => $s['id'], 'name' => $s['name']], $stops);
+
+        echo json_encode([
+            'success'  => true,
+            'line'     => $line,
+            'day'      => $day,
+            'headsign' => $headsign,
+            'stops'    => $stopsOut,
+            'runs'     => $runs,
+        ]);
+    }
+
+    /**
+     * API /api/stop-upcoming
+     * Dato uno stop_id (param: stop), un giorno (param: day) e un'ora
+     * (param: time HH:MM), ritorna tutti i bus (qualsiasi linea) previsti a
+     * quella fermata entro la prossima ora.
+     */
+    function stopUpcoming() {
+        header('Content-Type: application/json');
+
+        $stopId = $_GET['stop'] ?? '';
+        $time   = $_GET['time'] ?? date('H:i');
+        $day    = $this->dayColumn($_GET['day'] ?? date('l'));
+
+        if ($stopId === '') {
+            echo json_encode(['success' => false, 'error' => 'Parametro stop mancante']);
+            return;
+        }
+        if ($day === null) {
+            echo json_encode(['success' => false, 'error' => 'Giorno non valido']);
+            return;
+        }
+
+        $db = $this->getDb();
+
+        $allowedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        $yesterday = $allowedDays[(array_search($day, $allowedDays) + 6) % 7];
+
+        // Bus di oggi a questa fermata + notturni di ieri (arrival >= 24:00:00).
+        $sql = "SELECT r.route_short_name, r.route_id, t.trip_headsign, st.departure_time, t.trip_id, 'today' AS source
+                FROM stop_times st
+                JOIN trips t ON st.trip_id = t.trip_id
+                JOIN routes r ON t.route_id = r.route_id
+                JOIN calendar c ON t.service_id = c.service_id
+                WHERE st.stop_id = ? AND c.{$day} = 1
+                UNION ALL
+                SELECT r.route_short_name, r.route_id, t.trip_headsign, st.departure_time, t.trip_id, 'yesterday' AS source
+                FROM stop_times st
+                JOIN trips t ON st.trip_id = t.trip_id
+                JOIN routes r ON t.route_id = r.route_id
+                JOIN calendar c ON t.service_id = c.service_id
+                WHERE st.stop_id = ? AND c.{$yesterday} = 1 AND st.departure_time >= '24:00:00'";
+        $rows = $db->query($sql, [$stopId, $stopId]);
+
+        $timeParts = explode(':', $time);
+        $searchSec = ((int) $timeParts[0] * 3600) + ((int) ($timeParts[1] ?? 0) * 60);
+        $window = 3600; // prossima ora
+
+        $seen = [];
+        $results = [];
+        foreach ($rows as $row) {
+            if (isset($seen[$row['trip_id']])) continue;
+
+            $tp = explode(':', $row['departure_time']);
+            $tripSec = ((int) $tp[0] * 3600) + ((int) ($tp[1] ?? 0) * 60);
+
+            $delta = $tripSec - $searchSec;
+            // Notturni di ieri richiesti nelle ore piccole (es. 24:10 cercato alle 00:10).
+            if ($row['source'] === 'yesterday' && $searchSec < 3600) {
+                $delta = $tripSec - 86400 - $searchSec;
+            }
+
+            if ($delta >= 0 && $delta <= $window) {
+                $seen[$row['trip_id']] = true;
+                $results[] = [
+                    'route_short_name' => $row['route_short_name'],
+                    'route_id'         => $row['route_id'],
+                    'trip_headsign'    => $row['trip_headsign'],
+                    'trip_id'          => $row['trip_id'],
+                    'time'             => substr($row['departure_time'], 0, 5),
+                    'in_min'           => (int) round($delta / 60),
+                ];
+            }
+        }
+
+        usort($results, fn($a, $b) => $a['in_min'] <=> $b['in_min']);
+
+        echo json_encode([
+            'success' => true,
+            'stop'    => $stopId,
+            'day'     => $day,
+            'time'    => $time,
+            'count'   => count($results),
+            'buses'   => $results,
+        ]);
+    }
 }
