@@ -7,11 +7,12 @@ Benvenuto nella documentazione tecnica di **ACTV Live**. Questo manuale è proge
 1.  **[Architettura del Sistema](architecture.md)**: Struttura del progetto, ciclo di vita della richiesta e pattern MVC.
 2.  **[Database & Modelli](database.md)**: Schema delle tabelle MySQL e gestione della persistenza.
 3.  **[API Reference](api.md)**: Elenco completo degli endpoint, parametri e formati di risposta.
-4.  **[GTFS & Route Planning](gtfs.md)**: Come vengono elaborati i dati statici e come funziona l'algoritmo di ricerca percorsi.
-5.  **[Frontend & UI](frontend.md)**: Design system, moduli JavaScript e integrazione con Leaflet.
-6.  **[Admin Tools & Logging](admin-tools.md)**: Gestione degli errori, logs centralizzati e la Time Machine.
-7.  **[Live Bus Tracking](live-tracker.md)**: Logica di interpolazione delle posizioni e caricamento asincrono sulla mappa.
-8.  **[Documentazione per Feature](features/README.md)**: Documentazione ad albero, una pagina per feature (le feature più grandi sono cartelle con un README e file dedicati ai sotto-problemi).
+4.  **[Database GTFS](gtfs-format.md)**: Tabelle, campi, relazioni e contenuti di esempio.
+5.  **[GTFS & Route Planning](GTFS.md)**: Come vengono elaborati i dati statici e come funziona l'algoritmo di ricerca percorsi.
+6.  **[Frontend & UI](frontend.md)**: Design system, moduli JavaScript e integrazione con Leaflet.
+7.  **[Admin Tools & Logging](admin-tools.md)**: Gestione degli errori, logs centralizzati e la Time Machine.
+8.  **[Live Bus Tracking](live-tracker.md)**: Logica di interpolazione delle posizioni e caricamento asincrono sulla mappa.
+9.  **[Documentazione per Feature](features/README.md)**: Documentazione ad albero, una pagina per feature (le feature più grandi sono cartelle con un README e file dedicati ai sotto-problemi).
 
 ## Stack Tecnologico
 

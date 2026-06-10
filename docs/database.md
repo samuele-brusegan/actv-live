@@ -1,13 +1,14 @@
 # Database & Modelli
 
-Il sistema utilizza MySQL (o MariaDB) per la gestione dei dati dinamici, dei log e per alcune query spaziali/GTFS.
+Il sistema utilizza MySQL (o MariaDB) per i dati GTFS, i log e le registrazioni
+Time Machine. Lo schema dettagliato delle tabelle di trasporto, con tipi ed
+esempi reali, è in [Database GTFS](gtfs-format.md).
 
 ## Connettore Database (`app/models/databaseConnector.php`)
 
-La classe `databaseConnector` è un wrapper attorno a `mysqli`. Fornisce metodi semplici per connettersi ed eseguire query.
-
-### Funzione Particolare: `seamsValidSQL`
-Il metodo `seamsValidSQL` viene utilizzato (anche se con una logica "invertita" nel codice attuale) per controllare se una query contiene parole chiave pericolose. **Nota**: Il sistema si affida principalmente a `addslashes` per la sanificazione, ma sarebbe preferibile passare a Prepared Statements (PDO) per una sicurezza completa.
+La classe `databaseConnector` è un wrapper attorno a PDO. Usa prepared
+statements con emulazione disabilitata e restituisce i risultati come array
+associativi.
 
 ---
 
@@ -21,6 +22,9 @@ Queste tabelle contengono i dati statici dei trasporti ACTV.
 -   **`trips`**: Singole corse (es. la corsa delle 08:30 della linea 5E).
 -   **`routes`**: Linee (es. "5E", "7", "2").
 -   **`calendar`**: Giorni di servizio per ogni `service_id`.
+-   **`calendar_dates`**: Aggiunte e rimozioni per date specifiche.
+-   **`shapes`**: Punti geografici originali del feed.
+-   **`shapes_refined`**: Copia applicativa delle shape usata dalle API mappa.
 
 ### 2. Monitoraggio & Logs (`logs`)
 Memorizza errori e warning catturati dal sistema.
