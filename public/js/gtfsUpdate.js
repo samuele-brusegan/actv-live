@@ -36,7 +36,7 @@
             } else {
                 let xcodeTable = document.getElementById('xcode-table');
                 if (!xcodeTable) {
-                    document.body.insertAdjacentHTML('beforeend', '<div id="xcode-table"></div>');
+                    document.body.insertAdjacentHTML('afterbegin', '<div id="xcode-table"></div>');
                     xcodeTable = document.getElementById('xcode-table');
                 }
                 xcodeTable.innerHTML = text;
