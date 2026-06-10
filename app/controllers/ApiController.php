@@ -40,8 +40,20 @@ class ApiController {
 
         $stops = $db->query(
             "SELECT 
-                stops.*, 
-                stop_times.*
+                stops.stop_id,
+                stops.stop_code,
+                stops.stop_name,
+                stops.stop_lat,
+                stops.stop_lon,
+                stops.data_url,
+                stop_times.trip_id,
+                stop_times.arrival_time,
+                stop_times.departure_time,
+                stop_times.stop_sequence,
+                stop_times.stop_headsign,
+                stop_times.pickup_type,
+                stop_times.drop_off_type,
+                stop_times.shape_dist_traveled
             FROM stops
             INNER JOIN stop_times ON stops.stop_id = stop_times.stop_id
             WHERE stop_times.trip_id = ?
@@ -50,17 +62,16 @@ class ApiController {
             [$tripId]
         );
 
-        //Controllo se ci sono fermate duplicate una dopo l'altra
+        // Alcuni trip contengono la stessa fermata due volte consecutive.
         $uniqueStops = [];
+        $previousStopId = null;
         foreach ($stops as $stop) {
-            //Se la fermata precedente è uguale a questa, la salto
-            if (!isset($uniqueStops[$stop['stop_id']]) || $uniqueStops[$stop['stop_id']]['stop_id'] != $stop['stop_id']) {
-                $uniqueStops[$stop['stop_id']] = $stop;
-            }
+            if ((string) $stop['stop_id'] === $previousStopId) continue;
+            $uniqueStops[] = $stop;
+            $previousStopId = (string) $stop['stop_id'];
         }
-        $stops = array_values($uniqueStops);
 
-        echo json_encode($stops);
+        echo json_encode($uniqueStops);
     }
 
     // Refactored from dbControll::gtfsStopTranslater
