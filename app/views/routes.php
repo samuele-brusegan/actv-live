@@ -12,7 +12,7 @@
         <!-- Header -->
         <div class="header-green">
             <!-- Logo o Icona Menu (Placeholder basato su spazio vuoto nel design) -->
-            <div style="height: 20px;"></div> 
+            <div style="height: 20px;"></div>
             <h1 class="header-title">ACTV Live <br> Venezia</h1>
             <h3 class="header-subtitle">Orari in Tempo Reale</h3>
             <div class="theme-toggle" style="position: absolute; top: 20px; right: 20px;">
@@ -21,15 +21,48 @@
                 </button>
             </div>
         </div>
-        <?php
+        <div class="container mt-5">
+            <?php
             if (isset($routes)) {
-                echo "<div class='container mt-3 d-flex justify-content-between flex-wrap'>";
+                // Find common prefix
+                $prefixedList = [
+                    // key => list<route>
+                ];
                 foreach ($routes as  $route => $things) {
-                    
-                    echo "<a class='btn btn-primary mb-3' style='width:18%; z-index:10; box-shadow: 3px 6px 10px 2px #0003;' href='".$route."'>".$route."</a>";
+                    $splitted = explode("/",$route);
+                    $key = $splitted[1];
+                    if (!key_exists($key, $prefixedList)){
+                        $prefixedList[$key] = [];
+                    }
+                    $prefixedList[$key][][$route] = $things;
                 }
-                echo "</div>";                                                                                                                                  
+
+                // Se ci sono meno di 2 con lo stesso prefisso mettilo in root
+                foreach ($prefixedList as $prx => $routes) {
+                    if (sizeof($routes) == 1) {
+                        $prefixedList[""][] = $routes[0];
+                        unset($prefixedList[$prx]);
+                    }
+                }
+
+                //echo "<pre>"; print_r($prefixedList); echo "</pre>";
+
+                foreach ($prefixedList as  $prx => $routes) {
+                    render_block($routes, $prx);
+                    echo "<hr>";
+                }
+            }
+            function render_block($routes, $prx) {
+                echo "\t<h4>".$prx."</h4>";
+                echo "<div class='d-flex justify-content-between flex-wrap'>";
+                foreach ($routes as  $key => $routeObj) {
+                    //echo "<pre>"; print_r($routeObj); echo "</pre>";
+                    $route = key($routeObj);
+                    echo "\t<a class='btn btn-primary mb-3' style='width:18%; z-index:10; box-shadow: 3px 6px 10px 2px #0003;' href='".$route."'>".$route."</a>";
+                }
+                echo "</div>";
             }
         ?>
+        </div>
     </body>
 </html>
