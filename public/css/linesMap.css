@@ -93,3 +93,49 @@ body {
     font-size: 14px;
     color: var(--color-text-gray);
 }
+
+.route-map-legend {
+    position: absolute;
+    right: 12px;
+    bottom: 18px;
+    z-index: 1000;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.94);
+    color: #222;
+    font-size: 14px;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+}
+
+.route-map-toggle {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 7px;
+    margin: 4px 0;
+    padding: 5px 7px;
+    border: 1px solid #d5d5d5;
+    border-radius: 6px;
+    background: #fff;
+    color: #222;
+    text-align: left;
+    cursor: pointer;
+}
+
+.route-map-toggle:not(.active) {
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+.route-map-toggle:focus-visible {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+}
+
+.route-map-swatch {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    border-radius: 50%;
+}

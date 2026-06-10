@@ -351,36 +351,67 @@ class ApiController {
         // 1. Definisci i parametri opzionali
         $targetLine = $_GET['line'] ?? null;
         $targetTripId = $_GET['tripId'] ?? $_GET['trip_id'] ?? null; // Supporta entrambi i naming
+        $rawTripGroups = array_values(array_filter(explode('|', (string) ($_GET['tripGroups'] ?? ''))));
+        $tripGroupById = [];
+        foreach ($rawTripGroups as $groupIndex => $rawGroup) {
+            $groupNumber = $groupIndex + 1;
+            if (preg_match('/^(\d+):(.*)$/', $rawGroup, $matches)) {
+                $groupNumber = (int) $matches[1];
+                $rawGroup = $matches[2];
+            }
+            foreach (array_filter(array_map('trim', explode(',', $rawGroup))) as $id) {
+                $tripGroupById[(string) $id] = $groupNumber;
+            }
+        }
+        $targetTripIds = array_values(array_unique(array_filter(array_map(
+            'trim',
+            explode(',', (string) ($_GET['tripIds'] ?? ''))
+        ), fn($id) => $id !== '')));
+        $targetTripIds = array_values(array_unique(array_merge($targetTripIds, array_keys($tripGroupById))));
+        if ($targetTripId) {
+            array_unshift($targetTripIds, $targetTripId);
+            $targetTripIds = array_values(array_unique($targetTripIds));
+        }
+
+        // Indica se stiamo filtrando su una corsa/linea specifica: in tal caso
+        // includiamo anche la "shape" snappata sulle strade (shapes_refined),
+        // come fa la live-map. Per la vista "tutte le linee" restiamo sui
+        // segmenti fermata-fermata per non appesantire la risposta.
+        $isFiltered = !empty($targetTripIds) || $targetLine;
 
         // Costruzione dinamica della query
-        // Caso A: Specifico Trip ID
-        if ($targetTripId) {
+        // Caso A: uno o più Trip ID
+        if (!empty($targetTripIds)) {
+            $tripPlaceholders = implode(',', array_fill(0, count($targetTripIds), '?'));
             $sql = "
-                SELECT 
-                    r.route_id, 
-                    r.route_short_name, 
+                SELECT
+                    t.trip_id,
+                    r.route_id,
+                    r.route_short_name,
                     r.route_long_name,
-                    s.stop_lat AS lat, 
-                    s.stop_lon AS lng, 
+                    t.shape_id AS shape_id,
+                    s.stop_lat AS lat,
+                    s.stop_lon AS lng,
                     s.stop_name AS name
                 FROM trips t
                 JOIN routes r ON t.route_id = r.route_id
                 JOIN stop_times st ON t.trip_id = st.trip_id
                 JOIN stops s ON st.stop_id = s.stop_id
-                WHERE t.trip_id = ?
-                ORDER BY st.stop_sequence ASC
+                WHERE t.trip_id IN ($tripPlaceholders)
+                ORDER BY t.trip_id, st.stop_sequence ASC
             ";
-            $results = $db->query($sql, [$targetTripId]);
+            $results = $db->query($sql, $targetTripIds);
         }
         // Caso B: Specifica Linea
         elseif ($targetLine) {
             $sql = "
-                SELECT 
-                    r.route_id, 
-                    r.route_short_name, 
+                SELECT
+                    r.route_id,
+                    r.route_short_name,
                     r.route_long_name,
-                    s.stop_lat AS lat, 
-                    s.stop_lon AS lng, 
+                    tr.shape_id AS shape_id,
+                    s.stop_lat AS lat,
+                    s.stop_lon AS lng,
                     s.stop_name AS name
                 FROM routes r
                 JOIN (
@@ -388,6 +419,7 @@ class ApiController {
                     FROM trips
                     GROUP BY route_id
                 ) t_rep ON r.route_id = t_rep.route_id
+                JOIN trips tr ON tr.trip_id = t_rep.representative_trip_id
                 JOIN stop_times st ON t_rep.representative_trip_id = st.trip_id
                 JOIN stops s ON st.stop_id = s.stop_id
                 WHERE r.route_short_name = ?
@@ -398,12 +430,12 @@ class ApiController {
         // Caso C: Tutte le linee (Default)
         else {
             $sql = "
-                SELECT 
-                    r.route_id, 
-                    r.route_short_name, 
+                SELECT
+                    r.route_id,
+                    r.route_short_name,
                     r.route_long_name,
-                    s.stop_lat AS lat, 
-                    s.stop_lon AS lng, 
+                    s.stop_lat AS lat,
+                    s.stop_lon AS lng,
                     s.stop_name AS name
                 FROM routes r
                 JOIN (
@@ -421,27 +453,67 @@ class ApiController {
         $routesMap = [];
 
         // 2. Raggruppamento dei dati lato PHP
-        // La query restituisce righe 'piatte', noi le raggruppiamo per route_id (o per singolo risultato nel caso tripId)
-        // Nota: Nel caso di tripId singolo, route_id sarà unico.
+        // Con più trip della stessa linea, il trip_id deve restare parte della
+        // chiave per evitare di fondere percorsi distinti in un'unica polilinea.
         foreach ($results as $row) {
-            $routeId = $row['route_id'];
+            $routeKey = isset($row['trip_id'])
+                ? $row['route_id'] . '|' . $row['trip_id']
+                : $row['route_id'];
 
             // Se non abbiamo ancora inizializzato questa rotta nell'array, facciamolo
-            if (!isset($routesMap[$routeId])) {
-                $routesMap[$routeId] = [
+            if (!isset($routesMap[$routeKey])) {
+                $routesMap[$routeKey] = [
                     'route_id' => $row['route_id'],
+                    'trip_id' => $row['trip_id'] ?? null,
+                    'group_number' => isset($row['trip_id']) ? ($tripGroupById[(string) $row['trip_id']] ?? null) : null,
                     'route_short_name' => $row['route_short_name'],
                     'route_long_name' => $row['route_long_name'],
+                    'shape_id' => $row['shape_id'] ?? null,
                     'path' => []
                 ];
             }
 
             // Aggiungiamo la fermata all'array 'path' della rotta corrente
-            $routesMap[$routeId]['path'][] = [
+            $routesMap[$routeKey]['path'][] = [
                 'lat' => $row['lat'],
                 'lng' => $row['lng'],
                 'name' => $row['name']
             ];
+        }
+
+        // 2b. Se filtrato, carica le shape snappate sulle strade da shapes_refined
+        // e allegale come 'shape' (lista di punti lat/lng) ad ogni rotta.
+        if ($isFiltered) {
+            $shapeIds = [];
+            foreach ($routesMap as $r) {
+                if (!empty($r['shape_id'])) {
+                    $shapeIds[$r['shape_id']] = true;
+                }
+            }
+            $shapeIds = array_keys($shapeIds);
+
+            $pointsByShape = [];
+            if (!empty($shapeIds)) {
+                $ph = implode(',', array_fill(0, count($shapeIds), '?'));
+                $shapeRows = $db->query(
+                    "SELECT shape_id, lat, lng
+                     FROM shapes_refined
+                     WHERE shape_id IN ($ph)
+                     ORDER BY shape_id, sequence ASC",
+                    $shapeIds
+                );
+                foreach ($shapeRows as $sr) {
+                    $pointsByShape[$sr['shape_id']][] = [
+                        'lat' => (float) $sr['lat'],
+                        'lng' => (float) $sr['lng'],
+                    ];
+                }
+            }
+
+            foreach ($routesMap as $rid => $r) {
+                $sid = $r['shape_id'] ?? null;
+                $routesMap[$rid]['shape'] = ($sid && isset($pointsByShape[$sid])) ? $pointsByShape[$sid] : [];
+            }
         }
 
         // 3. Reset delle chiavi dell'array per ottenere un JSON array pulito (es. [ {...}, {...} ])
