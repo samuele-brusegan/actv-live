@@ -49,9 +49,9 @@ class GtfsUpdateManager
         return array_merge([
             'enabled' => false,
             'weekday' => 1,
-            'time' => '03:00',
+            'time' => '03:00:00',
             'last_scheduled_week' => null,
-        ], $this->readJson($this->configFile));
+        ], $this->normalizeConfig($this->readJson($this->configFile)));
     }
 
     public function saveConfig(array $input): array
@@ -61,8 +61,10 @@ class GtfsUpdateManager
         $config['enabled'] = filter_var($input['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $weekday = (int) ($input['weekday'] ?? 1);
         $config['weekday'] = max(1, min(7, $weekday));
-        $time = (string) ($input['time'] ?? '03:00');
-        $config['time'] = preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $time) ? $time : '03:00';
+        $time = (string) ($input['time'] ?? '03:00:00');
+        $config['time'] = preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/', $time)
+            ? $time
+            : '03:00:00';
         $this->writeJson($this->configFile, $config);
         try {
             $this->syncCron($config);
@@ -93,7 +95,7 @@ class GtfsUpdateManager
         $updated = $this->removeManagedCronBlock($current);
         $expression = null;
         if (!empty($config['enabled'])) {
-            [$hour, $minute] = array_map('intval', explode(':', $config['time']));
+            [$hour, $minute, $second] = array_map('intval', explode(':', $config['time']));
             $cronWeekday = (int) $config['weekday'] === 7 ? 0 : (int) $config['weekday'];
             $php = $this->resolvePhpCliBinary();
             if ($php === null) {
@@ -102,7 +104,11 @@ class GtfsUpdateManager
             $script = BASE_PATH . '/scripts/update_gtfs.php';
             $log = $this->runtimeDir . '/cron.log';
             $expression = "$minute $hour * * $cronWeekday";
-            $command = implode(' ', [
+            $commandParts = [];
+            if ($second > 0) {
+                $commandParts[] = 'sleep ' . $second . ' &&';
+            }
+            $commandParts[] = implode(' ', [
                 escapeshellarg($php),
                 escapeshellarg($script),
                 '--trigger=scheduled',
@@ -110,7 +116,9 @@ class GtfsUpdateManager
                 escapeshellarg($log),
                 '2>&1',
             ]);
+            $command = implode(' ', $commandParts);
             $block = self::CRON_MARKER_START . "\n" .
+                "CRON_TZ=UTC\n" .
                 $expression . ' ' . $command . "\n" .
                 self::CRON_MARKER_END . "\n";
             $updated = rtrim($updated) . ($updated === '' ? '' : "\n\n") . $block;
@@ -132,6 +140,14 @@ class GtfsUpdateManager
         $pattern = '/^' . preg_quote(self::CRON_MARKER_START, '/') . '\R.*?^' .
             preg_quote(self::CRON_MARKER_END, '/') . '\R?/ms';
         return preg_replace($pattern, '', $crontab) ?? $crontab;
+    }
+
+    private function normalizeConfig(array $config): array
+    {
+        if (isset($config['time']) && preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $config['time'])) {
+            $config['time'] .= ':00';
+        }
+        return $config;
     }
 
     private function resolveCrontabBinary(): ?string
@@ -438,11 +454,11 @@ class GtfsUpdateManager
         $config = $this->getConfig();
         if (!$config['enabled']) return false;
 
-        $now = new DateTimeImmutable('now', new DateTimeZone('Europe/Rome'));
+        $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
 
         // Se non è il giorno corretto o l'orario non è arrivato, non faccio nulla
         if ((int) $now->format('N') !== (int) $config['weekday']) return false;
-        if ($now->format('H:i') < $config['time']) return false;
+        if ($now->format('H:i:s') < $config['time']) return false;
         // Prendo il numero della settimana corrente
         $week = $now->format('o-W');
         // Se è già stato eseguito questa settimana, non faccio nulla

@@ -30,7 +30,10 @@
             <div class="panel-header">
                 <div>
                     <h2>Pianificazione settimanale</h2>
-                    <div class="gtfs-muted">Il salvataggio installa o aggiorna automaticamente il cron settimanale.</div>
+                    <div class="gtfs-muted">
+                        Il salvataggio installa o aggiorna automaticamente il cron settimanale.
+                        <strong>Attenzione:</strong> giorno e ora sono espressi in UTC+00.
+                    </div>
                 </div>
                 <label class="gtfs-switch">
                     <input type="checkbox" id="schedule-enabled">
@@ -50,8 +53,8 @@
                         <option value="7">Domenica</option>
                     </select>
                 </label>
-                <label>Ora
-                    <input type="time" id="schedule-time" value="03:00">
+                <label>Ora (UTC+00)
+                    <input type="time" id="schedule-time" value="03:00:00" step="1">
                 </label>
                 <button type="button" class="gtfs-button" id="save-schedule">Salva pianificazione</button>
             </div>

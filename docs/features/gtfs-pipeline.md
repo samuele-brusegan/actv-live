@@ -84,6 +84,9 @@ Il comando `crontab` deve essere installato e l'utente PHP deve poter gestire il
 proprio crontab. Il salvataggio dal pannello restituisce un errore e ripristina la
 configurazione precedente se la sincronizzazione fallisce.
 
+La pianificazione usa il fuso UTC+00. I secondi vengono applicati tramite un
+ritardo `sleep` dopo l'avvio del job da parte di cron, che ha precisione al minuto.
+
 Avvio CLI manuale:
 
 ```bash

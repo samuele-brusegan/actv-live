@@ -481,7 +481,7 @@ della cache e coda del log.
     "config": {
       "enabled": false,
       "weekday": 1,
-      "time": "03:00",
+      "time": "03:00:00",
       "last_scheduled_week": null
     },
     "state": {
@@ -504,11 +504,12 @@ della cache e coda del log.
   "csrf": "token-della-sessione",
   "enabled": true,
   "weekday": 1,
-  "time": "03:00"
+  "time": "03:00:00"
 }
 ```
 
-`weekday` usa i numeri ISO `1`-`7` (lunedì-domenica). `time` usa `HH:MM`.
+`weekday` usa i numeri ISO `1`-`7` (lunedì-domenica). `time` usa `HH:MM:SS`.
+Il giorno e l'orario della pianificazione sono sempre interpretati in UTC+00.
 La risposta contiene `success` e la configurazione normalizzata in `config`.
 
 ### `POST /api/admin/gtfs-update/start`
