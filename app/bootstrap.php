@@ -14,7 +14,8 @@ if (!defined('ENV')) {
     define('ENV', parse_ini_file(BASE_PATH . '/.env'));
 }
 
-const URL_PATH = "https://actv-live.test";
+//const URL_PATH = "https://actv-live.test";
+const URL_PATH = ENV['URL_PATH'];
 const COMMON_HTML_HEAD = BASE_PATH . '/public/commons/head.php';
 const COMMON_HTML_FOOT = BASE_PATH . '/public/commons/bottom_navigation.php';
 const THEME = 'dark'; // Simplified for now
