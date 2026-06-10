@@ -6,7 +6,7 @@
 // Usiamo history.pushState per cambiare l'URL in jsdom
 window.history.pushState({}, 'Test', '?tripId=123');
 
-const { formatMinutesRemaining, mergeStops, state } = require('../../public/js/tripDetails');
+const { formatMinutesRemaining, mergeStops, normalizeStopName, state } = require('../../public/js/tripDetails');
 
 describe('formatMinutesRemaining', () => {
     test('ritorna la stringa originale se non contiene ":"', () => {
@@ -92,6 +92,37 @@ describe('mergeStops', () => {
         expect(result[0].arrival_time).toBe('10:02');
     });
 
+    test('fonde nomi fermata con maiuscole, spazi e apostrofi diversi', () => {
+        state.stopsGTFS = [
+            { stop_name: "Ca' Marcello  Cappuccina", stop_id: '9', arrival_time: '10:00' }
+        ];
+        state.stopsJSON = [
+            { stop: 'CA’ MARCELLO CAPPUCCINA', time: '10:02' }
+        ];
+
+        const result = mergeStops();
+
+        expect(result).toHaveLength(1);
+        expect(result[0].hasRealTime).toBe(true);
+        expect(result[0].arrival_time).toBe('10:02');
+    });
+
+    test('mantiene le occorrenze duplicate nello stesso ordine', () => {
+        state.stopsGTFS = [
+            { stop_name: 'Fermata A', stop_id: '100', arrival_time: '10:00' },
+            { stop_name: 'Fermata A', stop_id: '100', arrival_time: '10:10' }
+        ];
+        state.stopsJSON = [
+            { stop: 'fermata a', time: '10:02' },
+            { stop: 'FERMATA A', time: '10:12' }
+        ];
+
+        const result = mergeStops();
+
+        expect(result).toHaveLength(2);
+        expect(result.map(stop => stop.arrival_time)).toEqual(['10:02', '10:12']);
+    });
+
     test('aggiunge fermate JSON non presenti in GTFS', () => {
         state.stopsGTFS = [
             { stop_name: 'Fermata A', stop_id: '100', arrival_time: '10:00', departure_time: '10:00' }
@@ -104,5 +135,11 @@ describe('mergeStops', () => {
         expect(result).toHaveLength(2);
         expect(result[1].hasGTFS).toBe(false);
         expect(result[1].hasRealTime).toBe(true);
+    });
+});
+
+describe('normalizeStopName', () => {
+    test('normalizza accenti e punteggiatura', () => {
+        expect(normalizeStopName('  Università—Ca’ Foscari ')).toBe('universita ca foscari');
     });
 });

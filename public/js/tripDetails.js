@@ -250,7 +250,8 @@ async function refreshData() {
         );
 
         if (selectedStopInGTFS) {
-            const rtStop = state.stopsJSON.find(s => s.stop === selectedStopInGTFS.stop_name);
+            const selectedStopKey = normalizeStopName(selectedStopInGTFS.stop_name);
+            const rtStop = state.stopsJSON.find(s => normalizeStopName(s.stop) === selectedStopKey);
             if (rtStop) {
                 state.arrivalTime = rtStop.time;
             }
@@ -453,13 +454,18 @@ function mergeStops() {
 
     // 1. Popola la mappa con i dati JSON (Real-Time)
     state.stopsJSON.forEach(item => {
-        jsonMap.set(item.stop, item);
+        const key = normalizeStopName(item.stop);
+        if (!key) return;
+        if (!jsonMap.has(key)) jsonMap.set(key, []);
+        jsonMap.get(key).push(item);
     });
 
     // 2. Itera sulle fermate GTFS e fonde i dati
     state.stopsGTFS.forEach(gtfsStop => {
         const stopName = gtfsStop.stop_name;
-        const jsonItem = jsonMap.get(stopName);
+        const key = normalizeStopName(stopName);
+        const matches = jsonMap.get(key);
+        const jsonItem = matches?.shift();
 
         const mergedItem = {
             ...gtfsStop,
@@ -474,19 +480,32 @@ function mergeStops() {
         merged.push(mergedItem);
 
         // Rimuovi l'elemento dalla mappa per marcare come "usato"
-        jsonMap.delete(stopName);
+        if (matches && matches.length === 0) jsonMap.delete(key);
     });
 
     // 3. Aggiungi eventuali fermate JSON che non erano nel GTFS (raro ma possibile)
-    jsonMap.forEach((jsonItem, stopName) => {
-        merged.push({
-            ...jsonItem,
-            hasRealTime: true,
-            hasGTFS: false
+    jsonMap.forEach(items => {
+        items.forEach(jsonItem => {
+            merged.push({
+                ...jsonItem,
+                hasRealTime: true,
+                hasGTFS: false
+            });
         });
     });
 
     return merged;
+}
+
+function normalizeStopName(value) {
+    return String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[’`´]/g, "'")
+        .replace(/[^a-zA-Z0-9]+/g, ' ')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toLowerCase();
 }
 
 async function getPreviousStopsRealTime_block() {
@@ -697,5 +716,5 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl = null) {
 
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { formatMinutesRemaining, mergeStops, state };
+    module.exports = { formatMinutesRemaining, mergeStops, normalizeStopName, state };
 }
