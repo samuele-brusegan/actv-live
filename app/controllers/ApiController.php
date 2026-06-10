@@ -79,9 +79,9 @@ class ApiController {
     // Refactored from dbControll::api_gtfsIdentify
     function api_gtfsIdentify() {
         $tableJoins = "
-            INNER JOIN trips ON routes.route_id = trips.route_id 
-            INNER JOIN stop_times ON trips.trip_id = stop_times.trip_id 
-            INNER JOIN stops ON stop_times.stop_id = stops.stop_id 
+            INNER JOIN trips ON routes.route_id = trips.route_id
+            INNER JOIN stop_times ON trips.trip_id = stop_times.trip_id
+            INNER JOIN stops ON stop_times.stop_id = stops.stop_id
             INNER JOIN calendar ON trips.service_id = calendar.service_id
             ";
 
@@ -105,7 +105,7 @@ class ApiController {
         $db = $this->getDb();
 
         $stops = $db->query(
-            "SELECT 
+            "SELECT
                 stops.stop_id,
                 stops.stop_code,
                 stops.stop_name,
@@ -559,15 +559,15 @@ class ApiController {
                 $selectedTripId = $tripByHeadsign[0]['trip_id'];
             } else {
                 $deepQuery = "
-                    SELECT t.trip_id 
+                    SELECT t.trip_id
                     FROM trips t
                     WHERE t.route_id = ?
                     AND (
-                        SELECT s.stop_name 
-                        FROM stop_times st 
-                        JOIN stops s ON st.stop_id = s.stop_id 
-                        WHERE st.trip_id = t.trip_id 
-                        ORDER BY st.stop_sequence DESC 
+                        SELECT s.stop_name
+                        FROM stop_times st
+                        JOIN stops s ON st.stop_id = s.stop_id
+                        WHERE st.trip_id = t.trip_id
+                        ORDER BY st.stop_sequence DESC
                         LIMIT 1
                     ) LIKE ?
                     LIMIT 1
@@ -594,7 +594,7 @@ class ApiController {
 
         // 3. Get stops for selected trip
         $stopsQuery = "
-            SELECT 
+            SELECT
                 s.stop_id as id,
                 s.stop_name as name,
                 s.stop_lat as lat,
@@ -640,9 +640,9 @@ class ApiController {
 
     function gtfsResolve() {
         $tableJoins = "
-            INNER JOIN trips ON routes.route_id = trips.route_id 
-            INNER JOIN stop_times ON trips.trip_id = stop_times.trip_id 
-            INNER JOIN stops ON stop_times.stop_id = stops.stop_id 
+            INNER JOIN trips ON routes.route_id = trips.route_id
+            INNER JOIN stop_times ON trips.trip_id = stop_times.trip_id
+            INNER JOIN stops ON stop_times.stop_id = stops.stop_id
             INNER JOIN calendar ON trips.service_id = calendar.service_id
             ";
 
@@ -821,9 +821,9 @@ class ApiController {
         $shapePoints = [];
         if (!empty($tripInfo) && !empty($tripInfo[0]['shape_id'])) {
             $shapeId = $tripInfo[0]['shape_id'];
-            $sqlShape = "SELECT lat, lng, sequence, dist_traveled 
-                         FROM shapes_refined 
-                         WHERE shape_id = ? 
+            $sqlShape = "SELECT lat, lng, sequence, dist_traveled
+                         FROM shapes_refined
+                         WHERE shape_id = ?
                          ORDER BY sequence ASC";
             $shapePoints = $db->query($sqlShape, [$shapeId]);
         }
