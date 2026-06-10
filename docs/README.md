@@ -24,9 +24,17 @@ Benvenuto nella documentazione tecnica di **ACTV Live**. Questo manuale è proge
 ## Requisiti di Installazione
 
 1.  **Server Web**: Apache con `mod_rewrite` abilitato (vedi `.htaccess`).
-2.  **PHP**: Versione >= 8.0.
-3.  **Database**: MySQL con il dump fornito.
-4.  **Configurazione**: Rinominare `.env.example` (se presente) in `.env` e configurare le credenziali DB.
+2.  **PHP**: Versione >= 8.4, con estensioni `curl` e `pdo_mysql`.
+3.  **Estrazione GTFS**: Estensione PHP `zip` (`ZipArchive`) oppure comando di sistema `unzip`.
+4.  **Pianificazione GTFS**: Comando `crontab` disponibile e servizio cron attivo.
+5.  **Database**: MySQL o MariaDB con il dump fornito.
+6.  **Configurazione**: Rinominare `.env.example` (se presente) in `.env` e configurare le credenziali DB.
+
+Su Debian/Ubuntu le dipendenze PHP e GTFS possono essere installate con:
+
+```bash
+sudo apt install cron php8.4-cli php8.4-curl php8.4-mysql php8.4-zip unzip
+```
 
 ## Avvio Rapido
 

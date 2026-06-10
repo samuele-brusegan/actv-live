@@ -10,6 +10,72 @@ class ApiController {
         return $db;
     }
 
+    private function requireAdminJson(): bool {
+        if (AdminAuth::check()) return true;
+        http_response_code(401);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Autenticazione amministratore richiesta']);
+        return false;
+    }
+
+    private function adminJsonInput(): ?array {
+        $data = json_decode((string) file_get_contents('php://input'), true);
+        if (!is_array($data)) $data = $_POST;
+        if (!AdminAuth::verifyCsrf($data['csrf'] ?? null)) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Token CSRF non valido']);
+            return null;
+        }
+        return $data;
+    }
+
+    function adminGtfsUpdateStatus() {
+        if (!$this->requireAdminJson()) return;
+        header('Content-Type: application/json');
+        header('Cache-Control: no-store');
+        try {
+            require_once BASE_PATH . '/app/services/GtfsUpdateManager.php';
+            echo json_encode(['success' => true, 'data' => (new GtfsUpdateManager())->getOverview()]);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    function adminGtfsUpdateConfig() {
+        if (!$this->requireAdminJson()) return;
+        $data = $this->adminJsonInput();
+        if ($data === null) return;
+        header('Content-Type: application/json');
+        header('Cache-Control: no-store');
+        try {
+            require_once BASE_PATH . '/app/services/GtfsUpdateManager.php';
+            $config = (new GtfsUpdateManager())->saveConfig($data);
+            echo json_encode(['success' => true, 'config' => $config]);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    function adminGtfsUpdateStart() {
+        if (!$this->requireAdminJson()) return;
+        $data = $this->adminJsonInput();
+        if ($data === null) return;
+        header('Content-Type: application/json');
+        header('Cache-Control: no-store');
+        try {
+            require_once BASE_PATH . '/app/services/GtfsUpdateManager.php';
+            $result = (new GtfsUpdateManager())->start('manual');
+            if (!$result['started']) http_response_code(409);
+            echo json_encode(array_merge(['success' => $result['started']], $result));
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     // Refactored from dbControll::api_gtfsIdentify
     function api_gtfsIdentify() {
         $tableJoins = "

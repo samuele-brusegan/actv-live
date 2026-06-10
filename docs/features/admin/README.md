@@ -3,11 +3,12 @@
 A minimal administrative area to log in, inspect the centralized error log, and view
 live operational metrics.
 
-- **Routes:** `/admin/login`, `/admin/logout`, `/admin/logs`, `/admin/dashboard`
+- **Routes:** `/admin/login`, `/admin/logout`, `/admin/logs`, `/admin/dashboard`,
+  `/admin/gtfs-update`
 - **Actions:** `Controller::adminLogin/adminLogout/logs/adminDashboard`
 - **Auth gate:** `app/services/AdminAuth.php`
 - **Logging:** `app/services/Logger.php`
-- **Views:** `app/views/admin/{login,dashboard,logs}.php`
+- **Views:** `app/views/admin/{login,dashboard,logs,gtfsUpdate}.php`
 - **Client JS:** `public/js/adminDashboard.js`
 
 This is a **large feature**; its sub-problems are documented separately:

@@ -9,11 +9,14 @@ class GTFSParser {
     private $dataDir;
     private $cacheDir;
     
-    public function __construct() {
+    public function __construct(?string $dataDir = null, ?string $cacheDir = null) {
         ini_set('memory_limit', '1024M');
-        $this->dataDir = BASE_PATH . '/data/gtfs';
-        $this->cacheDir = BASE_PATH . '/data/gtfs/cache';
-        
+        $this->dataDir = $dataDir ?: BASE_PATH . '/data/gtfs';
+        $this->cacheDir = $cacheDir ?: $this->dataDir . '/cache';
+
+        if (!file_exists($this->dataDir)) {
+            mkdir($this->dataDir, 0777, true);
+        }
         if (!file_exists($this->cacheDir)) {
             mkdir($this->cacheDir, 0777, true);
         }
@@ -42,10 +45,24 @@ class GTFSParser {
         }
         
         echo "Extracting GTFS files...\n";
-        $zip = new ZipArchive;
-        if ($zip->open($zipFile) === TRUE) {
+        if (class_exists('ZipArchive')) {
+            $zip = new ZipArchive;
+            if ($zip->open($zipFile) !== TRUE) {
+                throw new Exception("Failed to extract GTFS files");
+            }
             $zip->extractTo($this->dataDir);
             $zip->close();
+            echo "GTFS files extracted successfully\n";
+        } elseif (is_executable('/usr/bin/unzip')) {
+            exec(
+                '/usr/bin/unzip -oq ' . escapeshellarg($zipFile) .
+                ' -d ' . escapeshellarg($this->dataDir),
+                $output,
+                $code
+            );
+            if ($code !== 0) {
+                throw new Exception("Failed to extract GTFS files with unzip");
+            }
             echo "GTFS files extracted successfully\n";
         } else {
             throw new Exception("Failed to extract GTFS files");
@@ -264,6 +281,13 @@ class GTFSParser {
      */
     public function parseAll() {
         $this->downloadGTFS();
+        $this->parseExtracted();
+    }
+
+    /**
+     * Generate JSON caches from GTFS text files already extracted in dataDir.
+     */
+    public function parseExtracted() {
         $this->parseStops();
         $this->parseRoutes();
         $this->parseTrips();

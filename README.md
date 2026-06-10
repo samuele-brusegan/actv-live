@@ -4,6 +4,36 @@ Questo progetto è rilasciato sotto la licenza MIT. Vedere il file [LICENSE](LIC
 ## Requisiti
 - Node.js >= 20.x
 - Composer >= 2.9.5
+- PHP >= 8.4 con estensioni `curl` e `pdo_mysql`
+- Estensione PHP `zip` (`ZipArchive`) oppure comando di sistema `unzip`
+- Comando `crontab` e servizio cron attivo per la pianificazione automatica
+- MySQL o MariaDB
+
+Su Debian/Ubuntu:
+
+```bash
+sudo apt install cron php8.4-cli php8.4-curl php8.4-mysql php8.4-zip unzip
+sudo systemctl enable --now cron
+```
+
+Nei container basati sull'immagine PHP ufficiale:
+
+```dockerfile
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends cron libcurl4-openssl-dev libzip-dev unzip \
+    && docker-php-ext-install curl pdo_mysql zip \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+Nei container il demone cron deve essere avviato dal processo di init o dal
+supervisor usato dallo stack.
+
+Verificare che almeno uno dei due metodi di estrazione sia disponibile:
+
+```bash
+php -r 'var_dump(class_exists("ZipArchive"));'
+command -v unzip
+```
 
 ## Configurazione Locale
 Per configurare il progetto, è necessario creare un file .env con le seguenti variabili:

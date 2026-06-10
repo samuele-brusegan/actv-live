@@ -54,4 +54,61 @@ php scripts/parse_gtfs.php
 `GTFSParser::isCacheValid($maxAge = 86400)` checks the age of `stops.json` so callers
 can decide whether a refresh is needed (default freshness window: 24h). `parseStops`
 raises the PHP memory limit to 1024M.
-</content>
+
+## Aggiornamento completo e pianificato
+
+La pagina autenticata `/admin/gtfs-update` gestisce la pipeline completa:
+
+1. selezione del feed più recente fra gli URL in `GTFS_URLS`;
+2. download ed estrazione in una directory temporanea;
+3. rigenerazione della cache JSON;
+4. import nelle tabelle DB di staging;
+5. compilazione di `stops.data_url`;
+6. creazione di `shapes_refined` con ID auto-incrementali;
+7. validazione e pubblicazione con `RENAME TABLE` atomico.
+
+Il runner usa `flock`, quindi due aggiornamenti non possono essere eseguiti insieme.
+La pianificazione è disabilitata di default. Salvando giorno e ora dalla pagina
+admin, il sistema installa o aggiorna automaticamente una voce marcata nel crontab
+dell'utente che esegue PHP-FPM. Disattivando lo switch, la voce viene rimossa.
+L'esecuzione avviene esattamente nel giorno e all'ora selezionati, secondo il fuso
+orario del server.
+
+La sincronizzazione può essere eseguita anche da CLI:
+
+```bash
+php scripts/sync_gtfs_cron.php
+```
+
+Il comando `crontab` deve essere installato e l'utente PHP deve poter gestire il
+proprio crontab. Il salvataggio dal pannello restituisce un errore e ripristina la
+configurazione precedente se la sincronizzazione fallisce.
+
+Avvio CLI manuale:
+
+```bash
+php scripts/update_gtfs.php --trigger=manual
+```
+
+### Dipendenze runtime
+
+L'aggiornamento richiede:
+
+- PHP CLI, configurabile tramite `GTFS_PHP_CLI` quando il percorso non è standard;
+- comando `crontab` e demone cron attivo per la pianificazione settimanale;
+- estensione PHP `curl` per scaricare il feed;
+- estensione `pdo_mysql` per importare i dati;
+- estensione PHP `zip`, che fornisce `ZipArchive`, oppure il comando `unzip`.
+
+Il runner prova prima `ZipArchive` e usa `unzip` come fallback. Se entrambi sono
+assenti, l'aggiornamento termina con l'errore `Né ZipArchive né il comando unzip
+sono disponibili`.
+
+Verifica rapida:
+
+```bash
+php --ri curl
+php --ri pdo_mysql
+php -r 'var_dump(class_exists("ZipArchive"));'
+command -v unzip
+```

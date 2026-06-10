@@ -25,6 +25,7 @@ $router->add('/admin/login'             , 'Controller', 'adminLogin');
 $router->add('/admin/logout'            , 'Controller', 'adminLogout');
 $router->add('/admin/logs'              , 'Controller', 'logs');
 $router->add('/admin/dashboard'         , 'Controller', 'adminDashboard');
+$router->add('/admin/gtfs-update'       , 'Controller', 'adminGtfsUpdate');
 
 // === API ===
 $router->add('/api/plan-route'          , 'ApiController', 'planRoute');
@@ -34,6 +35,9 @@ $router->add('/api/lines-shapes'        , 'ApiController', 'linesShapes');
 $router->add('/api/trip-stops'          , 'ApiController', 'tripStops');
 $router->add('/api/bus-position'        , 'ApiController', 'busPosition');
 $router->add('/api/log-js-error'        , 'ApiController', 'logJsError');
+$router->add('/api/admin/gtfs-update/status', 'ApiController', 'adminGtfsUpdateStatus');
+$router->add('/api/admin/gtfs-update/config', 'ApiController', 'adminGtfsUpdateConfig');
+$router->add('/api/admin/gtfs-update/start', 'ApiController', 'adminGtfsUpdateStart');
 
 // === API GTFS ===
 $router->add('/api/gtfs-identify'       , 'ApiController', 'api_gtfsIdentify');

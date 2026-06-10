@@ -118,6 +118,12 @@ class Controller {
         require_once BASE_PATH . '/app/views/admin/dashboard.php';
     }
 
+    function adminGtfsUpdate() {
+        AdminAuth::requireAuth();
+        $csrf = AdminAuth::csrfToken();
+        require_once BASE_PATH . '/app/views/admin/gtfsUpdate.php';
+    }
+
 
 
     function liveMap() {

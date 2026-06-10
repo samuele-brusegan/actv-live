@@ -7,7 +7,10 @@ require_once BASE_PATH . '/public/commons/head.php';
 <div class="admin-container">
     <div class="admin-header">
         <h1>Dashboard Amministrazione</h1>
-        <div class="last-update" id="last-update">In attesa di dati...</div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="/admin/gtfs-update" class="btn btn-sm btn-outline-primary">Aggiornamento GTFS</a>
+            <div class="last-update" id="last-update">In attesa di dati...</div>
+        </div>
     </div>
 
     <!-- Progress bar primo caricamento -->

@@ -1,0 +1,167 @@
+.gtfs-muted {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.gtfs-actions,
+.gtfs-form-row {
+    display: flex;
+    align-items: end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.gtfs-form-row label {
+    display: grid;
+    gap: 6px;
+    color: var(--text-secondary);
+}
+
+.gtfs-form-row select,
+.gtfs-form-row input {
+    min-width: 160px;
+    padding: 9px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: #2a2a2a;
+    color: var(--text-primary);
+}
+
+.gtfs-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 9px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 6px;
+    background: var(--accent-color);
+    color: #fff;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.gtfs-button.secondary {
+    border-color: var(--border-color);
+    background: var(--bg-panel);
+}
+
+.gtfs-button.danger {
+    border-color: var(--danger-color);
+    background: var(--danger-color);
+}
+
+.gtfs-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.gtfs-switch {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    cursor: pointer;
+}
+
+.gtfs-switch input {
+    position: absolute;
+    opacity: 0;
+}
+
+.gtfs-switch span {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    background: #555;
+}
+
+.gtfs-switch span::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s;
+}
+
+.gtfs-switch input:checked + span {
+    background: var(--success-color);
+}
+
+.gtfs-switch input:checked + span::after {
+    transform: translateX(20px);
+}
+
+.gtfs-stat-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.gtfs-task {
+    margin-bottom: 14px;
+}
+
+.gtfs-task-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.gtfs-progress {
+    height: 10px;
+    overflow: hidden;
+    border-radius: 8px;
+    background: rgba(127, 127, 127, 0.25);
+}
+
+.gtfs-progress div {
+    height: 100%;
+    background: var(--accent-color);
+    transition: width 0.25s ease;
+}
+
+.gtfs-task.completed .gtfs-progress div {
+    background: var(--success-color);
+}
+
+.gtfs-task.failed .gtfs-progress div {
+    background: var(--danger-color);
+}
+
+.gtfs-log {
+    max-height: 320px;
+    overflow: auto;
+    padding: 12px;
+    border-radius: 6px;
+    background: #111;
+    color: #ddd;
+    white-space: pre-wrap;
+}
+
+.gtfs-message {
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    border-radius: 6px;
+}
+
+.gtfs-message.success {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+}
+
+.gtfs-message.error {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+}
+
+@media (max-width: 640px) {
+    .admin-header {
+        align-items: flex-start;
+        gap: 14px;
+        flex-direction: column;
+    }
+}
