@@ -3,9 +3,17 @@
 function getBusesSmartMidnight(DatabaseConnector $db, $currentTime, $day) {
     $allowedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     $dayIndex = array_search(strtolower($day), $allowedDays);
-    
+
     // Giorno precedente per catturare le corse "24:00+" iniziate ieri
     $yesterday = $allowedDays[($dayIndex + 6) % 7];
+
+    try {
+        $todayDate = (new DateTime("this $day", new DateTimeZone('Europe/Rome')))->format('Ymd');
+        $yesterdayDate = (new DateTime("this $yesterday", new DateTimeZone('Europe/Rome')))->format('Ymd');
+    } catch (Exception $e) {
+        $todayDate = date('Ymd');
+        $yesterdayDate = date('Ymd', strtotime('yesterday'));
+    }
 
     // 1. Prendiamo i bus di oggi E i bus di "ieri" (per le ore piccole)
     // Usiamo una UNION per essere sicuri di non mancare i notturni
@@ -14,26 +22,65 @@ function getBusesSmartMidnight(DatabaseConnector $db, $currentTime, $day) {
             JOIN stop_times st ON s.stop_id = st.stop_id
             JOIN trips t ON st.trip_id = t.trip_id
             JOIN routes r ON t.route_id = r.route_id
-            JOIN calendar c ON t.service_id = c.service_id
-            WHERE c.{$day} = 1
+            LEFT JOIN calendar c ON t.service_id = c.service_id
+            WHERE (
+                (
+                    c.service_id IS NOT NULL
+                    AND c.{$day} = 1
+                    AND ? BETWEEN c.start_date AND c.end_date
+                    AND NOT EXISTS (
+                        SELECT 1 FROM calendar_dates cd_ex
+                        WHERE cd_ex.service_id = t.service_id
+                        AND cd_ex.date = ?
+                        AND cd_ex.exception_type = 2
+                    )
+                )
+                OR EXISTS (
+                    SELECT 1 FROM calendar_dates cd_in
+                    WHERE cd_in.service_id = t.service_id
+                    AND cd_in.date = ?
+                    AND cd_in.exception_type = 1
+                )
+            )
             UNION ALL
             SELECT r.route_short_name, t.trip_headsign, st.arrival_time, t.trip_id, 'yesterday' as source
             FROM stops s
             JOIN stop_times st ON s.stop_id = st.stop_id
             JOIN trips t ON t.trip_id = st.trip_id
             JOIN routes r ON t.route_id = r.route_id
-            JOIN calendar c ON t.service_id = c.service_id
-            WHERE c.{$yesterday} = 1 AND st.arrival_time >= '24:00:00'
+            LEFT JOIN calendar c ON t.service_id = c.service_id
+            WHERE (
+                (
+                    c.service_id IS NOT NULL
+                    AND c.{$yesterday} = 1
+                    AND ? BETWEEN c.start_date AND c.end_date
+                    AND NOT EXISTS (
+                        SELECT 1 FROM calendar_dates cd_ex
+                        WHERE cd_ex.service_id = t.service_id
+                        AND cd_ex.date = ?
+                        AND cd_ex.exception_type = 2
+                    )
+                )
+                OR EXISTS (
+                    SELECT 1 FROM calendar_dates cd_in
+                    WHERE cd_in.service_id = t.service_id
+                    AND cd_in.date = ?
+                    AND cd_in.exception_type = 1
+                )
+            ) AND st.arrival_time >= '24:00:00'
             ORDER BY arrival_time ASC";
 
-    $allTrips = $db->query($sql);
+    $allTrips = $db->query($sql, [
+        $todayDate, $todayDate, $todayDate,
+        $yesterdayDate, $yesterdayDate, $yesterdayDate
+    ]);
 
     $results = [];
-    
+
     // Convertiamo l'orario di ricerca in secondi dall'inizio del giorno (0-86400)
     $timeParts = explode(':', $currentTime);
     $searchSec = ($timeParts[0] * 3600) + ($timeParts[1] * 60);
-    
+
     $range = 1800; // 30 minuti
 
     foreach ($allTrips as $trip) {
@@ -43,17 +90,17 @@ function getBusesSmartMidnight(DatabaseConnector $db, $currentTime, $day) {
 
         // Calcoliamo la differenza assoluta minima su un cerchio di 24 ore (86400 sec)
         $diff = abs($tripSec - $searchSec);
-        
-        // Gestione del "giro della morte": la differenza può essere piccola 
+
+        // Gestione del "giro della morte": la differenza può essere piccola
         // anche se un tempo è 23:55 e l'altro è 00:05 (86400 - 85800 + 300)
-        if ($diff > 43200) { 
+        if ($diff > 43200) {
             $diff = 86400 - $diff;
         }
 
         if ($diff <= $range) {
             // Aggiungiamo un campo per l'utente per capire se è tra poco o è già passato
             $trip['diff_min'] = round(($tripSec - $searchSec) / 60);
-            
+
             // Correzione per i passaggi che arrivano dal giorno prima (es. 24:10 cercato alle 00:10)
             if ($trip['source'] == 'yesterday' && $searchSec < 3600) {
                  $trip['diff_min'] = round(($tripSec - 86400 - $searchSec) / 60);
@@ -62,7 +109,7 @@ function getBusesSmartMidnight(DatabaseConnector $db, $currentTime, $day) {
             $results[] = $trip;
         }
     }
-    
+
     // Ri-ordiniamo per differenza temporale reale
     usort($results, function($a, $b) {
         return $a['diff_min'] <=> $b['diff_min'];

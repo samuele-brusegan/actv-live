@@ -40,20 +40,14 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
 }
 
 function queryBuilder() {
-    //busTrack, busDirection, day, time, stop, lineId
-    $q = "SELECT SUBSTRING_INDEX(t.shape_id, '_', 1) AS line_id, 
-        r.route_short_name AS bus_track, 
+    $q = "SELECT SUBSTRING_INDEX(t.shape_id, '_', 1) AS line_id,
+        r.route_short_name AS bus_track,
         t.trip_headsign AS bus_direction,
         r.route_desc AS line_tag
-        -- Calcoliamo la differenza normalizzata in secondi
-        -- time busTrack busDirection day stop lineId limit
         FROM trips t
         JOIN routes r ON t.route_id = r.route_id
-        JOIN stop_times st ON t.trip_id = st.trip_id
-        JOIN stops s ON st.stop_id = s.stop_id
-        JOIN calendar c ON t.service_id = c.service_id
         WHERE t.trip_id = ?
-        limit 1";
+        LIMIT 1";
     return $q;
 }
 

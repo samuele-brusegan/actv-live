@@ -1,7 +1,7 @@
 <?php
 error_reporting(E_ERROR | E_PARSE);
 if (isset($_GET["return"]) || isset($_GET["rtable"])) {
-    
+
     try{
         /* $time = $_GET['time']; //07:07
         $busTrack = addslashes($_GET['busTrack']); //21
@@ -19,23 +19,39 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         $lineId = $_GET['lineId'] ?? null;              //29387
         $stopId = $_GET['stopId'] ?? null;              //337-web-aut
         $limit = $_GET['limit'] ?? 1;
-        
+
         $pdo = getPDOConnection();
         $trips = dbquery($pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId);
+
+        /*
+            {
+                "error":"No trips found",
+                "params":{
+                    "time":"13:36",
+                    "busTrack":"5E",
+                    "busDirection":"MESTRE CENTRO",
+                    "day":"wednesday",
+                    "lineId":"5011",
+                    "stop":"San Rocco Bruno",
+                    "stopId":null
+                }
+            }
+        */
 
         if (count($trips) == 0) {
             header("Content-Type: application/json");
             echo json_encode([
-                "error" => "No trips found", 
+                "error" => "No trips found",
                 "params" => [
-                    "time" => $time, 
-                    "busTrack" => $busTrack, 
-                    "busDirection" => $busDirection, 
-                    "day" => $day, 
-                    "lineId" => $lineId, 
+                    "time" => $time,
+                    "busTrack" => $busTrack,
+                    "busDirection" => $busDirection,
+                    "day" => $day,
+                    "lineId" => $lineId,
                     "stop" => $stop,
                     "stopId" => $stopId
                 ],
+                "note" => "stopId==null shouldn't be a problem"
             ]);
             exit;
         }
@@ -61,13 +77,13 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         Logger::log('EXCEPTION', $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());
         header("Content-Type: application/json");
         echo json_encode([
-            "error" => "Errore interno", 
+            "error" => "Errore interno",
             "params" => [
-                "time" => $time, 
-                "busTrack" => $busTrack, 
-                "busDirection" => $busDirection, 
-                "day" => $day, 
-                "lineId" => $lineId, 
+                "time" => $time,
+                "busTrack" => $busTrack,
+                "busDirection" => $busDirection,
+                "day" => $day,
+                "lineId" => $lineId,
                 "stop" => $stop,
                 "stopId" => $stopId
             ],
@@ -91,7 +107,7 @@ function getPDOConnection() {
 
 function queryBuilder($day, $hasStopId, $hasTime) {
     // Match fermata: se abbiamo lo stopId ACTV facciamo un match esatto sul
-    // "token" dentro data_url (es. data_url "4824-4825-web-aut" -> token 4824,
+    // \"token\" dentro data_url (es. data_url \"4824-4825-web-aut\" -> token 4824,
     // 4825) per evitare i falsi positivi del LIKE a sottostringa (337 ~ 1337).
     if ($hasStopId) {
         $stopQuery = "CONCAT('-', s.data_url, '-') LIKE CONCAT('%-', ?, '-%')";
@@ -115,12 +131,30 @@ function queryBuilder($day, $hasStopId, $hasTime) {
         JOIN routes r ON t.route_id = r.route_id
         JOIN stop_times st ON t.trip_id = st.trip_id
         JOIN stops s ON st.stop_id = s.stop_id
-        JOIN calendar c ON t.service_id = c.service_id
+        LEFT JOIN calendar c ON t.service_id = c.service_id
         WHERE
             r.route_short_name = ?
             AND $stopQuery
-            AND c.{$day} = 1
-            AND st.pickup_type IN (0, 1)
+            AND (
+                (
+                    c.service_id IS NOT NULL
+                    AND c.{$day} = 1
+                    AND ? BETWEEN c.start_date AND c.end_date
+                    AND NOT EXISTS (
+                        SELECT 1 FROM calendar_dates cd_ex
+                        WHERE cd_ex.service_id = t.service_id
+                        AND cd_ex.date = ?
+                        AND cd_ex.exception_type = 2
+                    )
+                )
+                OR EXISTS (
+                    SELECT 1 FROM calendar_dates cd_in
+                    WHERE cd_in.service_id = t.service_id
+                    AND cd_in.date = ?
+                    AND cd_in.exception_type = 1
+                )
+            )
+            AND (st.pickup_type IN (0, 1) OR st.pickup_type IS NULL)
         $order
         LIMIT 60";
     return $q;
@@ -142,7 +176,7 @@ function get_actv_match_score($search, $target) {
             '-' => ' '
         ];
         $s = strtr($s, $replacements);
-        
+
         // Esplode in parole e tiene solo quelle significative (>1 caratt.)
         return array_filter(explode(' ', $s), function($word) {
             return strlen(trim($word)) > 1;
@@ -161,7 +195,7 @@ function get_actv_match_score($search, $target) {
             // Usiamo str_contains per gestire anche match parziali tra parole
             if (str_contains($tTarget, $token) || str_contains($token, $tTarget)) {
                 $matches++;
-                break; 
+                break;
             }
         }
     }
@@ -231,8 +265,16 @@ function addCombinedScores(array &$trips, string $busDirection, $realSec) {
 
 function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId = null) {
     $allowedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    if (!in_array(strtolower($day), $allowedDays)) {
+    $day = strtolower($day);
+    if (!in_array($day, $allowedDays)) {
         throw new Exception("Invalid day: $day");
+    }
+
+    try {
+        $d = new DateTime("this $day", new DateTimeZone('Europe/Rome'));
+        $date = $d->format('Ymd');
+    } catch (Exception $e) {
+        $date = date('Ymd');
     }
 
     $hasStopId = ($stopId && $stopId !== 'null' && $stopId !== 'undefined');
@@ -242,8 +284,8 @@ function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop
     $query = queryBuilder($day, $hasStopId, $hasTime);
     $stmt = $pdo->prepare($query);
 
-    // Ordine parametri: route_short_name, stop, [time, time per l'ORDER BY].
-    $params = [$busTrack, $paramStop];
+    // Ordine parametri: route_short_name, stop, date (x3), [time, time per l'ORDER BY].
+    $params = [$busTrack, $paramStop, $date, $date, $date];
     if ($hasTime) {
         $params[] = $time;
         $params[] = $time;
@@ -334,9 +376,9 @@ function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop
         //Salva in cache!
         if (!file_exists(BASE_PATH . "/data/cache/busDirections.json")) {
             $tableJoins = "
-                INNER JOIN trips ON routes.route_id = trips.route_id 
-                INNER JOIN stop_times ON trips.trip_id = stop_times.trip_id 
-                INNER JOIN stops ON stop_times.stop_id = stops.stop_id 
+                INNER JOIN trips ON routes.route_id = trips.route_id
+                INNER JOIN stop_times ON trips.trip_id = stop_times.trip_id
+                INNER JOIN stops ON stop_times.stop_id = stops.stop_id
                 INNER JOIN calendar ON trips.service_id = calendar.service_id
                 ";
             $busDirections = $pdo->query("SELECT DISTINCT stops.stop_name FROM routes {$tableJoins} WHERE stop_times.pickup_type = 1")->fetchAll();

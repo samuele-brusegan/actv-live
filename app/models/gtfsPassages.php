@@ -28,26 +28,45 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         }
 
         $now = date('H:i:s');
+        $date = date('Ymd');
 
         // $day è whitelisted: interpolazione sicura nel nome colonna
-        $sql = "SELECT r.route_short_name AS line,
-                       t.trip_headsign   AS destination,
-                       st.departure_time AS dep_time,
-                       s.stop_name       AS stop_name,
-                       s.stop_id         AS stop_id,
-                       t.route_id        AS lineId
+        $sql = "SELECT SUBSTRING_INDEX(SUBSTRING_INDEX(t.shape_id, '_', 3), '_', -1) AS lineId,
+                    t.trip_headsign   AS destination,
+                    st.departure_time AS dep_time,
+                    s.stop_id       AS stop_name,
+                    s.stop_name         AS stop_id,
+                    t.route_id        AS line
                 FROM stops s
                 JOIN stop_times st ON st.stop_id = s.stop_id
                 JOIN trips t       ON t.trip_id = st.trip_id
                 JOIN routes r      ON r.route_id = t.route_id
-                JOIN calendar c    ON c.service_id = t.service_id
+                LEFT JOIN calendar c ON c.service_id = t.service_id
                 WHERE s.data_url LIKE CONCAT('%', ?, '%')
-                  AND c.`$day` = 1
+                  AND (
+                      (
+                          c.service_id IS NOT NULL
+                          AND c.`$day` = 1
+                          AND ? BETWEEN c.start_date AND c.end_date
+                          AND NOT EXISTS (
+                              SELECT 1 FROM calendar_dates cd_ex
+                              WHERE cd_ex.service_id = t.service_id
+                              AND cd_ex.date = ?
+                              AND cd_ex.exception_type = 2
+                          )
+                      )
+                      OR EXISTS (
+                          SELECT 1 FROM calendar_dates cd_in
+                          WHERE cd_in.service_id = t.service_id
+                          AND cd_in.date = ?
+                          AND cd_in.exception_type = 1
+                      )
+                  )
                   AND st.departure_time >= ?
                 ORDER BY st.departure_time ASC
                 LIMIT 40";
 
-        $rows = $db->query($sql, [$stop, $now]);
+        $rows = $db->query($sql, [$stop, $date, $date, $date, $now]);
 
         $seen = [];
         $out = [];

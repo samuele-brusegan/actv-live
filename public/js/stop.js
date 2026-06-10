@@ -113,7 +113,11 @@ async function fetchScheduledPassages() {
         });
         if (!response.ok) return [];
         const data = await response.json();
-        return Array.isArray(data) ? data : [];
+        // Tengo solo quelli nella prossima ora
+        const now = new Date();
+        const nextHour = new Date(now.getTime() + 60 * 60 * 1000 * 2);
+        const nextHourStr = nextHour.toISOString().slice(11, 16);
+        return Array.isArray(data) ? data.filter(p => p.time < nextHourStr) : [];
     } catch (error) {
         console.warn("Errore fetch passaggi previsti:", error);
         return [];
@@ -123,7 +127,11 @@ async function fetchScheduledPassages() {
 /** Chiave linea+destinazione per individuare i passaggi già coperti dal real-time */
 function lineDestKey(p) {
     const line = (p.line || '').split('_')[0];
-    const dest = (p.destination || '').trim().toLowerCase();
+    let dest = (p.destination || '').trim().toLowerCase();
+    // Se dest è regex: mestre centro [a-z][1-9] o piazzale roma [a-z][1-9] o mestre fs [a-z][1-9] rimuovo il suffisso generico [a-z][1-9]
+    if (/^(mestre centro|piazzale roma|mestre fs) [a-z][1-9]$/.test(dest)) {
+        dest = dest.replace(/[a-z][1-9]$/, '');
+    }
     return `${line}|${dest}`;
 }
 
@@ -137,7 +145,18 @@ function mergePassages(realtime, scheduled) {
     (Array.isArray(scheduled) ? scheduled : []).forEach(p => {
         const ld = lineDestKey(p);
         if (covered.has(ld)) return; // già coperto dal real-time
-        const full = ld + '|' + (p.time || '');
+
+        // Se l'orario è relativo lo converto ad assoluto
+        let time = p.time;
+        if (time && time.includes("'")) {
+            // TODO: convertire in orario assoluto
+            const now = new Date();
+            const minutes = parseInt(time.replace("'", ""));
+            const target = new Date(now.getTime() + minutes * 60000);
+            time = target.toISOString().slice(11, 16); // formato HH:MM
+        }
+
+        const full = ld + '|' + (time || '');
         if (added.has(full)) return; // evita duplicati tra i previsti
         added.add(full);
         result.push(p);
@@ -412,7 +431,7 @@ async function fetchTripId(busTrack, busDirection, day, time, stop, lineId) {
             lineId: lineId
         });
         let url = `/api/gtfs-identify?${params.toString()}`;
-        // console.log("https://actv-live.test"+url);
+        //console.log("https://actv-live.test"+url);
 
         const response = await fetch(url);
         text = await response.text();
