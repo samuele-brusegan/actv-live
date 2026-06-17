@@ -99,8 +99,51 @@ async function sendLocalNotification(title, body, tag) {
     });
 }
 
+const IMMINENT_STATE_KEY = 'imminent_state';
+const IMMINENT_THRESHOLD_MIN = 1; // <=1 min (o "departure") = bus imminente
+
+/** Converte il tempo real-time ACTV in minuti ("departure"->0, "5'"->5). */
+function passageMinutes(timeStr) {
+    if (timeStr === 'departure') return 0;
+    const m = String(timeStr || '').match(/(\d+)/);
+    return m ? parseInt(m[1], 10) : null;
+}
+
 /**
- * Controlla i ritardi per le fermate monitorate.
+ * Confronta lo stato precedente (mappa "linea|dest" -> minuti) con i passaggi
+ * correnti e individua i bus appena partiti: erano imminenti (<=1 min) e ora
+ * non ci sono più o il loro orario è "saltato" alla corsa successiva.
+ * Funzione pura per testabilità.
+ * @returns {{departed: Array<{line:string,dest:string}>, state: Object}}
+ */
+function detectDepartures(prevState, passages) {
+    const current = {};
+    (Array.isArray(passages) ? passages : []).forEach(p => {
+        if (!p.real) return;
+        const min = passageMinutes(p.time);
+        if (min === null) return;
+        const line = (p.line || '').split('_')[0];
+        const dest = (p.destination || '').trim();
+        const key = `${line}|${dest}`;
+        if (current[key] === undefined || min < current[key]) current[key] = min;
+    });
+
+    const departed = [];
+    const prev = prevState || {};
+    Object.keys(prev).forEach(key => {
+        if (prev[key] > IMMINENT_THRESHOLD_MIN) return; // non era imminente
+        const now = current[key];
+        if (now === undefined || now > prev[key]) {
+            const [line, dest] = key.split('|');
+            departed.push({ line, dest });
+        }
+    });
+
+    return { departed, state: current };
+}
+
+/**
+ * Controlla i ritardi per le fermate monitorate e notifica i bus appena passati.
  * Usa l'API ACTV real-time e confronta i tempi.
  */
 async function checkDelays() {
@@ -115,6 +158,11 @@ async function checkDelays() {
         lastNotified = JSON.parse(sessionStorage.getItem(notifiedKey) || '{}');
     } catch (e) { /* ignore */ }
 
+    let imminentState = {};
+    try {
+        imminentState = JSON.parse(sessionStorage.getItem(IMMINENT_STATE_KEY) || '{}');
+    } catch (e) { /* ignore */ }
+
     for (const stop of stops) {
         try {
             const response = await fetch(
@@ -127,6 +175,7 @@ async function checkDelays() {
             const passages = await response.json();
             if (!Array.isArray(passages)) continue;
 
+            // ── Notifiche ritardo ──
             for (const p of passages) {
                 if (!p.real || !p.time) continue;
 
@@ -150,12 +199,29 @@ async function checkDelays() {
                     }
                 }
             }
+
+            // ── Notifiche "bus passato" ──
+            // Al primo giro lo stato precedente è assente: nessuna falsa notifica.
+            const hadState = Object.prototype.hasOwnProperty.call(imminentState, stop.id);
+            const { departed, state } = detectDepartures(imminentState[stop.id], passages);
+            imminentState[stop.id] = state;
+
+            if (hadState) {
+                for (const d of departed) {
+                    await sendLocalNotification(
+                        `Bus passato`,
+                        `Il bus ${d.line} verso ${d.dest} è appena passato a ${stop.name}`,
+                        `passed_${stop.id}_${d.line}_${d.dest}`
+                    );
+                }
+            }
         } catch (error) {
             console.warn(`Errore check ritardi per ${stop.id}:`, error);
         }
     }
 
     sessionStorage.setItem(notifiedKey, JSON.stringify(lastNotified));
+    sessionStorage.setItem(IMMINENT_STATE_KEY, JSON.stringify(imminentState));
 }
 
 /** Avvia il monitoraggio periodico dei ritardi */
@@ -214,6 +280,6 @@ if (typeof module !== 'undefined' && module.exports) {
         areNotificationsEnabled, setNotificationsEnabled,
         getDelayThreshold, setDelayThreshold,
         getMonitoredStops, addMonitoredStop, removeMonitoredStop, isStopMonitored,
-        toggleNotifications
+        toggleNotifications, detectDepartures, passageMinutes
     };
 }

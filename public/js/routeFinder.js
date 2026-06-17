@@ -362,6 +362,82 @@ function toggleReturn() {
     persistState();
 }
 
+/* ====================  Tragitti preferiti  ==================== */
+
+function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/** Carica un tragitto preferito e avvia la ricerca. */
+function loadFavoriteRoute(r) {
+    searchState.origin = r.origin;
+    searchState.destination = r.destination;
+    persistState();
+    updateUI();
+    searchRoutes();
+}
+
+/** Attiva/disattiva le notifiche (incl. "bus passato") per l'origine del tragitto. */
+async function toggleRouteNotify(r, btn) {
+    if (typeof addMonitoredStop === 'undefined' || !r.origin || !r.origin.id) return;
+
+    if (typeof isStopMonitored !== 'undefined' && isStopMonitored(r.origin.id)) {
+        removeMonitoredStop(r.origin.id);
+        btn.classList.remove('active');
+        return;
+    }
+
+    if (typeof areNotificationsEnabled !== 'undefined' && !areNotificationsEnabled()) {
+        if (typeof toggleNotifications !== 'undefined') {
+            const ok = await toggleNotifications();
+            if (!ok) return; // permesso negato
+        }
+    }
+    addMonitoredStop(r.origin.id, r.origin.name);
+    btn.classList.add('active');
+}
+
+function renderFavoriteRoutes() {
+    if (typeof getFavoriteRoutes === 'undefined') return;
+    const section = document.getElementById('favorite-routes-section');
+    const list = document.getElementById('favorite-routes-list');
+    if (!section || !list) return;
+
+    const routes = getFavoriteRoutes();
+    if (!routes.length) {
+        section.style.display = 'none';
+        list.innerHTML = '';
+        return;
+    }
+    section.style.display = 'block';
+    list.innerHTML = '';
+
+    routes.forEach(r => {
+        const monitored = (typeof isStopMonitored !== 'undefined') && r.origin && isStopMonitored(r.origin.id);
+        const lineBadge = r.line ? `<span class="fav-route-line">${escapeHtml(r.line.split('_')[0])}</span>` : '';
+
+        const row = document.createElement('div');
+        row.className = 'favorite-route-row';
+        row.innerHTML = `
+            <button class="fav-route-main" type="button">
+                ${lineBadge}
+                <span class="fav-route-text">${escapeHtml(r.origin && r.origin.name)} \u2192 ${escapeHtml(r.destination && r.destination.name)}</span>
+            </button>
+            <button class="fav-route-bell ${monitored ? 'active' : ''}" type="button" title="Avvisami quando passa il bus">\u{1F514}</button>
+            <button class="fav-route-del" type="button" title="Rimuovi tragitto">\u00D7</button>
+        `;
+        row.querySelector('.fav-route-main').addEventListener('click', () => loadFavoriteRoute(r));
+        row.querySelector('.fav-route-bell').addEventListener('click', (e) => { e.stopPropagation(); toggleRouteNotify(r, e.currentTarget); });
+        row.querySelector('.fav-route-del').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof removeFavoriteRoute !== 'undefined') removeFavoriteRoute(r.key);
+            renderFavoriteRoutes();
+        });
+        list.appendChild(row);
+    });
+}
+
 // Inizializzazione al caricamento
 window.addEventListener('DOMContentLoaded', () => {
     // Carica dati salvati
@@ -389,6 +465,7 @@ window.addEventListener('DOMContentLoaded', () => {
     updateUI();
     updateDisplayDateTime();
     updateOptimizeUI();
+    renderFavoriteRoutes();
 
     // Sincronizza UI del toggle ritorno
     const returnToggle = document.getElementById('return-toggle');

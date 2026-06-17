@@ -422,3 +422,51 @@ input:checked+.toggle-slider:before {
         width: 90%;
     }
 }
+
+/* Tragitti preferiti */
+.favorite-routes-section { margin-bottom: 1rem; }
+.favorite-route-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--color-white);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    padding: 6px 10px;
+    margin-bottom: 8px;
+}
+.fav-route-main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font-size: 15px;
+    color: var(--color-black);
+    padding: 6px 0;
+}
+.fav-route-line {
+    background: var(--color-primary-blue);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    border-radius: 6px;
+    padding: 2px 8px;
+    flex-shrink: 0;
+}
+.fav-route-text { line-height: 1.2; }
+.fav-route-bell, .fav-route-del {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 18px;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    opacity: 0.55;
+    flex-shrink: 0;
+}
+.fav-route-bell.active { opacity: 1; }
+.fav-route-bell:hover, .fav-route-del:hover { background: rgba(0,0,0,0.06); opacity: 1; }

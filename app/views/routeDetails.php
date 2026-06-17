@@ -9,6 +9,7 @@
         <link rel="stylesheet" href="/css/structure/structure-routeDetails.css">
         <link rel="stylesheet" href="/css/routeDetails.css">
         <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        <script src="/js/favoriteRoutes.js"></script>
         <script src="/js/routeDetails.js"></script>
     </head>
     <body>
@@ -41,6 +42,8 @@
                 </div>
 
             </div>
+
+            <button id="save-route-btn" class="btn-save-route" onclick="toggleSaveRoute()">&#9734; Salva tragitto</button>
 
             <button class="btn-map" onclick="showMap()">visualizza sulla mappa</button>
 

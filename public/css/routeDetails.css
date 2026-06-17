@@ -201,3 +201,24 @@
     flex: 1;
     width: 100%;
 }
+
+/* Pulsante salva tragitto */
+.btn-save-route {
+    display: block;
+    width: 100%;
+    margin-top: var(--spacing-md, 16px);
+    padding: 14px;
+    border: 2px solid var(--color-primary-green);
+    background: transparent;
+    color: var(--color-primary-green);
+    border-radius: var(--radius-xl, 24px);
+    font-family: var(--font-secondary);
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.btn-save-route.saved {
+    background: var(--color-primary-green);
+    color: var(--color-white);
+}

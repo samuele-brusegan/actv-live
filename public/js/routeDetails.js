@@ -9,6 +9,8 @@ let ORIGIN_COORDS = null;
 let DEST_COORDS = null;
 let USER_COORDS = null;
 let mapInstance = null;
+let FAV_ORIGIN = null;
+let FAV_DESTINATION = null;
 
 window.addEventListener('DOMContentLoaded', () => {
     try {
@@ -28,8 +30,12 @@ window.addEventListener('DOMContentLoaded', () => {
         const destination = destinationData ? JSON.parse(destinationData) : { name: 'Destinazione' };
 
         CURRENT_ROUTE = route;
+        FAV_ORIGIN = origin;
+        FAV_DESTINATION = destination;
         ORIGIN_COORDS = parseCoords(origin);
         DEST_COORDS = parseCoords(destination);
+
+        updateSaveRouteBtn();
 
         const dateEl = document.getElementById('route-date');
         const durationEl = document.getElementById('route-duration');
@@ -244,6 +250,31 @@ function renderLeaveInfo(info) {
             <span>Parti entro le <strong>${info.leaveBy}</strong> per arrivare con ~${info.bufferMin} min di anticipo <small>(bus alle ${info.boarding})</small></span>
         </div>`;
     el.style.display = 'block';
+}
+
+/* ====================  Tragitto preferito  ==================== */
+
+/** Linea principale del percorso (prima tratta non a piedi). */
+function routeMainLine(route) {
+    if (route && Array.isArray(route.legs)) {
+        const bus = route.legs.find(l => l.type !== 'walking');
+        if (bus) return bus.route_short_name || null;
+    }
+    return route ? (route.route_short_name || null) : null;
+}
+
+function toggleSaveRoute() {
+    if (typeof toggleFavoriteRoute === 'undefined' || !FAV_ORIGIN || !FAV_DESTINATION) return;
+    toggleFavoriteRoute(FAV_ORIGIN, FAV_DESTINATION, routeMainLine(CURRENT_ROUTE));
+    updateSaveRouteBtn();
+}
+
+function updateSaveRouteBtn() {
+    const btn = document.getElementById('save-route-btn');
+    if (!btn || typeof isFavoriteRoute === 'undefined') return;
+    const saved = isFavoriteRoute(FAV_ORIGIN, FAV_DESTINATION);
+    btn.classList.toggle('saved', saved);
+    btn.innerHTML = saved ? '\u2605 Tragitto salvato' : '\u2606 Salva tragitto';
 }
 
 /* ============================  Mappa  ============================ */
