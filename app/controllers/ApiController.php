@@ -1303,4 +1303,40 @@ class ApiController {
             'buses'   => $results,
         ]);
     }
+    
+    function deleteCookie() {
+        header('Content-Type: application/json');
+
+        $cookieName = $_GET['name'] ?? $_POST['name'] ?? null;
+        $deletedCookies = [];
+
+        // Elimina cookie PHP (server-side)
+        if ($cookieName) {
+            // Elimina un cookie specifico
+            if (isset($_COOKIE[$cookieName])) {
+                unset($_COOKIE[$cookieName]);
+                setcookie($cookieName, '', time() - 3600, '/');
+                setcookie($cookieName, '', time() - 3600, '/', '', true, true);
+                $deletedCookies[] = $cookieName;
+            }
+        } else {
+            // Elimina tutti i cookie PHP
+            foreach ($_COOKIE as $name => $value) {
+                unset($_COOKIE[$name]);
+                setcookie($name, '', time() - 3600, '/');
+                setcookie($name, '', time() - 3600, '/', '', true, true);
+                $deletedCookies[] = $name;
+            }
+        }
+
+        // Restituisce risposta JSON per eliminare cookie JS lato client
+        echo json_encode([
+            'success' => true,
+            'deleted_php_cookies' => $deletedCookies,
+            'js_instruction' => 'Esegui questo codice JS per eliminare i cookie lato client:',
+            'js_code' => $cookieName
+                ? "document.cookie = '{$cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';"
+                : "document.cookie.split(';').forEach(function(c) { var parts = c.split('='); document.cookie = parts[0].trim() + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'; });"
+        ]);
+    }
 }

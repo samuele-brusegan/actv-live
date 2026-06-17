@@ -147,4 +147,8 @@ class Controller {
     function lineSchedule() {
         require_once BASE_PATH . '/app/views/lineSchedule.php';
     }
+    
+    function deleteCookie() {
+        require_once BASE_PATH . '/app/views/deleteCookie.php';
+    }
 }
