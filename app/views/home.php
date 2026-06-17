@@ -78,7 +78,7 @@
                 <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/delay-stats'">
                     Storico ritardi e statistiche
                 </button>
-                <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/lines-schedule'">
+                <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/line-schedule'">
                     Orari statici delle linee
                 </button>
             </div>
