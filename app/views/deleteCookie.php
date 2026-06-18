@@ -8,6 +8,31 @@
         <link rel="stylesheet" href="/css/routeResults.css">
         <script src="/js/routeResults.js"></script>
     </head>
+    <style>
+        :root {
+            --font-size-rm-cookie: 1.5rem;
+        }
+        @media (max-width: 768px) {
+            :root {
+                --font-size-rm-cookie: 1rem;
+            }
+        }
+        .my-container {
+            margin-top: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-grow: 1;
+            flex-direction: column;
+            gap: 2rem;
+        }
+        .btn:not(:has(img)) {
+            font-size: var(--font-size-rm-cookie);
+            border-radius: 1rem;
+            padding: 1rem 2rem;
+        }
+
+    </style>
     <body>
         <!-- Header -->
         <div class="header-green">
@@ -21,8 +46,9 @@
                 </button>
             </div>
         </div>
-        <div class="container mt-5 d-flex justify-content-center align-items-center" style="flex-grow: 1;">
-            <button class="btn btn-danger" onclick="deleteCookie()" style="font-size: 3rem; border-radius: 1rem; padding: 1rem 2rem;">Elimina tutti Cookie</button>
+        <div class="container my-container">
+            <button class="btn btn-danger"  onclick="deleteCookie()">Elimina tutti Cookie</button>
+            <button class="btn btn-success" onclick="window.location.href = '/';">Torna alla home</button>
         </div>
     </body>
     <script>
@@ -37,13 +63,13 @@
             .then(response => response.json())
             .then(data => {
                 console.log(data);
+                // Esegui il codice JS per eliminare i cookie lato client
+                eval(data.js_code);
             })
             .catch(error => {
                 console.error('Error:', error);
             });
 
-            // Esegui il codice JS per eliminare i cookie lato client
-            eval(data.js_code);
         }
     </script>
 </html>
