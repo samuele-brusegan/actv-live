@@ -57,7 +57,7 @@ class StopCard {
 
         // Generate onclick attribute
         const onclickAttr = onClick
-            ? `onclick='${onClick.name}(${JSON.stringify(stop)})'`
+            ? `onclick='${onClick.name}(${JSON.stringify(stop)}, this)'`
             : '';
 
         return /* html */`

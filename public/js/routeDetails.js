@@ -41,7 +41,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const durationEl = document.getElementById('route-duration');
 
         if (dateEl) dateEl.textContent = formatItalianDate(dateStr);
-        if (durationEl) durationEl.textContent = `\u23F1 ${Math.round(route.duration)} min`;
+        if (durationEl) durationEl.textContent = `\u23F1 ${formatRouteDuration(route)}`;
 
         renderRouteTimeline(route, origin, destination);
 
@@ -50,7 +50,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     } catch (e) {
         console.error("Errore init routeDetails:", e);
-        alert('Si è verificato un errore nel caricamento del percorso.');
+        if (window.actvAlert) actvAlert('Si è verificato un errore nel caricamento del percorso.', 'Impossibile caricare il percorso');
     }
 });
 
@@ -74,6 +74,39 @@ function formatShortTime(timeStr) {
     return timeStr ? timeStr.substring(0, 5) : '--:--';
 }
 
+function routeTransitLegs(route) {
+    return (route?.legs || []).filter(leg => leg.type !== 'walking');
+}
+
+function routeTimeMinutes(value) {
+    const parts = String(value || '').split(':').map(Number);
+    return Number.isFinite(parts[0]) && Number.isFinite(parts[1]) ? parts[0] * 60 + parts[1] : 0;
+}
+
+function routeDurationText(minutes) {
+    minutes = Math.max(0, Math.round(minutes || 0));
+    const days = Math.floor(minutes / 1440);
+    const hours = Math.floor((minutes % 1440) / 60);
+    const rest = minutes % 60;
+    const parts = [];
+    if (days) parts.push(`${days} ${days === 1 ? 'giorno' : 'giorni'}`);
+    if (hours) parts.push(`${hours} h`);
+    if (rest || !parts.length) parts.push(`${rest} min`);
+    return parts.join(' ');
+}
+
+function formatRouteDuration(route) {
+    const legs = routeTransitLegs(route);
+    if (!legs.length) return routeDurationText(route?.duration || 0);
+    const start = routeTimeMinutes(legs[0].departure_time);
+    let end = routeTimeMinutes(legs[legs.length - 1].arrival_time);
+    while (end < start) end += 1440;
+    const requested = routeTimeMinutes(localStorage.getItem('route_departure_time'));
+    let waiting = start - requested + (Number(route.day_offset) || 0) * 1440;
+    if (waiting < 0) waiting += 1440;
+    return `${routeDurationText(end - start)} (${routeDurationText(waiting)} da ora)`;
+}
+
 /** Convenzione colori linee (coerente con la pagina risultati / fermata). */
 function getLineBadge(lineRaw) {
     if (!lineRaw) return { name: '?', class: 'badge-red' };
@@ -88,6 +121,11 @@ function getLineBadge(lineRaw) {
     if (/^N/i.test(lineName)) badgeClass = 'badge-night';
 
     return { name: lineName, class: badgeClass };
+}
+
+function getLineBadgeStyle(leg) {
+    const color = String(leg?.route_color || '').trim();
+    return /^#[0-9a-f]{6}$/i.test(color) ? ` style="background-color:${color}"` : '';
 }
 
 /** Renderizza la timeline completa del percorso a partire dalle sue tratte (legs). */
@@ -136,7 +174,7 @@ function renderLeg(leg, index, total, finalDest) {
 
     html += `
         <div class="timeline-connector">
-            <div class="line-badge ${badge.class}">${badge.name}</div>
+            <div class="line-badge ${badge.class}"${getLineBadgeStyle(leg)}>${badge.name}</div>
             <div class="connector-info">${connectorInfo}</div>
         </div>`;
 
@@ -293,7 +331,7 @@ function closeMap(event) {
     if (modal) modal.classList.remove('active');
 }
 
-function initMap() {
+async function initMap() {
     if (typeof L === 'undefined') return;
     const container = document.getElementById('route-map');
     if (!container) return;
@@ -324,10 +362,14 @@ function initMap() {
         points.push([DEST_COORDS.lat, DEST_COORDS.lng]);
     }
 
-    if (ORIGIN_COORDS && DEST_COORDS) {
-        L.polyline([[ORIGIN_COORDS.lat, ORIGIN_COORDS.lng], [DEST_COORDS.lat, DEST_COORDS.lng]], {
-            color: '#009E61', weight: 4, opacity: 0.8
-        }).addTo(mapInstance);
+    const geometries = await fetchRouteGeometries(CURRENT_ROUTE);
+    if (geometries.length) {
+        geometries.forEach(geometry => {
+            L.polyline(geometry.points, {
+                color: geometry.color || '#009E61', weight: 5, opacity: 0.85
+            }).addTo(mapInstance);
+            points.push(...geometry.points);
+        });
     }
 
     if (USER_COORDS) {
@@ -351,6 +393,58 @@ function initMap() {
         mapInstance.setView(points[0], 15);
     } else {
         mapInstance.setView([45.49, 12.24], 12); // Fallback: Venezia
+    }
+}
+
+async function fetchRouteGeometries(route) {
+    const legs = (route?.legs || []).filter(leg => leg.type !== 'walking');
+    const tripIds = [...new Set(legs.map(leg => String(leg.trip_id || '')).filter(Boolean))];
+    if (!tripIds.length) return [];
+
+    try {
+        const params = new URLSearchParams({ tripIds: tripIds.join(',') });
+        const response = await fetch(`/api/lines-shapes?${params.toString()}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const shapes = await response.json();
+        if (!Array.isArray(shapes)) return [];
+
+        const colors = ['#00D4FF', '#FFB000', '#FF4F81', '#B9FF3D'];
+        const legByTrip = new Map(legs.map(leg => [String(leg.trip_id), leg]));
+        return shapes
+            .filter(shape => tripIds.includes(String(shape.trip_id)))
+            .map((shape, shapeIndex) => {
+                const rawPoints = Array.isArray(shape.path) && shape.path.length > 1
+                    ? shape.path : (shape.shape || []);
+                let points = rawPoints
+                    .map(point => [Number(point.lat), Number(point.lng)])
+                    .filter(point => point.every(Number.isFinite));
+                const leg = legByTrip.get(String(shape.trip_id));
+
+                // La risposta path contiene le fermate dell'intera corsa:
+                // limita il disegno alla tratta effettivamente utilizzata.
+                if (Array.isArray(shape.path) && leg && shape.path.length > 1) {
+                    const normalize = value => String(value || '').trim().toLowerCase();
+                    const origin = normalize(leg.origin);
+                    const destination = normalize(leg.destination);
+                    const startIndex = shape.path.findIndex(stop => normalize(stop.name) === origin);
+                    const endIndex = shape.path.findIndex((stop, index) =>
+                        index >= Math.max(0, startIndex) && normalize(stop.name) === destination
+                    );
+                    if (startIndex >= 0 && endIndex > startIndex) {
+                        points = shape.path.slice(startIndex, endIndex + 1)
+                            .map(point => [Number(point.lat), Number(point.lng)])
+                            .filter(point => point.every(Number.isFinite));
+                    }
+                }
+                return {
+                    points,
+                    color: colors[shapeIndex % colors.length]
+                };
+            })
+            .filter(geometry => geometry.points.length > 1);
+    } catch (error) {
+        console.warn('[ACTV] Geometria percorso non disponibile:', error);
+        return [];
     }
 }
 

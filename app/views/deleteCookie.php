@@ -55,11 +55,10 @@
         function deleteCookie() {
 
             // Confirm deletion
-            if (!confirm('Sei sicuro di voler eliminare tutti i cookie?')) {
-                return;
-            }
-
-            fetch('/api/deleteCookie')
+            const confirmation = actvConfirm('Verranno rimossi i dati locali utilizzati per preferenze, tema e preferiti.', 'Elimina dati locali');
+            confirmation.then(function (confirmed) {
+                if (!confirmed) return;
+                return fetch('/api/deleteCookie')
             .then(response => response.json())
             .then(data => {
                 console.log(data);
@@ -68,6 +67,7 @@
             })
             .catch(error => {
                 console.error('Error:', error);
+            });
             });
 
         }

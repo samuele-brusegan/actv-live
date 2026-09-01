@@ -557,7 +557,7 @@ body {
 /* Compare Bar (sticky bottom) */
 .compare-bar {
     position: fixed;
-    bottom: 0;
+    bottom: 76px;
     left: 0;
     right: 0;
     background: var(--color-white);
@@ -566,7 +566,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    z-index: 100;
+    z-index: 110;
 }
 
 .compare-bar span {
@@ -596,6 +596,76 @@ body {
 /* Compare Modal */
 .compare-modal-content {
     max-height: 85vh;
+}
+
+.compare-map-shell {
+    position: relative;
+}
+
+.compare-map {
+    width: 100%;
+    height: 320px;
+    margin: -0.25rem 0 0.5rem;
+    border: 1px solid var(--color-border-gray);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #dfeae6;
+}
+
+.compare-map-expand {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 500;
+    width: 40px;
+    min-height: 40px;
+    padding: 0;
+    border: 1px solid rgba(16,35,31,.18);
+    border-radius: 10px;
+    background: rgba(255,255,255,.94);
+    color: #10231f;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 3px 12px rgba(16,35,31,.16);
+}
+
+.compare-map-shell.is-expanded {
+    position: fixed;
+    inset: 12px;
+    z-index: 1200;
+    padding: 0;
+    background: var(--color-white);
+}
+
+.compare-map-shell.is-expanded .compare-map {
+    height: 100%;
+    margin: 0;
+    border-radius: 16px;
+}
+
+.compare-map-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    color: var(--color-text-gray);
+    font-size: 12px;
+}
+
+.compare-map-status span { display: inline-flex; align-items: center; gap: 5px; }
+.compare-map-status i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.route-wait-time { color: var(--color-text-gray); font-size: .72em; font-weight: 500; white-space: nowrap; }
+.compare-wait-time { display: block; color: var(--color-text-gray); font-size: .72em; font-weight: 500; white-space: nowrap; }
+
+@media (min-width: 760px) {
+    .compare-map {
+        height: 360px;
+    }
+
+    .compare-bar {
+        bottom: 108px;
+    }
 }
 
 .compare-table {

@@ -35,6 +35,8 @@ let outboundRoutes = [];
 let returnRoutes = [];
 let currentDirection = 'andata'; // 'andata' | 'ritorno'
 let activeDestName = '';
+const ROUTE_RESULTS_CACHE_KEY = 'actv_route_results_cache_v3';
+const ROUTE_RESULTS_CACHE_TTL = 5 * 60 * 1000;
 
 /**
  * Inizializzazione della Pagina
@@ -105,13 +107,67 @@ function getOptimizeParam() {
 async function fetchRoutes(from, to, time, optimize) {
     const params = new URLSearchParams({ from, to, time });
     if (optimize) params.set('optimize', optimize);
+    const cacheKey = params.toString();
 
-    const response = await fetch(`/api/plan-route?${params.toString()}`);
-    if (!response.ok) throw new Error(`Status HTTP: ${response.status}`);
+    try {
+        const cache = JSON.parse(localStorage.getItem(ROUTE_RESULTS_CACHE_KEY) || '{}');
+        const cached = cache[cacheKey];
+        if (cached && Date.now() - cached.timestamp < ROUTE_RESULTS_CACHE_TTL && Array.isArray(cached.routes)) {
+            console.log('[ACTV] Risultati percorsi dalla cache:', cacheKey);
+            return cached.routes;
+        }
+    } catch (cacheError) {
+        console.warn('[ACTV] Cache percorsi non disponibile:', cacheError);
+    }
 
-    const data = await response.json();
+    const response = await fetch(`/api/plan-route?${params.toString()}`, { cache: 'no-store' });
+    const responseText = await response.text();
+    console.log('[ACTV] Risposta ricerca percorsi:', {
+        url: response.url,
+        status: response.status,
+        contentType: response.headers.get('content-type'),
+        text: responseText
+    });
+    let data = null;
+
+    try {
+        data = responseText.trim() ? JSON.parse(responseText) : null;
+    } catch (parseError) {
+        // Tolleranza per eventuali warning PHP emessi prima del payload JSON.
+        // La risposta server viene comunque corretta lato PHP, ma questo evita
+        // di perdere il risultato durante un deploy con codice misto in cache.
+        const jsonStart = responseText.search(/[\[{]/);
+        if (jsonStart >= 0) {
+            try { data = JSON.parse(responseText.slice(jsonStart)); } catch (ignored) { data = null; }
+        }
+        if (data) {
+            if (!data.success) throw new Error(data.error || 'Errore durante la ricerca.');
+            return data.routes || [];
+        }
+        throw new Error(response.ok
+            ? 'Il server ha restituito una risposta non valida.'
+            : `HTTP ${response.status}: risposta non valida dal server.`);
+    }
+
+    if (!response.ok) {
+        throw new Error(data?.error || `HTTP ${response.status}: errore durante la ricerca.`);
+    }
+    if (!data || typeof data !== 'object') {
+        throw new Error('Il server ha restituito una risposta vuota.');
+    }
     if (!data.success) throw new Error(data.error || 'Errore durante la ricerca.');
-    return data.routes || [];
+    const routes = data.routes || [];
+    try {
+        const cache = JSON.parse(localStorage.getItem(ROUTE_RESULTS_CACHE_KEY) || '{}');
+        cache[cacheKey] = { timestamp: Date.now(), routes };
+        const entries = Object.entries(cache)
+            .sort((a, b) => b[1].timestamp - a[1].timestamp)
+            .slice(0, 8);
+        localStorage.setItem(ROUTE_RESULTS_CACHE_KEY, JSON.stringify(Object.fromEntries(entries)));
+    } catch (cacheError) {
+        console.warn('[ACTV] Impossibile salvare i risultati in cache:', cacheError);
+    }
+    return routes;
 }
 
 async function performRouteSearch() {
@@ -213,6 +269,53 @@ function getLineBadgeDetails(lineRaw) {
     return { name: lineName, class: badgeClass };
 }
 
+function getBadgeStyle(leg) {
+    const color = String(leg?.route_color || '').trim();
+    return /^#[0-9a-f]{6}$/i.test(color) ? ` style="background-color:${color}"` : '';
+}
+
+function timeToMinutes(value) {
+    const parts = String(value || '').split(':').map(Number);
+    return Number.isFinite(parts[0]) && Number.isFinite(parts[1]) ? parts[0] * 60 + parts[1] : 0;
+}
+
+function formatDuration(minutes) {
+    minutes = Math.max(0, Math.round(minutes || 0));
+    const days = Math.floor(minutes / 1440);
+    const hours = Math.floor((minutes % 1440) / 60);
+    const rest = minutes % 60;
+    const parts = [];
+    if (days) parts.push(`${days} ${days === 1 ? 'giorno' : 'giorni'}`);
+    if (hours) parts.push(`${hours} h`);
+    if (rest || !parts.length) parts.push(`${rest} min`);
+    return parts.join(' ');
+}
+
+function getTransitLegs(route) {
+    return (route.legs || []).filter(leg => leg.type !== 'walking');
+}
+
+function getRideDuration(route) {
+    const legs = getTransitLegs(route);
+    if (!legs.length) return Math.max(0, Number(route.duration) || 0);
+    const start = timeToMinutes(legs[0].departure_time);
+    let end = timeToMinutes(legs[legs.length - 1].arrival_time);
+    while (end < start) end += 1440;
+    return end - start;
+}
+
+function getWaitingDuration(route) {
+    const departure = timeToMinutes(getRouteDepartureTime(route));
+    const requested = timeToMinutes(departureTime);
+    let wait = departure - requested + (Number(route.day_offset) || 0) * 1440;
+    if (wait < 0) wait += 1440;
+    return wait;
+}
+
+function formatRouteDuration(route) {
+    return `${formatDuration(getRideDuration(route))} <span class="route-wait-time">(${formatDuration(getWaitingDuration(route))} da ora)</span>`;
+}
+
 function renderRouteResults(routes) {
     const loadingEl = document.getElementById('loading');
     const containerEl = document.getElementById('routes-container');
@@ -235,7 +338,7 @@ function renderRouteResults(routes) {
                 <div class="route-card-body">
                     <div class="route-header-row">
                         <div class="route-date">${formatItalianDate(departureDate)}</div>
-                        <div class="route-total-duration">\u23F1 ${Math.round(route.duration)} min</div>
+                        <div class="route-total-duration">\u23F1 ${formatRouteDuration(route)}</div>
                     </div>
                     <div class="route-timeline">
                         ${legsHtml}
@@ -271,7 +374,7 @@ function renderLegHTML(leg, route, index) {
     const connectorContent = isWalking
         ? `<div class="line-badge badge-walking">\u{1F6B6}</div>
            <div class="connector-info">Cammina per ${Math.round(leg.duration)} min (${leg.distance}m)</div>`
-        : `<div class="line-badge ${badge.class}">${badge.name}</div>
+        : `<div class="line-badge ${badge.class}"${getBadgeStyle(leg)}>${badge.name}</div>
            <div class="connector-info">per ${leg.stops_count} fermate</div>`;
 
     html += `<div class="timeline-connector">${connectorContent}</div>`;
@@ -350,6 +453,7 @@ function openCompareModal() {
 
     body.innerHTML = renderComparisonView(routes);
     modal.classList.add('active');
+    loadComparisonMap(routes);
 }
 
 function closeCompareModal(event) {
@@ -401,9 +505,9 @@ function renderComparisonView(routes) {
     html += `<div class="compare-row">
         <div class="compare-label">Durata</div>
         ${routes.map(r => {
-            const dur = Math.round(r.duration);
+            const dur = Math.round(getRideDuration(r));
             const isBest = dur === best.duration;
-            return `<div class="compare-cell ${isBest ? 'best-value' : ''}">${dur} min</div>`;
+            return `<div class="compare-cell ${isBest ? 'best-value' : ''}">${formatDuration(dur)} <small class="compare-wait-time">(${formatDuration(getWaitingDuration(r))} da ora)</small></div>`;
         }).join('')}
     </div>`;
 
@@ -452,8 +556,99 @@ function renderComparisonView(routes) {
     return html;
 }
 
+let comparisonMap = null;
+
+function toggleComparisonMap() {
+    const shell = document.getElementById('compare-map-shell');
+    if (!shell) return;
+    const expanded = shell.classList.toggle('is-expanded');
+    const button = shell.querySelector('.compare-map-expand');
+    if (button) {
+        button.textContent = expanded ? '×' : '⛶';
+        button.setAttribute('aria-label', expanded ? 'Riduci mappa' : 'Espandi mappa');
+    }
+    setTimeout(() => comparisonMap?.invalidateSize(), 100);
+}
+
+async function loadComparisonMap(routes) {
+    const mapEl = document.getElementById('compare-map');
+    const statusEl = document.getElementById('compare-map-status');
+    if (!mapEl) return;
+
+    if (typeof L === 'undefined') {
+        if (statusEl) statusEl.textContent = 'Mappa non disponibile in questo momento.';
+        return;
+    }
+
+    if (comparisonMap) {
+        comparisonMap.remove();
+        comparisonMap = null;
+    }
+
+    const tripIds = [];
+    const groupParts = [];
+    routes.forEach((route, routeIndex) => {
+        const ids = (route.legs || [])
+            .filter(leg => leg.type !== 'walking' && leg.trip_id)
+            .map(leg => String(leg.trip_id));
+        ids.forEach(id => {
+            if (!tripIds.includes(id)) tripIds.push(id);
+            groupParts.push(`${routeIndex + 1}:${id}`);
+        });
+    });
+
+    try {
+        const params = new URLSearchParams({
+            tripIds: tripIds.join(','),
+            tripGroups: groupParts.join('|')
+        });
+        const response = await fetch(`/api/lines-shapes?${params.toString()}`, { cache: 'no-store' });
+        const text = await response.text();
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const shapesResponse = JSON.parse(text);
+        if (!Array.isArray(shapesResponse) || !shapesResponse.length) throw new Error('Geometria non disponibile');
+        const allowedTrips = new Set(tripIds);
+        const shapes = shapesResponse.filter(shape => allowedTrips.has(String(shape.trip_id)));
+        if (!shapes.length) throw new Error('Geometria delle corse selezionate non disponibile');
+
+        comparisonMap = L.map(mapEl, { zoomControl: true, attributionControl: false });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+        }).addTo(comparisonMap);
+
+        const colors = ['#087df5', '#ef7d32', '#9b59b6'];
+        const bounds = [];
+        shapes.forEach(shape => {
+            // Nel confronto usiamo le fermate ordinate: le shape stradali
+            // possono contenere deviazioni/varianti e rendere il percorso
+            // illeggibile quando più corse vengono sovrapposte.
+            const points = (shape.path || [])
+                .map(point => [Number(point.lat), Number(point.lng)])
+                .filter(point => point.every(Number.isFinite));
+            if (points.length < 2) return;
+            const group = Math.max(1, Number(shape.group_number) || 1);
+            const color = colors[(group - 1) % colors.length];
+            L.polyline(points, { color, weight: 6, opacity: .88 }).addTo(comparisonMap)
+                .bindPopup(`Percorso ${group}: ${shape.route_short_name || ''}`);
+            bounds.push(...points);
+        });
+
+        if (!bounds.length) throw new Error('Nessun punto disponibile');
+        comparisonMap.fitBounds(bounds, { padding: [18, 18] });
+        if (statusEl) {
+            statusEl.innerHTML = routes.map((_, i) =>
+                `<span><i style="background:${colors[i % colors.length]}"></i>Percorso ${i + 1}</span>`
+            ).join('');
+        }
+        setTimeout(() => comparisonMap?.invalidateSize(), 80);
+    } catch (error) {
+        console.error('[ACTV] Errore mappa confronto:', error);
+        if (statusEl) statusEl.textContent = 'Impossibile caricare la mappa dei percorsi.';
+    }
+}
+
 function findBestValues(routes) {
-    const durations = routes.map(r => Math.round(r.duration));
+    const durations = routes.map(r => Math.round(getRideDuration(r)));
     const stops = routes.map(r => r.stops_count || r.legs.reduce((sum, l) => sum + (l.stops_count || 0), 0));
     const transfers = routes.map(r => getTransferCount(r));
     const walking = routes.map(r => getWalkingMinutes(r));
@@ -472,18 +667,20 @@ function getRouteBadges(route) {
         .filter(l => l.type !== 'walking' && l.route_short_name)
         .map(l => {
             const badge = getLineBadgeDetails(l.route_short_name);
-            return `<span class="line-badge ${badge.class}">${badge.name}</span>`;
+            return `<span class="line-badge ${badge.class}"${getBadgeStyle(l)}>${badge.name}</span>`;
         })
         .join(' ');
 }
 
 function getRouteDepartureTime(route) {
-    if (route.legs && route.legs.length > 0) return route.legs[0].departure_time;
+    const legs = getTransitLegs(route);
+    if (legs.length > 0) return legs[0].departure_time;
     return route.departure_time;
 }
 
 function getRouteArrivalTime(route) {
-    if (route.legs && route.legs.length > 0) return route.legs[route.legs.length - 1].arrival_time;
+    const legs = getTransitLegs(route);
+    if (legs.length > 0) return legs[legs.length - 1].arrival_time;
     return route.arrival_time;
 }
 

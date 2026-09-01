@@ -1,0 +1,9 @@
+/* Administrative surfaces use the same ACTV foundations with denser layouts. */
+body.admin-page { padding-bottom: 24px; }
+.admin-container { width: min(100% - 32px, var(--actv-max)); margin: 24px auto; }
+.admin-header { padding: 20px 0; border-bottom: 1px solid var(--actv-border); }
+.admin-header h1 { color: var(--actv-ink); font-size: clamp(24px, 4vw, 32px); letter-spacing: -.03em; }
+.stats-grid { gap: 16px !important; }
+.stat-card,.panel-card { background: var(--actv-surface) !important; border: 1px solid var(--actv-border) !important; border-radius: 18px !important; box-shadow: var(--actv-shadow-sm) !important; }
+.admin-table th { color: var(--actv-muted); background: var(--actv-surface-2); }
+.admin-table td { color: var(--actv-ink); border-color: var(--actv-border); }

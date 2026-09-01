@@ -16,6 +16,7 @@
 	<?php require_once BASE_PATH . '/app/views/common/icons.php'; ?>
 	<link rel="stylesheet" href="<?=URL_PATH?>/css/structure/structure-style.css">
 	<link rel="stylesheet" href="<?=URL_PATH?>/css/style.css">
+	<link rel="stylesheet" href="<?=URL_PATH?>/css/app-shell.css">
 
 	<!--PWA-->
 	<link rel="icon" type="image/png" href="<?=URL_PATH?>/pwa/favicon-96x96.png" sizes="96x96" />
@@ -29,6 +30,8 @@
 	<script src="/js/cookie-notice.js"></script>
 	<script src="/js/theme.js"></script>
 	<script src="/js/offline.js"></script>
+	<script src="/js/ui-feedback.js"></script>
+	<script src="/js/app-shell.js" defer></script>
 
 <?php 
 //Send globals to JS

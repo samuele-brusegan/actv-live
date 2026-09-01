@@ -11,11 +11,13 @@ if (!defined('BASE_PATH')) {
 }
 
 if (!defined('ENV')) {
-    define('ENV', parse_ini_file(BASE_PATH . '/.env'));
+    $envFile = BASE_PATH . '/.env';
+    $envValues = is_file($envFile) ? parse_ini_file($envFile) : [];
+    define('ENV', is_array($envValues) ? $envValues : []);
 }
 
 //const URL_PATH = "https://actv-live.test";
-const URL_PATH = ENV['URL_PATH'];
+define('URL_PATH', rtrim(trim((string) (ENV['URL_PATH'] ?? '')), '/'));
 const COMMON_HTML_HEAD = BASE_PATH . '/public/commons/head.php';
 const COMMON_HTML_FOOT = BASE_PATH . '/public/commons/bottom_navigation.php';
 const THEME = 'dark'; // Simplified for now
@@ -28,4 +30,3 @@ if (php_sapi_name() === 'cli' || !headers_sent()) {
     set_error_handler(['Logger', 'phpErrorHandler']);
     set_exception_handler(['Logger', 'exceptionHandler']);
 }
-

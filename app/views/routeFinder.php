@@ -51,6 +51,9 @@
                 </div>
             </div>
 
+            <details class="journey-options">
+                <summary>Opzioni di partenza e ritorno</summary>
+
             <!-- Date/Time Triggers -->
             <div class="datetime-section">
                 <div class="section-label">seleziona data e ora partenza:</div>
@@ -96,9 +99,21 @@
                 </div>
             </div>
 
+            </details>
+
             <!-- Search Button -->
             <button class="search-button" onclick="searchRoutes()">ricerca soluzioni</button>
 
+        </div>
+
+        <div id="station-picker-panel" class="station-picker-panel" aria-hidden="true">
+            <div class="station-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="station-picker-title">
+                <div class="station-picker-head">
+                    <h2 id="station-picker-title" class="picker-compact-title">Scegli una fermata</h2>
+                    <button type="button" class="station-picker-close" onclick="closeStationPicker()" aria-label="Chiudi">×</button>
+                </div>
+                <iframe id="station-picker-frame" title="Selezione fermata" loading="lazy"></iframe>
+            </div>
         </div>
 
         <!-- Date Modal -->

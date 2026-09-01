@@ -6,7 +6,7 @@ class RoutePlanner {
     private $stops;
     private $routes;
     private $stopRoutesIndex;
-    private $loadedRoutesData = []; // Cache for loaded route files
+    private $loadedRoutesData = []; // Cache dell'ultima rotta caricata
     private $nameIndex = null; // Index: normalized stop name -> [stop_id, ...]
     
     public function __construct() {
@@ -64,9 +64,11 @@ class RoutePlanner {
         // For now, we'll keep searching but limit the number of routes we check to avoid timeouts
         
         $routesChecked = 0;
-        $maxRoutesToCheck = 50; // Safety limit
-        
-        foreach ($originRoutes as $routeId) {
+        $maxRoutesToCheck = 25; // Safety limit
+
+        // Se esistono già almeno tre alternative dirette, il confronto è più
+        // utile e molto più rapido senza esplorare anche tutti i cambi.
+        if (count($results) < 3) foreach ($originRoutes as $routeId) {
             // Skip if it's a direct route (already handled)
             if (in_array($routeId, $commonRoutes)) continue;
             
@@ -352,6 +354,14 @@ class RoutePlanner {
         return $info['route_short_name'] ?? $info['short_name'] ?? $routeId;
     }
 
+    private function getRouteColor($routeId) {
+        $color = $this->routes[$routeId]['route_color']
+            ?? $this->routes[$routeId]['color']
+            ?? '';
+        $color = ltrim(trim((string) $color), '#');
+        return preg_match('/^[0-9a-fA-F]{6}$/', $color) ? '#' . strtoupper($color) : null;
+    }
+
     /**
      * Get cached route data
      */
@@ -368,7 +378,10 @@ class RoutePlanner {
         }
         
         $data = json_decode(file_get_contents($file), true);
-        $this->loadedRoutesData[$routeId] = $data;
+        // Non conservare tutte le linee in memoria: alcune cache di linea
+        // contengono migliaia di corse e superano facilmente il limite PHP.
+        // Una sola rotta è sufficiente per ogni singola ricerca.
+        $this->loadedRoutesData = [$routeId => $data];
         
         return $data;
     }
@@ -438,13 +451,18 @@ class RoutePlanner {
                         'stops_count' => $stopsCount,
                         'route_short_name' => $shortName,
                         'route_long_name' => $longName,
+                        'route_color' => $this->getRouteColor($routeId),
                         'origin' => $originName,
                         'destination' => $destName,
                         // Una tratta diretta è composta da una singola "leg" (corsa bus)
                         'legs' => [[
                             'type' => 'bus',
-                            'route_short_name' => $shortName,
-                            'route_long_name' => $longName,
+                            'route_id' => $routeId,
+                            'trip_id' => $tripId,
+                            'route_color' => $this->getRouteColor($routeId),
+                    'route_short_name' => $shortName,
+                    'route_long_name' => $longName,
+                    'route_color' => $this->getRouteColor($routeId),
                             'departure_time' => $dep,
                             'arrival_time' => $arr,
                             'stops_count' => $stopsCount,
@@ -560,6 +578,7 @@ class RoutePlanner {
                     'route_id' => $routeId,
                     'route_short_name' => $this->getRouteName($routeId, 'short'),
                     'route_long_name' => $this->getRouteName($routeId, 'long'),
+                    'route_color' => $this->getRouteColor($routeId),
                     'departures' => array_slice($departures, 0, $limit)
                 ];
             }

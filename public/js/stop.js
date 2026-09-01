@@ -339,6 +339,9 @@ function createPassageCard(p) {
     const isReal = p.real;
     const stop = p.stop || stationId;
     const lineId = p.lineId;
+    const routeColor = String(p.route_color || p.color || '').trim();
+    const routeColorStyle = /^#?[0-9a-f]{6}$/i.test(routeColor)
+        ? ` style="background-color:#${routeColor.replace('#', '')}"` : '';
 
     // Parsing nome linea (es. "7E_US" -> "7E")
     const [lineName, lineTag] = lineNameRaw.split("_");
@@ -406,7 +409,7 @@ function createPassageCard(p) {
 
     div.innerHTML = `
         <div class="d-flex align-items-center">
-            <div class="line-badge ${badgeColor}">${lineName}</div>
+            <div class="line-badge ${badgeColor}"${routeColorStyle}>${lineName}</div>
             <div class="passage-info">
                 <span class="passage-dest"><b>${destination}</b></span><br/>
                 <span class="passage-meta">Presso <b>${stop}</b></span>

@@ -11,7 +11,12 @@ async function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return null;
 
     try {
-        const registration = await navigator.serviceWorker.register('/sw.js');
+        const registration = await navigator.serviceWorker.register('/sw.js', {
+            updateViaCache: 'none'
+        });
+        // Verifica esplicitamente la presenza di una nuova versione ad ogni
+        // apertura: evita che il browser mantenga uno SW vecchio troppo a lungo.
+        await registration.update();
         return registration;
     } catch (error) {
         console.error('Errore registrazione SW:', error);

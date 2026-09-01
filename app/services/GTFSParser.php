@@ -126,7 +126,9 @@ class GTFSParser {
                 'id' => $route['route_id'],
                 'short_name' => $route['route_short_name'] ?? '',
                 'long_name' => $route['route_long_name'] ?? '',
-                'type' => intval($route['route_type'])
+                'type' => intval($route['route_type']),
+                'color' => $route['route_color'] ?? '',
+                'text_color' => $route['route_text_color'] ?? ''
             ];
         }
         

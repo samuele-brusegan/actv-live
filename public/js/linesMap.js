@@ -48,10 +48,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadingEl = document.getElementById('loading');
 
         try {
-            const response = await fetch(`/api/lines-shapes${window.location.search}`);
-            if (!response.ok) throw new Error('Fallimento fetch linee');
+            const response = await fetch(`/api/lines-shapes${window.location.search}`, { cache: 'no-store' });
+            const responseText = await response.text();
+            if (!response.ok) {
+                let serverMessage = '';
+                try { serverMessage = JSON.parse(responseText).error || ''; } catch (parseError) { /* risposta non JSON */ }
+                throw new Error(`HTTP ${response.status}${serverMessage ? `: ${serverMessage}` : ''}`);
+            }
+            if (!responseText.trim()) throw new Error('Il server ha restituito una risposta vuota');
 
-            const shapes = await response.json();
+            let shapes;
+            try {
+                shapes = JSON.parse(responseText);
+            } catch (parseError) {
+                throw new Error('Il server ha restituito dati non validi');
+            }
+            if (!Array.isArray(shapes)) throw new Error(shapes?.error || 'Formato dati linee non valido');
             let bounds = null;
             const routeGroups = new Map();
 
@@ -184,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Errore caricamento linee:', error);
             if (loadingEl) {
-                loadingEl.innerHTML = '<div class="text-danger">Errore durante il caricamento della mappa.</div>';
+                loadingEl.innerHTML = `<div class="text-danger">Impossibile caricare le linee.<br><small>${error.message}</small></div>`;
             }
         }
     }

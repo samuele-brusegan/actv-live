@@ -1,5 +1,15 @@
 /* Home page specific styles */
 
+.brand-lockup { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; letter-spacing: -.02em; }
+.theme-button { display: grid; place-items: center; width: 44px; height: 44px; padding: 10px; border: 1px solid rgba(255,255,255,.35); border-radius: 50%; background: rgba(255,255,255,.14); }
+.theme-button img { width: 20px; height: 20px; }
+.home-welcome { margin-bottom: 28px; padding: 22px; background: var(--actv-surface); border: 1px solid var(--actv-border); border-radius: 20px; box-shadow: var(--actv-shadow-sm); }
+.home-welcome h2 { margin: 4px 0 18px; font-size: 24px; letter-spacing: -.04em; }
+.eyebrow { color: var(--actv-green-dark); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 800; }
+.home-primary-action { display: flex; align-items: center; gap: 12px; padding: 14px; color: var(--actv-ink); text-decoration: none; border-radius: 14px; background: var(--actv-surface-2); }
+.home-primary-action .action-symbol { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--actv-blue); color: #fff; font-size: 22px; }
+.home-primary-action strong,.home-primary-action small { display: block; } .home-primary-action small { color: var(--actv-muted); margin-top: 2px; } .home-primary-action > :last-child { margin-left: auto; font-size: 28px; color: var(--actv-blue); }
+
 .stop-card {
     background: var(--color-white);
     box-shadow: var(--shadow-card-alt);

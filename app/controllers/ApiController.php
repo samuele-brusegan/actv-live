@@ -160,12 +160,37 @@ class ApiController {
 
     // Moved from Controller::stopsJson and renamed
     function stops() {
-        $db = $this->getDb();
-
         header("Content-Type: application/json");
+        try {
+            $db = $this->getDb();
+            $stops = $db->query("SELECT * FROM stops");
+            echo json_encode($stops, JSON_INVALID_UTF8_SUBSTITUTE);
+        } catch (Throwable $e) {
+            // La cache GTFS è sufficiente per la ricerca fermate e mantiene
+            // l'endpoint JSON funzionante anche durante un'interruzione DB.
+            $cacheFile = BASE_PATH . '/data/gtfs/cache/stops.json';
+            $cached = is_file($cacheFile)
+                ? json_decode((string) file_get_contents($cacheFile), true)
+                : null;
+            if (is_array($cached)) {
+                $stops = [];
+                foreach ($cached as $stop) {
+                    if (!is_array($stop) || !isset($stop['id'], $stop['name'], $stop['lat'], $stop['lon'])) continue;
+                    $stops[] = [
+                        'stop_id' => (string) $stop['id'],
+                        'stop_name' => (string) $stop['name'],
+                        'stop_lat' => (float) $stop['lat'],
+                        'stop_lon' => (float) $stop['lon']
+                    ];
+                }
+                echo json_encode($stops, JSON_INVALID_UTF8_SUBSTITUTE);
+                return;
+            }
 
-        $stops = $db->query("SELECT * FROM stops");
-        echo json_encode($stops);
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Errore nel caricamento delle fermate'], JSON_INVALID_UTF8_SUBSTITUTE);
+            Logger::log('PHP_ERROR', 'stops: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -190,6 +215,12 @@ class ApiController {
     }
 
     function planRoute() {
+        // Evita che notice/warning emessi da librerie o dati GTFS contaminino
+        // la risposta dell'API e provochino un JSON.parse nel browser.
+        ini_set('memory_limit', '512M');
+        set_time_limit(120);
+        $outputLevel = ob_get_level();
+        ob_start();
         require_once BASE_PATH . '/app/services/RoutePlanner.php';
 
         $origin = $_GET['from'] ?? '';
@@ -332,17 +363,108 @@ class ApiController {
             }
 
             header('Content-Type: application/json');
+            ob_end_clean();
             echo json_encode(['success' => true, 'routes' => $routes, 'optimize' => $optimize]);
 
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
+            while (ob_get_level() > $outputLevel) ob_end_clean();
             Logger::log('EXCEPTION', $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());
             header('Content-Type: application/json');
+            http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Errore durante la pianificazione del percorso']);
         }
     }
 
+    /**
+     * Fallback per la mappa quando il database non è raggiungibile.
+     * I dati GTFS già presenti in cache contengono comunque le fermate ordinate
+     * di ogni corsa e permettono di disegnare una geometria fermata-fermata.
+     */
+    private function linesShapesFromCache(): array {
+        $cacheDir = BASE_PATH . '/data/gtfs/cache';
+        $routesFile = $cacheDir . '/routes.json';
+        $stopsFile = $cacheDir . '/stops.json';
+        $tripsDir = $cacheDir . '/routes';
+
+        if (!is_file($routesFile) || !is_file($stopsFile) || !is_dir($tripsDir)) {
+            return [];
+        }
+
+        $routes = json_decode((string) file_get_contents($routesFile), true);
+        $stops = json_decode((string) file_get_contents($stopsFile), true);
+        if (!is_array($routes) || !is_array($stops)) return [];
+
+        $targetLine = trim((string) ($_GET['line'] ?? ''));
+        $targetTripId = trim((string) ($_GET['tripId'] ?? $_GET['trip_id'] ?? ''));
+        $targetTripIds = array_values(array_unique(array_filter(array_map(
+            'trim', explode(',', (string) ($_GET['tripIds'] ?? ''))
+        ), fn($id) => $id !== '')));
+        if ($targetTripId !== '') array_unshift($targetTripIds, $targetTripId);
+        $targetTripIds = array_values(array_unique($targetTripIds));
+
+        $tripGroupById = [];
+        foreach (array_values(array_filter(explode('|', (string) ($_GET['tripGroups'] ?? '')))) as $index => $group) {
+            $number = $index + 1;
+            if (preg_match('/^(\d+):(.*)$/', $group, $matches)) {
+                $number = (int) $matches[1];
+                $group = $matches[2];
+            }
+            foreach (array_filter(array_map('trim', explode(',', $group))) as $id) {
+                $tripGroupById[$id] = $number;
+            }
+        }
+
+        $result = [];
+        foreach ($routes as $routeId => $route) {
+            if (!is_array($route)) continue;
+            $shortName = (string) ($route['short_name'] ?? '');
+            if ($targetLine !== '' && $shortName !== $targetLine) continue;
+
+            $file = $tripsDir . '/route_' . basename((string) $routeId) . '.json';
+            if (!is_file($file)) continue;
+            $trips = json_decode((string) file_get_contents($file), true);
+            if (!is_array($trips)) continue;
+
+            $selected = $targetTripIds
+                ? array_intersect_key($trips, array_fill_keys($targetTripIds, true))
+                : array_slice($trips, 0, 1, true);
+
+            foreach ($selected as $tripId => $tripStops) {
+                if (!is_array($tripStops)) continue;
+                $path = [];
+                usort($tripStops, fn($a, $b) => ((int) ($a['stop_sequence'] ?? 0)) <=> ((int) ($b['stop_sequence'] ?? 0)));
+                foreach ($tripStops as $tripStop) {
+                    $stopId = (string) ($tripStop['stop_id'] ?? '');
+                    $stop = $stops[$stopId] ?? null;
+                    if (!is_array($stop) || !isset($stop['lat'], $stop['lon'])) continue;
+                    $path[] = [
+                        'lat' => (float) $stop['lat'],
+                        'lng' => (float) $stop['lon'],
+                        'name' => (string) ($stop['name'] ?? '')
+                    ];
+                }
+                if (count($path) < 2) continue;
+                $key = (string) $routeId . '|' . (string) $tripId;
+                $result[$key] = [
+                    'route_id' => (string) $routeId,
+                    'trip_id' => (string) $tripId,
+                    'group_number' => $tripGroupById[(string) $tripId] ?? null,
+                    'route_short_name' => $shortName,
+                    'route_long_name' => (string) ($route['long_name'] ?? ''),
+                    'shape_id' => null,
+                    'path' => $path,
+                    'shape' => []
+                ];
+            }
+        }
+
+        return array_values($result);
+    }
+
     // Refactored from Controller::linesShapes to use DB
     function linesShapes() {
+        header('Content-Type: application/json');
+        try {
         ini_set('memory_limit', '256M');
         set_time_limit(120); // Give DB more time if needed
 
@@ -389,6 +511,7 @@ class ApiController {
                     r.route_id,
                     r.route_short_name,
                     r.route_long_name,
+                    r.route_color AS route_color,
                     t.shape_id AS shape_id,
                     s.stop_lat AS lat,
                     s.stop_lon AS lng,
@@ -409,6 +532,7 @@ class ApiController {
                     r.route_id,
                     r.route_short_name,
                     r.route_long_name,
+                    r.route_color AS route_color,
                     tr.shape_id AS shape_id,
                     s.stop_lat AS lat,
                     s.stop_lon AS lng,
@@ -434,6 +558,7 @@ class ApiController {
                     r.route_id,
                     r.route_short_name,
                     r.route_long_name,
+                    r.route_color AS route_color,
                     s.stop_lat AS lat,
                     s.stop_lon AS lng,
                     s.stop_name AS name
@@ -468,6 +593,7 @@ class ApiController {
                     'group_number' => isset($row['trip_id']) ? ($tripGroupById[(string) $row['trip_id']] ?? null) : null,
                     'route_short_name' => $row['route_short_name'],
                     'route_long_name' => $row['route_long_name'],
+                    'route_color' => $row['route_color'] ?? null,
                     'shape_id' => $row['shape_id'] ?? null,
                     'path' => []
                 ];
@@ -520,8 +646,28 @@ class ApiController {
         $shapes = array_values($routesMap);
 
 
-        header('Content-Type: application/json');
-        echo json_encode($shapes);
+        $payload = json_encode($shapes, JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($payload === false) {
+            throw new RuntimeException('Impossibile serializzare le geometrie delle linee');
+        }
+        echo $payload;
+        } catch (Throwable $e) {
+            Logger::log('PHP_ERROR', 'linesShapes: ' . $e->getMessage());
+            try {
+                $fallback = $this->linesShapesFromCache();
+                if (!empty($fallback)) {
+                    echo json_encode($fallback, JSON_INVALID_UTF8_SUBSTITUTE);
+                    return;
+                }
+            } catch (Throwable $fallbackError) {
+                Logger::log('PHP_ERROR', 'linesShapes fallback: ' . $fallbackError->getMessage());
+            }
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Errore nel caricamento delle geometrie delle linee'
+            ], JSON_INVALID_UTF8_SUBSTITUTE);
+        }
     }
 
     // Refactored from Controller::tripStops to use DB

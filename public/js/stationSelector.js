@@ -17,23 +17,38 @@ let debounceTimer;
 
 /** Carica l'elenco completo delle fermate dall'API */
 async function loadStops() {
+    // Le liste locali non devono dipendere dalla rete: mostrale subito.
+    renderFavorites();
+    renderRecent();
     try {
-        const response = await fetch('/api/stops');
-        if (!response.ok) throw new Error('Errore di rete');
-        const data = await response.json();
+        const response = await fetch('/api/stops', { cache: 'no-store' });
+        if (!response.ok) throw new Error('Catalogo locale non disponibile');
+        const responseText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            throw new Error('Catalogo locale non valido');
+        }
+        const localStops = Array.isArray(data) ? data : Object.values(data || {});
+        const validLocalStops = localStops.filter(stop => stop && typeof stop.stop_name === 'string');
+        const sourceStops = validLocalStops.length ? validLocalStops : await fetchExternalStops();
 
         // Mappa per raggruppare fermate con lo stesso nome
         const stopsMap = new Map();
 
-        Object.values(data).forEach(stop => {
-            const normalizedName = stop.stop_name.trim().toLowerCase().replace(/\s+/g, ' ');
+        sourceStops.forEach(stop => {
+            const normalizedName = String(stop.stop_name).trim().toLowerCase().replace(/\s+/g, ' ');
             const cleanName = stop.stop_name.trim();
 
+            const stopId = stop.stop_id || stop.id;
+            if (!stopId) return;
+
             if (stopsMap.has(normalizedName)) {
-                stopsMap.get(normalizedName).ids.push(stop.stop_id);
+                stopsMap.get(normalizedName).ids.push(stopId);
             } else {
                 stopsMap.set(normalizedName, {
-                    ids: [stop.stop_id],
+                    ids: [stopId],
                     name: cleanName,
                     lat: stop.stop_lat,
                     lng: stop.stop_lon
@@ -51,11 +66,44 @@ async function loadStops() {
             type: 'stop'
         }));
 
-        renderFavorites();
-        renderRecent();
+        const allStopsSection = document.getElementById('all-stops-section');
+        if (allStopsSection) allStopsSection.style.display = allStops.length ? 'block' : 'none';
+        renderAllResults(allStops, [], [], true);
     } catch (error) {
         console.error('Errore nel caricamento delle fermate:', error);
+        try {
+            const fallbackStops = await fetchExternalStops();
+            if (fallbackStops.length) {
+                allStops = fallbackStops;
+                const allStopsSection = document.getElementById('all-stops-section');
+                if (allStopsSection) allStopsSection.style.display = 'block';
+                renderAllResults(allStops, [], [], true);
+            }
+        } catch (fallbackError) {
+            console.error('Fallback fermate non disponibile:', fallbackError);
+        }
     }
+}
+
+async function fetchExternalStops() {
+    const response = await fetch('https://oraritemporeale.actv.it/aut/backend/page/stops', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Catalogo ACTV non disponibile');
+    const data = await response.json();
+    return (Array.isArray(data) ? data : []).map(stop => {
+        const rawDescription = String(stop.description || stop.name || '');
+        const ids = [...rawDescription.matchAll(/\[(\d+)\]/g)].map(match => match[1]);
+        const fallbackId = String(stop.name || '').replace(/-web-aut|-web/g, '').split('-')[0];
+        const name = rawDescription.replace(/\[\d+\]/g, '').trim();
+        return {
+            id: ids[0] || fallbackId,
+            ids: ids.length ? ids : [fallbackId],
+            name: name || `Fermata ${fallbackId}`,
+            stop_name: name || `Fermata ${fallbackId}`,
+            stop_lat: Number(stop.latitude),
+            stop_lon: Number(stop.longitude),
+            type: 'stop'
+        };
+    }).filter(stop => stop.name && Number.isFinite(stop.stop_lat) && Number.isFinite(stop.stop_lon));
 }
 
 /**
@@ -63,29 +111,23 @@ async function loadStops() {
  */
 
 function renderFavorites() {
-    const favorites = JSON.parse(localStorage.getItem('favorite_stops') || '[]');
+    const favorites = readStoredArray('favorite_stops');
     const container = document.getElementById('favorites-list');
     if (!container) return;
 
-    if (favorites.length === 0) {
-        container.innerHTML = '<div class="no-results">Nessuna fermata preferita</div>';
-        return;
-    }
-
     container.innerHTML = favorites.map(stop => createStopCardHTML(stop, true)).join('');
+    const section = document.getElementById('favorites-section');
+    if (section) section.style.display = favorites.length ? 'block' : 'none';
 }
 
 function renderRecent() {
-    const recent = JSON.parse(localStorage.getItem('recent_stops') || '[]').filter(Boolean);
+    const recent = readStoredArray('recent_stops').filter(Boolean);
     const container = document.getElementById('recent-list');
     if (!container) return;
 
-    if (recent.length === 0) {
-        container.innerHTML = '<div class="no-results">Nessuna fermata recente</div>';
-        return;
-    }
-
     container.innerHTML = recent.slice(0, 5).map(stop => createStopCardHTML(stop, false)).join('');
+    const section = document.getElementById('recent-section');
+    if (section) section.style.display = recent.length ? 'block' : 'none';
 }
 
 /** Genera l'HTML per una card fermata o indirizzo */
@@ -156,7 +198,6 @@ function updateActiveUI(element) {
 
     if (element) {
         element.classList.add('selected');
-        element.style.background = '#E8F5E9'; // Verde leggero per selezione
     }
 }
 
@@ -179,15 +220,32 @@ function addToRecent(stop) {
 /** Conferma la scelta e torna al cercapercorsi */
 function confirmSelection() {
     if (!selectedStop) {
-        alert('Seleziona una fermata o un indirizzo prima di continuare.');
+        if (window.actvAlert) actvAlert('Seleziona una fermata o un indirizzo prima di continuare.', 'Fermata non selezionata');
         return;
     }
 
     localStorage.setItem(`route_${selectionType}`, JSON.stringify(selectedStop));
+    if (window.parent !== window) {
+        window.parent.postMessage({ type: 'actv-station-selected', selectionType, stop: selectedStop }, window.location.origin);
+        return;
+    }
     window.location.href = '/route-finder';
 }
 
+function readStoredArray(key) {
+    try {
+        const value = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(value) ? value.filter(Boolean) : [];
+    } catch (error) {
+        return [];
+    }
+}
+
 function cancelSelection() {
+    if (window.parent !== window) {
+        window.parent.postMessage({ type: 'actv-station-picker-cancelled' }, window.location.origin);
+        return;
+    }
     window.location.href = '/route-finder';
 }
 
@@ -204,9 +262,10 @@ function filterStops() {
     const allStopsSection = document.getElementById('all-stops-section');
 
     if (query.length === 0) {
-        if (favoritesSection) favoritesSection.style.display = 'block';
-        if (recentSection) recentSection.style.display = 'block';
-        if (allStopsSection) allStopsSection.style.display = 'none';
+        renderFavorites();
+        renderRecent();
+        if (allStopsSection) allStopsSection.style.display = allStops.length ? 'block' : 'none';
+        renderAllResults(allStops, [], [], true);
         return;
     }
 
@@ -220,8 +279,8 @@ function filterStops() {
     );
 
     // 2. Filtro suggerimenti dai preferiti/recenti
-    const favorites = JSON.parse(localStorage.getItem('favorite_stops') || '[]');
-    const recent = JSON.parse(localStorage.getItem('recent_stops') || '[]').filter(Boolean);
+    const favorites = readStoredArray('favorite_stops');
+    const recent = readStoredArray('recent_stops');
 
     const combined = [...favorites, ...recent];
     const seenKeys = new Set();
@@ -283,7 +342,7 @@ async function fetchAddresses(query) {
 }
 
 /** Visualizza tutti i risultati raggruppati per categoria */
-function renderAllResults(stops, addresses = [], suggestions = []) {
+function renderAllResults(stops, addresses = [], suggestions = [], showFullList = false) {
     const listEl = document.getElementById('all-stops-list');
     if (!listEl) return;
 
@@ -301,7 +360,8 @@ function renderAllResults(stops, addresses = [], suggestions = []) {
 
     if (stops.length > 0) {
         html += '<div class="subsection-title">FERMATE</div>';
-        html += stops.slice(0, 25).map(stop => createStopCardHTML(stop, false)).join('');
+        const visibleStops = showFullList ? stops : stops.slice(0, 25);
+        html += visibleStops.map(stop => createStopCardHTML(stop, false)).join('');
     }
 
     if (stops.length === 0 && addresses.length === 0 && suggestions.length === 0) {
