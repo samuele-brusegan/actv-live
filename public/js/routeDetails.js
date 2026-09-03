@@ -41,7 +41,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const durationEl = document.getElementById('route-duration');
 
         if (dateEl) dateEl.textContent = formatItalianDate(dateStr);
-        if (durationEl) durationEl.textContent = `\u23F1 ${formatRouteDuration(route)}`;
+        if (durationEl) durationEl.innerHTML = `${getClockIcon()} ${formatRouteDuration(route)}`;
 
         renderRouteTimeline(route, origin, destination);
 
@@ -110,7 +110,7 @@ function formatRouteDuration(route) {
 /** Convenzione colori linee (coerente con la pagina risultati / fermata). */
 function getLineBadge(lineRaw) {
     if (!lineRaw) return { name: '?', class: 'badge-red' };
-    if (lineRaw === 'Cammina') return { name: '\u{1F6B6}', class: 'badge-walking' };
+    if (lineRaw === 'Cammina') return { name: getWalkingIcon(), class: 'badge-walking' };
 
     const [lineName, lineTag] = String(lineRaw).split('_');
 
@@ -123,9 +123,32 @@ function getLineBadge(lineRaw) {
     return { name: lineName, class: badgeClass };
 }
 
+function getWalkingIcon() {
+    return '<svg class="route-icon walking-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">' +
+        '<path fill-rule="evenodd" clip-rule="evenodd" d="M13 6C14.1046 6 15 5.10457 15 4C15 2.89543 14.1046 2 13 2C11.8955 2 11 2.89543 11 4C11 5.10457 11.8955 6 13 6ZM11.0528 6.60557C11.3841 6.43992 11.7799 6.47097 12.0813 6.68627L13.0813 7.40056C13.3994 7.6278 13.5559 8.01959 13.482 8.40348L12.4332 13.847L16.8321 20.4453C17.1384 20.9048 17.0143 21.5257 16.5547 21.8321C16.0952 22.1384 15.4743 22.0142 15.168 21.5547L10.5416 14.6152L9.72611 13.3919C9.58336 13.1778 9.52866 12.9169 9.57338 12.6634L10.1699 9.28309L8.38464 10.1757L7.81282 13.0334C7.70445 13.575 7.17759 13.9261 6.63604 13.8178C6.09449 13.7095 5.74333 13.1825 5.85169 12.641L6.51947 9.30379C6.58001 9.00123 6.77684 8.74356 7.05282 8.60557L11.0528 6.60557ZM16.6838 12.9487L13.8093 11.9905L14.1909 10.0096L17.3163 11.0513C17.8402 11.226 18.1234 11.7923 17.9487 12.3162C17.7741 12.8402 17.2078 13.1234 16.6838 12.9487ZM6.12844 20.5097L9.39637 14.7001L9.70958 15.1699L10.641 16.5669L7.87159 21.4903C7.60083 21.9716 6.99111 22.1423 6.50976 21.8716C6.0284 21.6008 5.85768 20.9911 6.12844 20.5097Z" fill="currentColor"/>' +
+        '</svg>';
+}
+
+function getClockIcon() {
+    return '<svg class="route-icon clock-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">' +
+        '<circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="2"/>' +
+        '<path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '</svg>';
+}
+
 function getLineBadgeStyle(leg) {
     const color = String(leg?.route_color || '').trim();
-    return /^#[0-9a-f]{6}$/i.test(color) ? ` style="background-color:${color}"` : '';
+    const text = String(leg?.route_text_color || '').trim();
+    const styles = [];
+    const normalizeColor = value => /^#[0-9a-f]{6}$/i.test(value)
+        ? value : (/^[0-9a-f]{6}$/i.test(value) ? `#${value}` : '');
+    const background = normalizeColor(color);
+    const foreground = normalizeColor(text);
+    if (background) {
+        styles.push(`background-color:${background}`);
+        styles.push(`color:${foreground || '#FFFFFF'}`);
+    }
+    return styles.length ? ` style="${styles.join(';')}"` : '';
 }
 
 /** Renderizza la timeline completa del percorso a partire dalle sue tratte (legs). */
@@ -280,11 +303,11 @@ function renderLeaveInfo(info) {
     el.innerHTML = `
         <div class="leave-info-title">Dalla tua posizione</div>
         <div class="leave-info-row">
-            <span class="leave-info-icon">\u{1F6B6}</span>
+            <span class="leave-info-icon">${getWalkingIcon()}</span>
             <span><strong>~${info.walkMin} min</strong> a piedi fino alla fermata (${distStr})</span>
         </div>
         <div class="leave-info-row">
-            <span class="leave-info-icon">\u23F0</span>
+            <span class="leave-info-icon">${getClockIcon()}</span>
             <span>Parti entro le <strong>${info.leaveBy}</strong> per arrivare con ~${info.bufferMin} min di anticipo <small>(bus alle ${info.boarding})</small></span>
         </div>`;
     el.style.display = 'block';
@@ -364,10 +387,36 @@ async function initMap() {
 
     const geometries = await fetchRouteGeometries(CURRENT_ROUTE);
     if (geometries.length) {
+        const fallbackColors = ['#00D4FF', '#FFB000', '#FF4F81', '#B9FF3D', '#A78BFA', '#F97316'];
+        let previousColor = '';
+        let fallbackIndex = 0;
         geometries.forEach(geometry => {
+            let color = normalizeMapColor(geometry.color) || '#009E61';
+            if (color.toUpperCase() === previousColor.toUpperCase()) {
+                do {
+                    color = fallbackColors[fallbackIndex++ % fallbackColors.length];
+                } while (color.toUpperCase() === previousColor.toUpperCase());
+            }
+            previousColor = color;
+            const service = geometry.service === 'navigation' ? 'Navigazione' : 'Automobilistico';
+            const mode = geometry.mode === 'water' ? 'Vaporetto' : 'Bus';
+            const popup = `<strong>${escapeMapHtml(geometry.route_short_name || mode)}</strong><br>` +
+                `${service} · ${mode}<br>` +
+                `${escapeMapHtml(geometry.origin || '')} → ${escapeMapHtml(geometry.destination || '')}<br>` +
+                `${formatShortTime(geometry.departure_time)} – ${formatShortTime(geometry.arrival_time)}` +
+                (geometry.trip_id ? `<br><small>Corsa: ${escapeMapHtml(geometry.trip_id)}</small>` : '');
             L.polyline(geometry.points, {
-                color: geometry.color || '#009E61', weight: 5, opacity: 0.85
-            }).addTo(mapInstance);
+                color, weight: 5, opacity: 0.9
+            }).addTo(mapInstance).bindPopup(popup);
+
+            // Hit area più ampia della linea visibile: rende il tap affidabile
+            // anche su schermi piccoli senza modificare la grafica della mappa.
+            L.polyline(geometry.points, {
+                color: '#000000',
+                weight: 22,
+                opacity: 0,
+                interactive: true
+            }).addTo(mapInstance).bindPopup(popup);
             points.push(...geometry.points);
         });
     }
@@ -396,17 +445,67 @@ async function initMap() {
     }
 }
 
+function normalizeMapColor(value) {
+    const color = String(value || '').trim();
+    if (/^#[0-9a-f]{6}$/i.test(color)) return color;
+    return /^[0-9a-f]{6}$/i.test(color) ? `#${color}` : '';
+}
+
+function escapeMapHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char]));
+}
+
 async function fetchRouteGeometries(route) {
     const legs = (route?.legs || []).filter(leg => leg.type !== 'walking');
     const tripIds = [...new Set(legs.map(leg => String(leg.trip_id || '')).filter(Boolean))];
     if (!tripIds.length) return [];
 
     try {
-        const params = new URLSearchParams({ tripIds: tripIds.join(',') });
-        const response = await fetch(`/api/lines-shapes?${params.toString()}`, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const shapes = await response.json();
-        if (!Array.isArray(shapes)) return [];
+        const groups = new Map();
+        legs.forEach(leg => {
+            const service = leg.service === 'navigation' || leg.mode === 'water' ? 'navigation' : 'automobilistico';
+            if (!groups.has(service)) groups.set(service, []);
+            groups.get(service).push(String(leg.trip_id));
+        });
+        const responses = await Promise.all([...groups.entries()].map(async ([service, ids]) => {
+            const params = new URLSearchParams({ tripIds: ids.join(',') });
+            if (service === 'navigation') params.set('service', 'navigation');
+            const response = await fetch(`/api/lines-shapes?${params.toString()}`, { cache: 'no-store' });
+            let data = [];
+            if (response.ok) {
+                try {
+                    const responseText = await response.text();
+                    const parsed = JSON.parse(responseText);
+                    data = Array.isArray(parsed) ? parsed : [];
+                } catch (parseError) {
+                    console.warn('[ACTV] Risposta geometrie non JSON, uso la cache:', parseError);
+                }
+            }
+            data = Array.isArray(data) ? data : [];
+
+            // Il database può non avere ancora la corsa selezionata, mentre
+            // la cache GTFS sì: completa solo le corse mancanti dalla cache.
+            const found = new Set(data.map(shape => String(shape.trip_id || '')));
+            if (ids.some(id => !found.has(String(id)))) {
+                const cacheParams = new URLSearchParams({ tripIds: ids.join(','), cache: '1' });
+                if (service === 'navigation') cacheParams.set('service', 'navigation');
+                const cacheResponse = await fetch(`/api/lines-shapes?${cacheParams.toString()}`, { cache: 'no-store' });
+                if (cacheResponse.ok) {
+                    try {
+                        const cached = JSON.parse(await cacheResponse.text());
+                        if (Array.isArray(cached)) {
+                            data = data.concat(cached.filter(shape => !found.has(String(shape.trip_id || ''))));
+                        }
+                    } catch (parseError) {
+                        console.warn('[ACTV] Cache geometrie non JSON:', parseError);
+                    }
+                }
+            }
+            return data;
+        }));
+        const shapes = responses.flat();
 
         const colors = ['#00D4FF', '#FFB000', '#FF4F81', '#B9FF3D'];
         const legByTrip = new Map(legs.map(leg => [String(leg.trip_id), leg]));
@@ -426,19 +525,50 @@ async function fetchRouteGeometries(route) {
                     const normalize = value => String(value || '').trim().toLowerCase();
                     const origin = normalize(leg.origin);
                     const destination = normalize(leg.destination);
-                    const startIndex = shape.path.findIndex(stop => normalize(stop.name) === origin);
-                    const endIndex = shape.path.findIndex((stop, index) =>
-                        index >= Math.max(0, startIndex) && normalize(stop.name) === destination
-                    );
+                    const originId = String(leg.origin_id || '');
+                    const destinationId = String(leg.destination_id || '');
+                    const startIndexById = originId
+                        ? shape.path.findIndex(stop => String(stop.stop_id || '') === originId) : -1;
+                    const endIndexById = destinationId
+                        ? shape.path.findIndex((stop, index) => index >= Math.max(0, startIndexById) && String(stop.stop_id || '') === destinationId) : -1;
+                    const startIndex = startIndexById >= 0
+                        ? startIndexById : shape.path.findIndex(stop => normalize(stop.name) === origin);
+                    const endIndex = endIndexById >= 0
+                        ? endIndexById : shape.path.findIndex((stop, index) =>
+                            index >= Math.max(0, startIndex) && normalize(stop.name) === destination
+                        );
                     if (startIndex >= 0 && endIndex > startIndex) {
-                        points = shape.path.slice(startIndex, endIndex + 1)
-                            .map(point => [Number(point.lat), Number(point.lng)])
-                            .filter(point => point.every(Number.isFinite));
+                        const selectedStops = shape.path.slice(startIndex, endIndex + 1);
+                        const refined = Array.isArray(shape.shape) ? shape.shape : [];
+                        if (refined.length > 1) {
+                            const distance = (a, b) => (Number(a.lat) - Number(b.lat)) ** 2 + (Number(a.lng) - Number(b.lng)) ** 2;
+                            const nearest = stop => refined.reduce((best, point, index) =>
+                                distance(point, stop) < distance(refined[best], stop) ? index : best, 0);
+                            const refinedStart = nearest(selectedStops[0]);
+                            const refinedEnd = nearest(selectedStops[selectedStops.length - 1]);
+                            const from = Math.min(refinedStart, refinedEnd);
+                            const to = Math.max(refinedStart, refinedEnd);
+                            points = refined.slice(from, to + 1)
+                                .map(point => [Number(point.lat), Number(point.lng)])
+                                .filter(point => point.every(Number.isFinite));
+                        } else {
+                            points = selectedStops
+                                .map(point => [Number(point.lat), Number(point.lng)])
+                                .filter(point => point.every(Number.isFinite));
+                        }
                     }
                 }
                 return {
                     points,
-                    color: colors[shapeIndex % colors.length]
+                    color: normalizeMapColor(shape.route_color) || normalizeMapColor(leg?.route_color) || colors[shapeIndex % colors.length],
+                    route_short_name: shape.route_short_name || leg?.route_short_name,
+                    service: leg?.service || shape.service,
+                    mode: leg?.mode || shape.mode,
+                    trip_id: shape.trip_id || leg?.trip_id,
+                    origin: leg?.origin,
+                    destination: leg?.destination,
+                    departure_time: leg?.departure_time,
+                    arrival_time: leg?.arrival_time
                 };
             })
             .filter(geometry => geometry.points.length > 1);

@@ -23,6 +23,20 @@ document.addEventListener('DOMContentLoaded', () => {
         '#DC143C', '#1E90FF'
     ];
 
+    const service = new URLSearchParams(window.location.search).get('service') || 'all';
+    const serviceFilter = document.createElement('div');
+    serviceFilter.className = 'route-map-service-filter';
+    serviceFilter.innerHTML = '<button data-service="all">Tutti</button><button data-service="automobilistico">Bus</button><button data-service="navigation">Navigazione</button>';
+    serviceFilter.querySelectorAll('button').forEach(button => {
+        button.classList.toggle('active', button.dataset.service === service);
+        button.addEventListener('click', () => {
+            const params = new URLSearchParams(window.location.search);
+            params.set('service', button.dataset.service);
+            window.location.search = params.toString();
+        });
+    });
+    document.body.appendChild(serviceFilter);
+
     /**
      * Genera un colore deterministico per una linea basato sul suo nome
      * @param {string} name - Nome della linea
@@ -38,6 +52,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return LINE_COLORS[Math.abs(hash) % LINE_COLORS.length];
     }
 
+    function normalizeColor(value) {
+        const color = String(value || '').trim();
+        if (/^#[0-9a-f]{6}$/i.test(color)) return color;
+        if (/^[0-9a-f]{6}$/i.test(color)) return `#${color}`;
+        return '';
+    }
+
     /** Carica i dati delle linee dall'API e li disegna sulla mappa */
     async function loadLinesOnMap() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -48,7 +69,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadingEl = document.getElementById('loading');
 
         try {
-            const response = await fetch(`/api/lines-shapes${window.location.search}`, { cache: 'no-store' });
+            const services = service === 'all' ? ['automobilistico', 'navigation'] : [service];
+            const requests = services.map(async serviceName => {
+                const params = new URLSearchParams(window.location.search);
+                params.set('service', serviceName);
+                const response = await fetch(`/api/lines-shapes?${params.toString()}`, { cache: 'no-store' });
             const responseText = await response.text();
             if (!response.ok) {
                 let serverMessage = '';
@@ -64,6 +89,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error('Il server ha restituito dati non validi');
             }
             if (!Array.isArray(shapes)) throw new Error(shapes?.error || 'Formato dati linee non valido');
+                return shapes;
+            });
+            const shapeSets = await Promise.all(requests);
+            const shapes = shapeSets.flat();
             let bounds = null;
             const routeGroups = new Map();
 
@@ -79,9 +108,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isTarget = hasFilter; // Se filtrato, tutto ciò che arriva è considerato target
 
                 const groupNumber = Number(shape.group_number) || (hasFilter ? index + 1 : null);
-                const color = groupNumber
+                // Per i bus route_color descrive la categoria (urbano,
+                // extraurbano...), non identifica la singola linea. La mappa
+                // usa quindi il colore deterministico della linea; per la
+                // navigazione conserva invece il colore pubblicato nel feed.
+                const isBus = shape.service === 'automobilistico' || shape.mode === 'bus';
+                const color = isBus
+                    ? getDeterministicColor(shape.route_short_name || shape.route_id, true)
+                    : (normalizeColor(shape.route_color) || (groupNumber
                     ? LINE_COLORS[(groupNumber - 1) % LINE_COLORS.length]
-                    : getDeterministicColor(shape.route_short_name, true);
+                    : getDeterministicColor(shape.route_short_name, true)));
                 const style = {
                     color: color,
                     weight: isTarget ? 8 : 4,

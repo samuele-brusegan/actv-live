@@ -23,7 +23,33 @@ beforeEach(() => {
 });
 
 // 3. Carichiamo il modulo (ora stationId sarà "4825")
-const { getFavorites, isFavorite, createPassageCard, switchTab, renderStopLines, mergePassages, isLikelyStrike, lineDestKey } = require('../../public/js/stop');
+const { getFavorites, isFavorite, createPassageCard, switchTab, renderStopLines, mergePassages, isLikelyStrike, lineDestKey, passageDistanceMeters, passageVehicleLabel, attachVehiclesToPassages, passageVehicleProgress } = require('../../public/js/stop');
+
+describe('mezzi realtime alla fermata', () => {
+    test('associa il mezzo solo alla stessa corsa', () => {
+        const passages = [{ trip_id: 'trip-1', stop_lat: 45.4384, stop_lon: 12.3359 }, { trip_id: 'trip-2' }];
+        attachVehiclesToPassages(passages, [{ trip_id: 'trip-1', vehicle_position: { lat: 45.4393, lon: 12.3359 } }]);
+        expect(passages[0].vehicle_info).toEqual({ lat: 45.4393, lon: 12.3359 });
+        expect(passages[0].vehicle_distance_m).toBeGreaterThan(90);
+        expect(passages[1].vehicle_info).toBeUndefined();
+    });
+
+    test('produce etichette di prossimità non predittive', () => {
+        expect(passageVehicleLabel(80)).toBe('In prossimità della fermata');
+        expect(passageVehicleLabel(1550)).toBe('A circa 1,6 km');
+        expect(passageDistanceMeters({ vehicle_position: { lat: 45, lon: 12 } }, {})).toBeNull();
+    });
+
+    test('calcola quante fermate mancano', () => {
+        const passage = { gtfs_stop_id: 'C', vehicle_info: { lat: 45, lon: 12 } };
+        const shape = { stops: [
+            { id: 'A', lat: 45, lng: 12 },
+            { id: 'B', lat: 45.01, lng: 12 },
+            { id: 'C', lat: 45.02, lng: 12 }
+        ] };
+        expect(passageVehicleProgress(passage, shape).stopsToBoarding).toBe(2);
+    });
+});
 
 describe('mergePassages (fallback previsti)', () => {
     test('aggiunge i previsti per linee non coperte dal real-time', () => {

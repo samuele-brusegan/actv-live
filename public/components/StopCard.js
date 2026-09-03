@@ -29,7 +29,7 @@ class StopCard {
             ? stop.lines.slice(0, 3).map(line =>
                 `<span class="line-badge">${line.alias || line.line}</span>`
             ).join('')
-            : 'Nessuna linea';
+            : ((stop.services || []).includes('navigation') ? '⛴ Navigazione' : 'Nessuna linea');
 
         // Generate stop IDs badges (multiple if merged)
         let stopIdsHtml = '';

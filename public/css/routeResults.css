@@ -149,6 +149,18 @@ body {
     display: inline-block;
 }
 
+.walking-icon {
+    width: 20px;
+    height: 20px;
+    display: block;
+    margin: 0 auto;
+}
+
+.line-badge.badge-walking {
+    background: #F4B942 !important;
+    color: #101817 !important;
+}
+
 .route-info {
     font-family: 'SF Pro', sans-serif;
     font-size: 14px;
@@ -655,7 +667,25 @@ body {
 
 .compare-map-status span { display: inline-flex; align-items: center; gap: 5px; }
 .compare-map-status i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.compare-map .leaflet-marker-icon,
+.compare-map .leaflet-interactive,
+.compare-map svg path.leaflet-interactive { cursor: pointer !important; }
+.compare-stop-popup { min-width: 190px; font-size: 12px; }
+.compare-stop-name { display: block; margin-bottom: 8px; font-size: 14px; }
+.compare-stop-line { display: flex; align-items: flex-start; gap: 7px; line-height: 1.35; }
+.compare-stop-line + hr { margin: 7px 0; border: 0; border-top: 1px solid #d9e1de; }
+.compare-stop-route-badge { flex: 0 0 auto; padding: 2px 5px; border-radius: 5px; background: #087df5; color: #fff; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.compare-stop-time { color: var(--color-text-gray); font-size: 11px; }
+.compare-stop-direction { display: inline-block; margin-right: 4px; font-size: 19px; font-weight: 800; line-height: .75; vertical-align: -2px; }
+.compare-stop-direction-down { color: #d26a00; }
+.compare-stop-direction-up { color: #087df5; }
 .route-wait-time { color: var(--color-text-gray); font-size: .72em; font-weight: 500; white-space: nowrap; }
+.vehicle-live-info { display: flex; align-items: center; gap: 6px; margin-top: 5px; color: var(--color-primary-green); font-size: 12px; font-weight: 700; }
+.vehicle-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary-green); box-shadow: 0 0 0 4px rgba(0,158,97,.14); display: inline-block; flex: 0 0 auto; }
+.compare-vehicle-marker-shell { background: transparent; border: 0; }
+.compare-vehicle-marker { min-width: 42px; height: 30px; padding: 0 7px; border: 3px solid #fff; border-radius: 16px; background: var(--vehicle-color); color: #fff; box-shadow: 0 3px 10px rgba(16,35,31,.34); display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-size: 13px; white-space: nowrap; }
+.compare-vehicle-marker b { font-size: 11px; }
+.compare-live-count { margin-left: auto; color: var(--color-primary-green); font-weight: 700; }
 .compare-wait-time { display: block; color: var(--color-text-gray); font-size: .72em; font-weight: 500; white-space: nowrap; }
 
 @media (min-width: 760px) {

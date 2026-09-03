@@ -4,7 +4,7 @@
  * Strategia: Network-first per pagine e asset, fallback cache quando offline.
  */
 
-const CACHE_VERSION = 'v2.2';
+const CACHE_VERSION = 'v2.9-vehicle-positions';
 const STATIC_CACHE = `actv-static-${CACHE_VERSION}`;
 const DATA_CACHE = `actv-data-${CACHE_VERSION}`;
 const API_CACHE = `actv-api-${CACHE_VERSION}`;
@@ -44,6 +44,8 @@ const STATIC_ASSETS = [
     '/js/offline.js',
     '/js/app-shell.js',
     '/js/ui-feedback.js',
+    '/js/feedback.js',
+    '/css/feedback.css',
     '/pwa/web-app-manifest-192x192.png',
     '/pwa/web-app-manifest-512x512.png',
     '/pwa/favicon-96x96.png',
@@ -56,6 +58,11 @@ const CACHEABLE_API_PATTERNS = [
     '/api/stop-lines',
     '/api/plan-route',
     '/api/gtfs-stops'
+    ,'/api/navigation/stops'
+    ,'/api/navigation/lines'
+    ,'/api/navigation/passages'
+    ,'/api/navigation/vehicles'
+    ,'/api/line-colors'
 ];
 
 // Install: pre-cache static assets

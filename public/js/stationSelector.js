@@ -32,7 +32,19 @@ async function loadStops() {
         }
         const localStops = Array.isArray(data) ? data : Object.values(data || {});
         const validLocalStops = localStops.filter(stop => stop && typeof stop.stop_name === 'string');
-        const sourceStops = validLocalStops.length ? validLocalStops : await fetchExternalStops();
+        let sourceStops = validLocalStops;
+        // Endpoint separato: evita di perdere le fermate acquee se un
+        // reverse-proxy o una vecchia cache restituisce solo gli autobus.
+        try {
+            const waterResponse = await fetch('/api/navigation/stops', { cache: 'no-store' });
+            if (waterResponse.ok) {
+                const waterStops = await waterResponse.json();
+                if (Array.isArray(waterStops)) sourceStops = sourceStops.concat(waterStops);
+            }
+        } catch (waterError) {
+            console.warn('Catalogo Navigazione non disponibile:', waterError);
+        }
+        if (!sourceStops.length) sourceStops = await fetchExternalStops();
 
         // Mappa per raggruppare fermate con lo stesso nome
         const stopsMap = new Map();
@@ -46,12 +58,15 @@ async function loadStops() {
 
             if (stopsMap.has(normalizedName)) {
                 stopsMap.get(normalizedName).ids.push(stopId);
+                const service = stop.service || 'automobilistico';
+                if (!stopsMap.get(normalizedName).services.includes(service)) stopsMap.get(normalizedName).services.push(service);
             } else {
                 stopsMap.set(normalizedName, {
                     ids: [stopId],
                     name: cleanName,
                     lat: stop.stop_lat,
-                    lng: stop.stop_lon
+                    lng: stop.stop_lon,
+                    services: [stop.service || 'automobilistico']
                 });
             }
         });
@@ -101,7 +116,8 @@ async function fetchExternalStops() {
             stop_name: name || `Fermata ${fallbackId}`,
             stop_lat: Number(stop.latitude),
             stop_lon: Number(stop.longitude),
-            type: 'stop'
+            type: 'stop',
+            services: stop.services || ['automobilistico']
         };
     }).filter(stop => stop.name && Number.isFinite(stop.stop_lat) && Number.isFinite(stop.stop_lon));
 }
@@ -169,6 +185,7 @@ function createStopCardHTML(stop, isFavorite) {
                 <div class="stop-icon">🚏</div>
                 <div class="stop-content">
                     <div class="stop-name">${displayName}</div>
+                    <div class="stop-meta">${(stop.services || []).includes('navigation') ? 'Bus + Navigazione' : 'Bus'}</div>
                 </div>
             </div>`;
 }
@@ -249,6 +266,53 @@ function cancelSelection() {
     window.location.href = '/route-finder';
 }
 
+function normalizeStopSearch(value) {
+    return String(value || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/[’'`.-]/g, ' ').replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/).filter(Boolean)
+        .map(token => ({ santa: 's', san: 's' }[token] || token));
+}
+
+function stopSearchScore(name, query) {
+    const queryTokens = normalizeStopSearch(query);
+    const nameTokens = normalizeStopSearch(name);
+    if (!queryTokens.length) return 0;
+    let score = 0;
+    for (const queryToken of queryTokens) {
+        let best = Infinity;
+        nameTokens.forEach(nameToken => {
+            if (nameToken === queryToken) best = 0;
+            else if (nameToken.startsWith(queryToken) || queryToken.startsWith(nameToken)) best = Math.min(best, 1);
+            else if (queryToken.length >= 4 && nameToken.length >= 4) {
+                const distance = levenshteinDistance(queryToken, nameToken);
+                if (distance <= Math.max(1, Math.floor(queryToken.length / 4))) best = Math.min(best, 2 + distance);
+            }
+        });
+        if (best === Infinity) return Infinity;
+        score += best;
+    }
+    const normalizedQuery = normalizeStopSearch(query).join(' ');
+    const normalizedName = normalizeStopSearch(name).join(' ');
+    if (normalizedName === normalizedQuery) score -= 3;
+    else if (normalizedName.includes(normalizedQuery)) score -= 1;
+    return score;
+}
+
+function levenshteinDistance(a, b) {
+    const row = Array.from({ length: b.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= a.length; i++) {
+        let previous = row[0];
+        row[0] = i;
+        for (let j = 1; j <= b.length; j++) {
+            const current = row[j];
+            row[j] = Math.min(row[j] + 1, row[j - 1] + 1, previous + (a[i - 1] === b[j - 1] ? 0 : 1));
+            previous = current;
+        }
+    }
+    return row[b.length];
+}
+
 /**
  * Logica di Ricerca
  */
@@ -274,9 +338,11 @@ function filterStops() {
     if (allStopsSection) allStopsSection.style.display = 'block';
 
     // 1. Filtro fermate locali
-    const filteredLocalStops = allStops.filter(stop =>
-        stop.name.toLowerCase().includes(query)
-    );
+    const filteredLocalStops = allStops
+        .map(stop => ({ stop, score: stopSearchScore(stop.name, query) }))
+        .filter(item => item.score !== Infinity)
+        .sort((a, b) => a.score - b.score)
+        .map(item => item.stop);
 
     // 2. Filtro suggerimenti dai preferiti/recenti
     const favorites = readStoredArray('favorite_stops');
@@ -285,7 +351,7 @@ function filterStops() {
     const combined = [...favorites, ...recent];
     const seenKeys = new Set();
     const suggestions = combined.filter(item => {
-        if (!item || !item.name.toLowerCase().includes(query)) return false;
+        if (!item || stopSearchScore(item.name, query) === Infinity) return false;
         const key = item.type === 'address' ? item.name : item.id;
         if (seenKeys.has(key)) return false;
         seenKeys.add(key);
@@ -331,7 +397,11 @@ async function fetchAddresses(query) {
 
         // Riesegue il filtro locale per consistenza nel re-render
         const currentQuery = document.getElementById('search-input').value.toLowerCase();
-        const filtered = allStops.filter(s => s.name.toLowerCase().includes(currentQuery));
+        const filtered = allStops
+            .map(stop => ({ stop, score: stopSearchScore(stop.name, currentQuery) }))
+            .filter(item => item.score !== Infinity)
+            .sort((a, b) => a.score - b.score)
+            .map(item => item.stop);
 
         // Nota: Qui si potrebbero ricalcolare anche i suggestions se necessario
         renderAllResults(filtered, addressResults);

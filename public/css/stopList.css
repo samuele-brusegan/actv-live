@@ -188,3 +188,4 @@ body {
 .zone-back .chevron-back {
     font-size: 22px;
 }
+.stop-line-badge { display: inline-block; padding: 2px 7px; margin: 1px 2px 1px 0; border-radius: 999px; font-weight: 700; font-size: .78rem; line-height: 1.35; }

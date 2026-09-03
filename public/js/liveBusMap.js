@@ -21,9 +21,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterInput  = document.getElementById('filter-input');
     const filterClear  = document.getElementById('filter-clear');
     const btnRefresh   = document.getElementById('btn-refresh');
+    const btnToggleNd  = document.getElementById('btn-toggle-nd');
     const counterText  = document.getElementById('counter-text');
     const lastUpdateEl = document.getElementById('last-update');
     const spinnerEl    = document.querySelector('#bus-counter .spinner-small');
+    const serviceButtons = document.querySelectorAll('.service-switch-btn');
+    const savedServiceMode = localStorage.getItem('actv-live-map-service');
+    let serviceMode = ['both', 'navigation', 'automobilistico'].includes(savedServiceMode) ? savedServiceMode : 'both';
+    let ndHidden = localStorage.getItem('actv-live-map-hide-nd') !== 'false';
+
+    function updateNdToggle() {
+        btnToggleNd.querySelector('.nd-toggle-label').textContent = ndHidden ? 'Mostra N/D' : 'Nascondi N/D';
+        btnToggleNd.title = ndHidden ? 'Mostra i mezzi senza linea' : 'Nascondi i mezzi senza linea';
+        btnToggleNd.classList.toggle('active', ndHidden);
+        btnToggleNd.setAttribute('aria-pressed', ndHidden ? 'true' : 'false');
+    }
+
+    function clearBusMarkers() {
+        if (abortCtrl) abortCtrl.abort();
+        busMarkers.forEach(b => { map.removeLayer(b.marker); if (b.polyline) map.removeLayer(b.polyline); });
+        busMarkers.clear();
+        sidePanelList.innerHTML = '';
+        sidePanel.classList.add('hidden');
+    }
+
+    function clearNavigationMarkers() {
+        navigationMarkers.forEach(marker => map.removeLayer(marker));
+        navigationMarkers.clear();
+    }
     
     // Side Panel Container (Dynamic creation if missing)
     let sidePanel = document.getElementById('non-rt-panel');
@@ -42,6 +67,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const sidePanelList = sidePanel.querySelector('.nr-list');
 
+    serviceButtons.forEach(button => {
+        button.classList.toggle('active', button.dataset.service === serviceMode);
+        button.addEventListener('click', () => {
+            if (serviceMode === button.dataset.service) return;
+            serviceMode = button.dataset.service;
+            localStorage.setItem('actv-live-map-service', serviceMode);
+            serviceButtons.forEach(item => item.classList.toggle('active', item.dataset.service === serviceMode));
+            if (serviceMode === 'navigation') clearBusMarkers();
+            if (serviceMode === 'automobilistico') clearNavigationMarkers();
+            loadBuses();
+            loadNavigationVehicles();
+        });
+    });
+
     // ── Mappa Leaflet ─────────────────────────────────────────
     const map = L.map('map', {
         attributionControl: false,
@@ -55,7 +94,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Stato ─────────────────────────────────────────────────
     let busMarkers = new Map(); // tripId -> { marker, polyline }
+    let navigationMarkers = new Map();
+    let navigationColors = new Map();
+    let navigationColorsPromise = null;
     let abortCtrl = null;       // Per annullare fetch in corso
+    let busLoadRunning = false;
     let refreshTimer = null;
     let stopCache = new Map();  // Cache per i passaggi alle fermate
 
@@ -63,8 +106,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Also trigger after load
     const originalLoadBuses = loadBuses;
     loadBuses = async function() {
-        await originalLoadBuses.apply(this, arguments);
-        updateMarkerSizes();
+        // Non avviare un nuovo ciclo mentre il precedente sta ancora
+        // interrogando PHP: AbortController annulla il browser, ma le
+        // richieste già arrivate a PHP-FPM continuano a occupare worker.
+        if (busLoadRunning) return;
+        busLoadRunning = true;
+        try {
+            await originalLoadBuses.apply(this, arguments);
+            updateMarkerSizes();
+        } finally {
+            busLoadRunning = false;
+        }
     };
 
     // ── Event listeners e Inizializzazione ──────────────────
@@ -77,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let filterTimeout = null;
     filterInput.addEventListener('input', () => {
         clearTimeout(filterTimeout);
-        filterTimeout = setTimeout(() => loadBuses(), 400);
+        filterTimeout = setTimeout(() => { loadBuses(); loadNavigationVehicles(); }, 400);
     });
 
     filterClear.addEventListener('click', () => {
@@ -85,19 +137,30 @@ document.addEventListener('DOMContentLoaded', () => {
         // Pulisci anche parametri URL
         window.history.replaceState({}, '', window.location.pathname);
         loadBuses();
+        loadNavigationVehicles();
     });
 
     btnRefresh.addEventListener('click', () => {
         stopCache.clear();
         loadBuses();
+        loadNavigationVehicles();
     });
 
+    updateNdToggle();
+    btnToggleNd.addEventListener('click', () => {
+        ndHidden = !ndHidden;
+        localStorage.setItem('actv-live-map-hide-nd', ndHidden ? 'true' : 'false');
+        updateNdToggle();
+        loadBuses();
+        loadNavigationVehicles();
+    });
     function startAutoRefresh() {
         if (refreshTimer) clearInterval(refreshTimer);
-        refreshTimer = setInterval(() => loadBuses(), REFRESH_INTERVAL);
+        refreshTimer = setInterval(() => { loadBuses(); loadNavigationVehicles(); }, REFRESH_INTERVAL);
     }
 
     loadBuses();
+    loadNavigationVehicles();
     startAutoRefresh();
 
 
@@ -490,6 +553,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function navigationLineName(vehicle) {
+        return String(vehicle.route_short_name || vehicle.route_id || 'N/D').replace(/_(?:UN|EN|US|UM)$/i, '');
+    }
+
+    async function loadNavigationColors() {
+        if (navigationColorsPromise) return navigationColorsPromise;
+        navigationColorsPromise = fetch('/api/navigation/lines', { cache: 'no-store' })
+            .then(response => response.ok ? response.json() : [])
+            .then(routes => (Array.isArray(routes) ? routes : []).forEach(route => {
+                const color = String(route.route_color || route.color || '').replace(/^#?/, '#');
+                if (!/^#[0-9a-f]{6}$/i.test(color)) return;
+                if (route.id) navigationColors.set(String(route.id), color);
+                if (route.short_name) navigationColors.set(String(route.short_name), color);
+            }))
+            .catch(() => {});
+        return navigationColorsPromise;
+    }
+
+    function makeNavigationIcon(lineName, color) {
+        return L.divIcon({
+            className: 'bus-div-icon navigation-marker',
+            html: `<div class="bus-icon navigation" style="background-color:${color}" data-line="${lineName}">${lineName}<span class="navigation-symbol" aria-hidden="true">⛴</span></div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
+            popupAnchor: [0, -15]
+        });
+    }
+
     /**
      * Crea il contenuto popup per un bus
      */
@@ -549,6 +640,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Pool di fetch e Caricamento ───────────────────────────
 
+    async function loadNavigationVehicles() {
+        if (serviceMode === 'automobilistico') { clearNavigationMarkers(); return; }
+        try {
+            await loadNavigationColors();
+            const response = await fetch('/api/navigation/vehicles', { cache: 'no-store' });
+            if (!response.ok) return;
+            const vehicles = await response.json();
+            if (serviceMode === 'automobilistico') { clearNavigationMarkers(); return; }
+            const active = new Set();
+            const query = filterInput.value.trim().toLowerCase();
+            (Array.isArray(vehicles) ? vehicles : []).forEach(vehicle => {
+                const position = vehicle.vehicle_position;
+                const rawLine = String(vehicle.route_short_name || vehicle.route_id || '');
+                const id = vehicle.trip_id || vehicle.route_id || `nav-${active.size}`;
+                if (!position || position.lat == null || position.lon == null) return;
+                if (!rawLine && ndHidden) return;
+                if (query && !String(vehicle.route_short_name || vehicle.route_id || '').toLowerCase().includes(query) && !String(vehicle.trip_id || '').toLowerCase().includes(query)) return;
+                active.add(id);
+                const lineName = navigationLineName(vehicle);
+                const color = navigationColors.get(String(vehicle.route_id || '')) || navigationColors.get(lineName) || '#5B5B5B';
+                const icon = makeNavigationIcon(lineName, color);
+                const old = navigationMarkers.get(id);
+                if (old) map.removeLayer(old);
+                const marker = L.marker([Number(position.lat), Number(position.lon)], { icon })
+                    .bindPopup(`<strong>⛴ Navigazione ${lineName}</strong><br>Trip ${vehicle.trip_id || '-'}<br>${vehicle.status === 'cancelled' ? 'Corsa cancellata' : vehicle.status === 'delayed' ? `Ritardo: ${Math.round((vehicle.delay_seconds || 0) / 60)} min` : 'Programmata'}`)
+                    .addTo(map);
+                navigationMarkers.set(id, marker);
+            });
+            navigationMarkers.forEach((marker, id) => { if (!active.has(id)) { map.removeLayer(marker); navigationMarkers.delete(id); } });
+        } catch (error) {
+            console.warn('Veicoli Navigazione non disponibili:', error);
+        }
+    }
     async function parallelPool(tasks, concurrency, signal) {
         let idx = 0;
         async function worker() {
@@ -565,7 +689,49 @@ document.addEventListener('DOMContentLoaded', () => {
         await Promise.all(workers);
     }
 
+    async function loadRealtimeBusVehicles(signal) {
+        const response = await fetch('/api/realtime/vehicles?service=automobilistico', { signal, cache: 'no-store' });
+        if (!response.ok) return false;
+        const payload = await response.json();
+        if (!payload || !Array.isArray(payload.vehicles)) return false;
+
+        const query = filterInput.value.trim().toLowerCase();
+        const active = new Set();
+        let shown = 0;
+        payload.vehicles.forEach((vehicle, index) => {
+            const position = vehicle.vehicle_position;
+            if (!position || position.lat == null || position.lon == null) return;
+            const rawLine = String(vehicle.route_short_name || vehicle.route_id || '');
+            // Posizioni senza identificativo realtime e senza corrispondenza
+            // GTFS sono normalmente mezzi in deposito/parcheggio: non mostrare
+            // un bollino N/D sulla mappa.
+            if (!rawLine && !vehicle.route_guess && ndHidden) return;
+            const lineName = rawLine.replace(/_(?:UN|EN|US|UM|UL|ES)$/i, '') || 'N/D';
+            const searchable = `${rawLine} ${vehicle.trip_id || ''} ${vehicle.route_id || ''}`.toLowerCase();
+            if (query && !searchable.includes(query)) return;
+            const id = vehicle.trip_id || vehicle.route_id || `aut-${index}`;
+            active.add(id); shown++;
+            const old = busMarkers.get(id);
+            if (old) { map.removeLayer(old.marker); if (old.polyline) map.removeLayer(old.polyline); }
+            const routeColor = String(vehicle.route_color || '');
+            const marker = L.marker([Number(position.lat), Number(position.lon)], {
+                icon: makeBusIcon(lineName, /^#[0-9a-f]{6}$/i.test(routeColor) ? routeColor : getColor(lineName), 'realtime')
+            }).bindPopup(`<div class="bus-popup"><div class="bus-popup-line">Linea ${lineName}</div><div class="bus-popup-direction">Bus in servizio</div><div class="bus-popup-time">Trip: ${vehicle.trip_id || 'non disponibile'}</div></div>`).addTo(map);
+            busMarkers.set(id, { marker, polyline: null, shape: null, currentPos: position, busData: vehicle, status: 'REALTIME' });
+        });
+        busMarkers.forEach((item, id) => {
+            if (!active.has(id)) { map.removeLayer(item.marker); if (item.polyline) map.removeLayer(item.polyline); busMarkers.delete(id); }
+        });
+        sidePanelList.innerHTML = '';
+        sidePanel.classList.add('hidden');
+        spinnerEl.classList.add('hidden');
+        counterText.textContent = `${shown} bus realtime sulla mappa`;
+        lastUpdateEl.textContent = `Agg. ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+        return true;
+    }
+
     async function loadBuses() {
+        if (serviceMode === 'navigation') { clearBusMarkers(); counterText.textContent = 'Solo navigazione'; spinnerEl.classList.add('hidden'); return; }
         if (abortCtrl) abortCtrl.abort();
         abortCtrl = new AbortController();
         const signal = abortCtrl.signal;
@@ -574,6 +740,7 @@ document.addEventListener('DOMContentLoaded', () => {
         counterText.textContent = 'Caricamento...';
 
         try {
+            if (await loadRealtimeBusVehicles(signal)) return;
             const res = await fetch('/api/gtfs-bnr', { signal });
             if (!res.ok) throw new Error(`BNR status ${res.status}`);
             const data = await res.json();

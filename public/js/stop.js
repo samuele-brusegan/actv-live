@@ -124,6 +124,142 @@ async function fetchScheduledPassages() {
     }
 }
 
+/** Orari Navigazione dalla cache GTFS locale (separati dai passaggi bus). */
+async function fetchNavigationPassages() {
+    if (!stationId) return [];
+    const ids = stationId.split('-').filter(Boolean);
+    const time = new Date().toTimeString().slice(0, 8);
+    try {
+        const responses = await Promise.all(ids.map(id =>
+            fetch(`/api/navigation/passages?stop_id=${encodeURIComponent(id)}&time=${encodeURIComponent(time)}`, { cache: 'no-store' })
+                .then(r => r.ok ? r.json() : [])
+        ));
+        const result = [];
+        responses.flat().forEach(line => (line.departures || []).forEach(departure => result.push({
+            line: line.route_short_name || line.route_id || '?',
+            trip_id: departure.trip_id,
+            gtfs_stop_id: id,
+            destination: departure.destination || 'Navigazione',
+            time: departure.time,
+            real: false,
+            service: 'navigation',
+            route_color: line.route_color,
+            route_text_color: line.route_text_color,
+            stop_lat: line.stop_lat,
+            stop_lon: line.stop_lon,
+            stop: stationName || stationId
+        })));
+        return result;
+    } catch (error) {
+        console.warn('Errore passaggi Navigazione:', error);
+        return [];
+    }
+}
+
+function createNavigationPassageCard(p) {
+    const card = document.createElement('div');
+    card.className = 'passage-card navigation-passage';
+    const color = /^#?[0-9a-f]{6}$/i.test(String(p.route_color || '')) ? 'background-color:#' + String(p.route_color).replace('#', '') + ';' : '';
+    const textColor = /^#?[0-9a-f]{6}$/i.test(String(p.route_text_color || '')) ? 'color:#' + String(p.route_text_color).replace('#', '') + ';' : '';
+    card.innerHTML = '<div class="d-flex align-items-center"><div class="line-badge" style="' + color + textColor + '">⛴ ' + p.line + '</div><div class="passage-info"><span class="passage-dest"><b>' + p.destination + '</b></span><br><span class="passage-meta">Navigazione</span>' + vehicleInfoHtml(p) + '</div></div><div class="passage-time-column"><span class="time-badge scheduled">' + p.time + '</span>' + vehicleMapLinkHtml(p) + '</div>';
+    return card;
+}
+
+function passageDistanceMeters(vehicle, passage) {
+    const values = [vehicle?.vehicle_position?.lat, vehicle?.vehicle_position?.lon, passage?.stop_lat, passage?.stop_lon].map(Number);
+    if (!values.every(Number.isFinite)) return null;
+    const [lat1, lon1, lat2, lon2] = values.map(value => value * Math.PI / 180);
+    const h = Math.sin((lat2 - lat1) / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2 - lon1) / 2) ** 2;
+    return 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function passageVehicleLabel(meters) {
+    if (!Number.isFinite(meters)) return 'Posizione rilevata';
+    if (meters < 150) return 'In prossimità della fermata';
+    if (meters < 1000) return `A circa ${Math.max(100, Math.round(meters / 100) * 100)} m`;
+    return `A circa ${(meters / 1000).toFixed(meters < 10000 ? 1 : 0).replace('.', ',')} km`;
+}
+
+function vehicleInfoHtml(p) {
+    if (!p.vehicle_info) return '';
+    const progress = p.vehicle_progress;
+    const detail = progress?.boardingPassed
+        ? 'Il mezzo ha già superato questa fermata'
+        : `${passageVehicleLabel(p.vehicle_distance_m)}${progress?.stopsToBoarding > 0 ? ` · ${progress.stopsToBoarding} fermat${progress.stopsToBoarding === 1 ? 'a' : 'e'}` : ''}`;
+    return `<span class="passage-vehicle-info"><span class="passage-vehicle-dot"></span>${detail}</span>`;
+}
+
+function vehicleMapLinkHtml(p) {
+    if (!p.vehicle_info || !p.trip_id) return '';
+    const href = `/live-bus-map?tripId=${encodeURIComponent(p.trip_id)}`;
+    return `<a class="passage-map-link" href="${href}" onclick="event.stopPropagation()" aria-label="Mostra il mezzo sulla mappa">Mappa</a>`;
+}
+
+async function fetchStopVehicles() {
+    const urls = ['/api/realtime/vehicles?service=automobilistico', '/api/navigation/vehicles'];
+    const responses = await Promise.allSettled(urls.map(async url => {
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) return [];
+        const payload = await response.json();
+        return Array.isArray(payload) ? payload : (Array.isArray(payload?.vehicles) ? payload.vehicles : []);
+    }));
+    return responses.flatMap(result => result.status === 'fulfilled' ? result.value : []);
+}
+
+function attachVehiclesToPassages(passages, vehicles) {
+    const byTrip = new Map((vehicles || []).filter(vehicle => vehicle.trip_id && vehicle.vehicle_position)
+        .map(vehicle => [String(vehicle.trip_id), vehicle]));
+    (passages || []).forEach(passage => {
+        const vehicle = byTrip.get(String(passage.trip_id || ''));
+        if (!vehicle) return;
+        passage.vehicle_info = vehicle.vehicle_position;
+        passage.vehicle_distance_m = passageDistanceMeters(vehicle, passage);
+    });
+    return passages;
+}
+
+function passageVehicleProgress(passage, shape) {
+    const stops = Array.isArray(shape?.stops) ? shape.stops : [];
+    const boardingIndex = stops.findIndex(stop => String(stop.id ?? stop.stop_id) === String(passage.gtfs_stop_id));
+    if (!passage.vehicle_info || boardingIndex < 0) return null;
+    let nearestIndex = -1;
+    let nearestDistance = Infinity;
+    stops.forEach((stop, index) => {
+        const distance = passageDistanceMeters({ vehicle_position: passage.vehicle_info }, {
+            stop_lat: stop.lat ?? stop.stop_lat,
+            stop_lon: stop.lng ?? stop.lon ?? stop.stop_lon
+        });
+        if (distance != null && distance < nearestDistance) { nearestDistance = distance; nearestIndex = index; }
+    });
+    if (nearestIndex < 0) return null;
+    const boardingDistance = passageDistanceMeters({ vehicle_position: passage.vehicle_info }, {
+        stop_lat: stops[boardingIndex].lat ?? stops[boardingIndex].stop_lat,
+        stop_lon: stops[boardingIndex].lng ?? stops[boardingIndex].lon ?? stops[boardingIndex].stop_lon
+    });
+    return {
+        stopsToBoarding: boardingIndex - nearestIndex,
+        boardingPassed: nearestIndex > boardingIndex && boardingDistance > 150
+    };
+}
+
+async function enrichPassageProgress(passages) {
+    const groups = new Map();
+    (passages || []).filter(p => p.vehicle_info && p.trip_id).forEach(p => {
+        const service = p.service === 'navigation' ? 'navigation' : 'automobilistico';
+        if (!groups.has(service)) groups.set(service, new Set());
+        groups.get(service).add(String(p.trip_id));
+    });
+    const responses = await Promise.allSettled([...groups.entries()].map(async ([service, ids]) => {
+        const params = new URLSearchParams({ tripIds: [...ids].join(','), cache: '1' });
+        if (service === 'navigation') params.set('service', 'navigation');
+        const response = await fetch(`/api/lines-shapes?${params.toString()}`, { cache: 'no-store' });
+        return response.ok ? response.json() : [];
+    }));
+    const shapes = responses.flatMap(result => result.status === 'fulfilled' && Array.isArray(result.value) ? result.value : []);
+    const byTrip = new Map(shapes.map(shape => [String(shape.trip_id || ''), shape]));
+    (passages || []).forEach(p => { p.vehicle_progress = passageVehicleProgress(p, byTrip.get(String(p.trip_id || ''))); });
+}
+
 /** Chiave linea+destinazione per individuare i passaggi già coperti dal real-time */
 function lineDestKey(p) {
     const line = (p.line || '').split('_')[0];
@@ -139,6 +275,31 @@ function lineDestKey(p) {
  *  linea+destinazione NON già presenti nel real-time (dati mancanti). */
 function mergePassages(realtime, scheduled) {
     const result = Array.isArray(realtime) ? realtime.slice() : [];
+    const scheduledByKey = new Map();
+    (Array.isArray(scheduled) ? scheduled : []).forEach(p => {
+        const key = lineDestKey(p);
+        if (!scheduledByKey.has(key)) scheduledByKey.set(key, []);
+        scheduledByKey.get(key).push(p);
+    });
+    result.forEach(p => {
+        const candidates = scheduledByKey.get(lineDestKey(p)) || [];
+        const relativeMinutes = /^\s*\d+\s*'\s*$/.test(String(p.time || '')) ? parseInt(p.time, 10) : null;
+        const target = new Date();
+        if (relativeMinutes != null) target.setMinutes(target.getMinutes() + relativeMinutes);
+        const targetMinutes = relativeMinutes != null
+            ? target.getHours() * 60 + target.getMinutes()
+            : (() => { const parts = String(p.time || '').split(':').map(Number); return Number.isFinite(parts[0]) && Number.isFinite(parts[1]) ? parts[0] * 60 + parts[1] : null; })();
+        const candidate = candidates.slice().sort((a, b) => {
+            const minutes = item => { const parts = String(item.time || '').split(':').map(Number); return Number.isFinite(parts[0]) && Number.isFinite(parts[1]) ? parts[0] * 60 + parts[1] : Number.MAX_SAFE_INTEGER; };
+            return targetMinutes == null ? 0 : Math.abs(minutes(a) - targetMinutes) - Math.abs(minutes(b) - targetMinutes);
+        })[0];
+        if (candidate) Object.assign(p, {
+            trip_id: candidate.trip_id,
+            gtfs_stop_id: candidate.gtfs_stop_id,
+            stop_lat: candidate.stop_lat,
+            stop_lon: candidate.stop_lon
+        });
+    });
     const covered = new Set(result.map(lineDestKey));
     const added = new Set();
 
@@ -196,10 +357,12 @@ async function loadPassages() {
     if (!stationId) return;
 
     // Real-time + previsti + avvisi in parallelo
-    const [realtime, scheduled, noticeText] = await Promise.all([
+    const [realtime, scheduled, noticeText, navigationPassages, vehicles] = await Promise.all([
         fetchRealtimePassages(),
         fetchScheduledPassages(),
-        fetchNoticeboard()
+        fetchNoticeboard(),
+        fetchNavigationPassages(),
+        fetchStopVehicles()
     ]);
 
     const loadingEl = document.getElementById('loading');
@@ -227,14 +390,17 @@ async function loadPassages() {
     if (!listContainer) return;
 
     // Errore di rete reale (real-time null) e nessun dato previsto
-    if (realtime === null && (!scheduled || scheduled.length === 0)) {
+    if (realtime === null && (!scheduled || scheduled.length === 0) && navigationPassages.length === 0) {
         listContainer.innerHTML = "<p class='text-center text-danger'>Errore nel caricamento dei dati.</p>";
         return;
     }
 
     const passages = mergePassages(realtime, scheduled);
+    attachVehiclesToPassages(passages, vehicles);
+    attachVehiclesToPassages(navigationPassages, vehicles);
+    await enrichPassageProgress(passages.concat(navigationPassages));
 
-    if (passages.length === 0) {
+    if (passages.length === 0 && navigationPassages.length === 0) {
         const message = strike
             ? "Nessun passaggio in tempo reale (possibile sciopero). Vedi la bacheca."
             : "Nessun passaggio previsto.";
@@ -247,6 +413,13 @@ async function loadPassages() {
         const card = createPassageCard(p);
         listContainer.appendChild(card);
     });
+    if (navigationPassages.length) {
+        const heading = document.createElement('h3');
+        heading.className = 'navigation-passages-heading';
+        heading.textContent = '⛴ Navigazione';
+        listContainer.appendChild(heading);
+        navigationPassages.forEach(p => listContainer.appendChild(createNavigationPassageCard(p)));
+    }
 
     // Registra ritardi nello storico (solo i passaggi real-time: real:false vengono ignorati)
     if (typeof recordPassageDelays !== 'undefined') {
@@ -340,8 +513,9 @@ function createPassageCard(p) {
     const stop = p.stop || stationId;
     const lineId = p.lineId;
     const routeColor = String(p.route_color || p.color || '').trim();
-    const routeColorStyle = /^#?[0-9a-f]{6}$/i.test(routeColor)
-        ? ` style="background-color:#${routeColor.replace('#', '')}"` : '';
+    const routeTextColor = String(p.route_text_color || '').trim();
+    const routeColorStyle = /^#?[0-9a-f]{6}$/i.test(routeColor) || /^#?[0-9a-f]{6}$/i.test(routeTextColor)
+        ? ' style="' + (/^#?[0-9a-f]{6}$/i.test(routeColor) ? 'background-color:#' + routeColor.replace('#', '') + ';' : '') + (/^#?[0-9a-f]{6}$/i.test(routeTextColor) ? 'color:#' + routeTextColor.replace('#', '') + ';' : '') + '"' : '';
 
     // Parsing nome linea (es. "7E_US" -> "7E")
     const [lineName, lineTag] = lineNameRaw.split("_");
@@ -413,9 +587,10 @@ function createPassageCard(p) {
             <div class="passage-info">
                 <span class="passage-dest"><b>${destination}</b></span><br/>
                 <span class="passage-meta">Presso <b>${stop}</b></span>
+                ${vehicleInfoHtml(p)}
             </div>
         </div>
-        <div>${timeHtml}</div>
+        <div class="passage-time-column">${timeHtml}${vehicleMapLinkHtml(p)}</div>
     `;
 
     return div;
@@ -649,7 +824,7 @@ function renderStopLines(lines, container) {
         return `
             <div class="line-card">
                 <div class="line-card-header">
-                    <div class="line-badge ${badgeClass}">${lineName || line.route_short_name}</div>
+                    <div class="line-badge ${badgeClass}" style="${line.route_color ? 'background-color:' + line.route_color + ';' : ''}${line.route_text_color ? 'color:' + line.route_text_color + ';' : ''}">${lineName || line.route_short_name}</div>
                     <div class="line-card-name">${line.route_long_name || ''}</div>
                 </div>
                 <div class="line-departures">
@@ -699,5 +874,5 @@ window.onload = init;
 
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { getFavorites, isFavorite, toggleFavorite, updateFavoriteButton, createPassageCard, updateNotifyButton, switchTab, renderStopLines, mergePassages, isLikelyStrike, lineDestKey };
+    module.exports = { getFavorites, isFavorite, toggleFavorite, updateFavoriteButton, createPassageCard, updateNotifyButton, switchTab, renderStopLines, mergePassages, isLikelyStrike, lineDestKey, passageDistanceMeters, passageVehicleLabel, attachVehiclesToPassages, passageVehicleProgress };
 }
