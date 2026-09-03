@@ -38,6 +38,21 @@ $queries = [
       `fetched_at` DATETIME NOT NULL,
       `data_json` LONGTEXT NOT NULL,
       FOREIGN KEY (`session_id`) REFERENCES `tm_sessions`(`id`) ON DELETE CASCADE
+    )",
+    "CREATE TABLE IF NOT EXISTS `feedback` (
+      `id` INT AUTO_INCREMENT PRIMARY KEY,
+      `category` VARCHAR(32) NOT NULL,
+      `priority` VARCHAR(16) NOT NULL DEFAULT 'normal',
+      `status` VARCHAR(16) NOT NULL DEFAULT 'new',
+      `name` VARCHAR(120) NULL,
+      `email` VARCHAR(190) NULL,
+      `subject` VARCHAR(180) NULL,
+      `message` TEXT NOT NULL,
+      `ip_hash` CHAR(64) NULL,
+      `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX `idx_feedback_status` (`status`),
+      INDEX `idx_feedback_category` (`category`),
+      INDEX `idx_feedback_created` (`created_at`)
     )"
 ];
 

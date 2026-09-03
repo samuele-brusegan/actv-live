@@ -95,6 +95,9 @@
                 <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/line-schedule'">
                     Orari delle linee
                 </button>
+                <a class="btn rounded-pill px-4 py-2 home-action-btn feedback-home-btn" href="/feedback">
+                    ✎ Invia feedback
+                </a>
             </div>
             <div id="important-info-btn" class="hidden">!</div>
             <div id="important-info-toast" style="display: none;">
@@ -103,7 +106,7 @@
             </div>
 
             <div class="mit-licence" id="footer-licence">
-                MIT License (2025)
+                MIT License (2025–2026)
                 <hr>
                 App sviluppata da <a href="https://github.com/samuele-brusegan">Samuele Brusegan</a> <br>
                 Grafica e design da <a href="https://github.com/andreadavanzo09-bit">Andrea Davanzo</a> <br>

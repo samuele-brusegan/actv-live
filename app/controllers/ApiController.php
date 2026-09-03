@@ -76,6 +76,54 @@ class ApiController {
         }
     }
 
+    private function ensureFeedbackTable(): void {
+        $this->getDb()->query("CREATE TABLE IF NOT EXISTS feedback (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            category VARCHAR(32) NOT NULL,
+            priority VARCHAR(16) NOT NULL DEFAULT 'normal',
+            status VARCHAR(16) NOT NULL DEFAULT 'new',
+            name VARCHAR(120) NULL,
+            email VARCHAR(190) NULL,
+            subject VARCHAR(180) NULL,
+            message TEXT NOT NULL,
+            ip_hash CHAR(64) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_feedback_status (status), INDEX idx_feedback_category (category), INDEX idx_feedback_created (created_at)
+        )");
+    }
+
+    function feedback() {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success'=>false,'error'=>'Metodo non consentito']); return; }
+        $data = json_decode((string) file_get_contents('php://input'), true);
+        if (!is_array($data)) $data = $_POST;
+        if (!empty($data['website'])) { echo json_encode(['success'=>true]); return; }
+        $categories = ['feature', 'bug', 'improvement', 'question', 'other'];
+        $priorities = ['low', 'normal', 'high'];
+        $category = trim((string)($data['category'] ?? ''));
+        $priority = trim((string)($data['priority'] ?? 'normal'));
+        $message = trim((string)($data['message'] ?? ''));
+        if (!in_array($category, $categories, true)) { http_response_code(422); echo json_encode(['success'=>false,'error'=>'Seleziona una categoria valida.']); return; }
+        if (!in_array($priority, $priorities, true)) $priority = 'normal';
+        if (mb_strlen($message) < 10 || mb_strlen($message) > 5000) { http_response_code(422); echo json_encode(['success'=>false,'error'=>'Il messaggio deve contenere tra 10 e 5000 caratteri.']); return; }
+        $email = trim((string)($data['email'] ?? ''));
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) { http_response_code(422); echo json_encode(['success'=>false,'error'=>'Inserisci un indirizzo email valido oppure lascia il campo vuoto.']); return; }
+        try {
+            $db = $this->getDb();
+            $this->ensureFeedbackTable();
+            $db->query('INSERT INTO feedback (category, priority, name, email, subject, message, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?)', [
+                $category, $priority, trim((string)($data['name'] ?? '')) ?: null, $email ?: null,
+                trim((string)($data['subject'] ?? '')) ?: null, $message,
+                hash('sha256', (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown'))
+            ]);
+            echo json_encode(['success'=>true,'message'=>'Grazie, il tuo feedback è stato inviato.']);
+        } catch (Throwable $e) {
+            http_response_code(500); echo json_encode(['success'=>false,'error'=>'Impossibile salvare il feedback in questo momento.']);
+            Logger::log('EXCEPTION', 'Feedback insert: ' . $e->getMessage(), __FILE__, __LINE__);
+        }
+    }
+
     // Refactored from dbControll::api_gtfsIdentify
     function api_gtfsIdentify() {
         $tableJoins = "
