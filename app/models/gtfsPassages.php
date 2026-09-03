@@ -33,10 +33,15 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         // $day è whitelisted: interpolazione sicura nel nome colonna
         $sql = "SELECT SUBSTRING_INDEX(SUBSTRING_INDEX(t.shape_id, '_', 3), '_', -1) AS lineId,
                     t.trip_headsign   AS destination,
+                    t.trip_id,
                     st.departure_time AS dep_time,
+                    s.stop_lat,
+                    s.stop_lon,
                     s.stop_id       AS stop_name,
                     s.stop_name         AS stop_id,
-                    t.route_id        AS line
+                    t.route_id        AS line,
+                    r.route_color,
+                    r.route_text_color
                 FROM stops s
                 JOIN stop_times st ON st.stop_id = s.stop_id
                 JOIN trips t       ON t.trip_id = st.trip_id
@@ -78,10 +83,16 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
             $out[] = [
                 'line'         => $row['line'],
                 'destination'  => $row['destination'],
+                'trip_id'      => $row['trip_id'],
+                'gtfs_stop_id' => $row['stop_name'],
                 'time'         => substr($row['dep_time'], 0, 5),
                 'real'         => false,
                 'stop'         => $row['stop_name'],
                 'lineId'       => $row['lineId'],
+                'route_color'  => $row['route_color'],
+                'route_text_color' => $row['route_text_color'],
+                'stop_lat'     => (float) $row['stop_lat'],
+                'stop_lon'     => (float) $row['stop_lon'],
                 'timingPoints' => [[
                     'stop' => $row['stop_id'],
                     'time' => $row['dep_time'],

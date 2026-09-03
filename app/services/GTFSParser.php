@@ -5,14 +5,30 @@
  * Simplified version for hybrid approach - parses GTFS data and creates JSON cache
  */
 class GTFSParser {
-    private $gtfsUrl = 'http://actv.avmspa.it/sites/default/files/attachments/opendata/automobilistico/actv_aut.zip';
+    private const FEEDS = [
+        'automobilistico' => 'https://actv.avmspa.it/sites/default/files/attachments/opendata/automobilistico/actv_aut.zip',
+        'navigation' => 'https://actv.avmspa.it/sites/default/files/attachments/opendata/navigazione/actv_nav.zip',
+    ];
+    private string $profile;
+    private string $gtfsUrl;
     private $dataDir;
     private $cacheDir;
     
-    public function __construct(?string $dataDir = null, ?string $cacheDir = null) {
+    public function __construct(?string $dataDir = null, ?string $cacheDir = null, string $profile = 'automobilistico') {
         ini_set('memory_limit', '1024M');
-        $this->dataDir = $dataDir ?: BASE_PATH . '/data/gtfs';
-        $this->cacheDir = $cacheDir ?: $this->dataDir . '/cache';
+        $this->profile = array_key_exists($profile, self::FEEDS) ? $profile : 'automobilistico';
+        $this->gtfsUrl = self::FEEDS[$this->profile];
+        $baseDataDir = $dataDir ?: BASE_PATH . '/data/gtfs';
+        // Mantiene compatibilità con il feed automobilistico storico già
+        // estratto direttamente in data/gtfs; la navigazione resta isolata.
+        $legacyBusData = !$dataDir && $this->profile === 'automobilistico'
+            && is_file($baseDataDir . '/routes.txt');
+        $this->dataDir = $dataDir ? $baseDataDir : ($legacyBusData ? $baseDataDir : $baseDataDir . '/' . $this->profile);
+        $legacyBusCache = !$cacheDir && $this->profile === 'automobilistico'
+            && is_file($baseDataDir . '/cache/routes.json');
+        $this->cacheDir = $cacheDir ?: ($legacyBusCache
+            ? $baseDataDir . '/cache'
+            : BASE_PATH . '/data/gtfs/cache/' . $this->profile);
 
         if (!file_exists($this->dataDir)) {
             mkdir($this->dataDir, 0777, true);
@@ -90,7 +106,9 @@ class GTFSParser {
                 'id' => $stop['stop_id'],
                 'name' => $stop['stop_name'],
                 'lat' => floatval($stop['stop_lat']),
-                'lon' => floatval($stop['stop_lon'])
+                'lon' => floatval($stop['stop_lon']),
+                'service' => $this->profile,
+                'mode' => $this->profile === 'navigation' ? 'water' : 'bus'
             ];
         }
         
@@ -128,7 +146,11 @@ class GTFSParser {
                 'long_name' => $route['route_long_name'] ?? '',
                 'type' => intval($route['route_type']),
                 'color' => $route['route_color'] ?? '',
-                'text_color' => $route['route_text_color'] ?? ''
+                'text_color' => $route['route_text_color'] ?? '',
+                'service' => $this->profile,
+                'mode' => $this->profile === 'navigation' ? 'water' : 'bus',
+                'route_color' => $this->normaliseColor($route['route_color'] ?? '', $this->profile === 'navigation' ? '#5B5B5B' : null),
+                'route_text_color' => $this->normaliseColor($route['route_text_color'] ?? '', '#FFFFFF')
             ];
         }
         
@@ -164,7 +186,10 @@ class GTFSParser {
                 'id' => $trip['trip_id'],
                 'route_id' => $trip['route_id'],
                 'service_id' => $trip['service_id'],
-                'headsign' => $trip['trip_headsign'] ?? ''
+                'shape_id' => $trip['shape_id'] ?? '',
+                'headsign' => $trip['trip_headsign'] ?? '',
+                'service' => $this->profile,
+                'mode' => $this->profile === 'navigation' ? 'water' : 'bus'
             ];
         }
         
@@ -283,7 +308,87 @@ class GTFSParser {
      */
     public function parseAll() {
         $this->downloadGTFS();
-        $this->parseExtracted();
+        $publishedCache = $this->cacheDir;
+        $stagingCache = $publishedCache . '.staging-' . getmypid() . '-' . bin2hex(random_bytes(3));
+        mkdir($stagingCache, 0777, true);
+        $this->cacheDir = $stagingCache;
+        try {
+            $this->parseExtracted();
+            // La cache automobilistica storica coincide con cache/, mentre
+            // Navigazione vive in cache/navigation/. Preservala durante la
+            // pubblicazione atomica del feed bus.
+            if ($this->profile === 'automobilistico' && is_dir($publishedCache . '/navigation')) {
+                $this->copyDirectory($publishedCache . '/navigation', $stagingCache . '/navigation');
+            }
+            $previous = $publishedCache . '.previous-' . getmypid();
+            if (is_dir($publishedCache)) rename($publishedCache, $previous);
+            rename($stagingCache, $publishedCache);
+            $this->removeDirectory($previous);
+        } catch (Throwable $e) {
+            $this->removeDirectory($stagingCache);
+            throw $e;
+        } finally {
+            $this->cacheDir = $publishedCache;
+        }
+    }
+
+    /** Parse shapes.txt into an indexed cache usable by the map API. */
+    public function parseShapes(): array {
+        $file = $this->dataDir . '/shapes.txt';
+        if (!is_file($file)) return [];
+        $handle = fopen($file, 'r');
+        $headers = fgetcsv($handle, 0, ',', '"', '\\');
+        $shapes = [];
+        while (($data = fgetcsv($handle, 0, ',', '"', '\\')) !== false) {
+            $row = array_combine($headers, $data);
+            $id = (string) ($row['shape_id'] ?? '');
+            if ($id === '') continue;
+            $shapes[$id][] = [
+                'lat' => (float) ($row['shape_pt_lat'] ?? 0),
+                'lng' => (float) ($row['shape_pt_lon'] ?? 0),
+                'sequence' => (int) ($row['shape_pt_sequence'] ?? 0),
+            ];
+        }
+        fclose($handle);
+        foreach ($shapes as &$points) {
+            usort($points, fn($a, $b) => $a['sequence'] <=> $b['sequence']);
+            foreach ($points as &$point) unset($point['sequence']);
+        }
+        unset($points, $point);
+        file_put_contents($this->cacheDir . '/shapes.json', json_encode($shapes));
+        $shapesDir = $this->cacheDir . '/shapes';
+        if (!is_dir($shapesDir)) mkdir($shapesDir, 0777, true);
+        foreach ($shapes as $shapeId => $points) {
+            $safeId = preg_replace('/[^a-zA-Z0-9_-]/', '_', (string) $shapeId);
+            file_put_contents($shapesDir . '/shape_' . $safeId . '.json', json_encode($points));
+        }
+        return $shapes;
+    }
+
+    private function removeDirectory(string $directory): void {
+        if (!is_dir($directory)) return;
+        foreach (scandir($directory) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..') continue;
+            $path = $directory . '/' . $entry;
+            is_dir($path) ? $this->removeDirectory($path) : @unlink($path);
+        }
+        @rmdir($directory);
+    }
+
+    private function copyDirectory(string $source, string $destination): void {
+        if (!is_dir($destination)) mkdir($destination, 0777, true);
+        foreach (scandir($source) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..') continue;
+            $from = $source . '/' . $entry;
+            $to = $destination . '/' . $entry;
+            is_dir($from) ? $this->copyDirectory($from, $to) : copy($from, $to);
+        }
+    }
+
+    private function normaliseColor(string $value, ?string $fallback = null): ?string {
+        $value = ltrim(trim($value), '#');
+        if (preg_match('/^[0-9a-fA-F]{6}$/', $value)) return '#' . strtoupper($value);
+        return $fallback;
     }
 
     /**
@@ -293,6 +398,7 @@ class GTFSParser {
         $this->parseStops();
         $this->parseRoutes();
         $this->parseTrips();
+        $this->parseShapes();
         $this->parseStopTimes(); // This now handles splitting and indexing
         
         echo "\nGTFS parsing complete!\n";
@@ -312,4 +418,6 @@ class GTFSParser {
         $age = time() - filemtime($cacheFile);
         return $age < $maxAge;
     }
+
+    public function getProfile(): string { return $this->profile; }
 }

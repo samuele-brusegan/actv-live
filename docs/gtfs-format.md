@@ -479,3 +479,14 @@ Il feed corrente dichiara:
 
 Questi dati sono disponibili nell'archivio estratto, ma non hanno una tabella
 runtime dedicata.
+## Profili ACTV
+
+Il parser supporta due profili indipendenti:
+
+- `php scripts/parse_gtfs.php` mantiene la cache automobilistica storica;
+- `php scripts/parse_gtfs.php --navigation` oppure `php scripts/update_navigation.php`
+  scarica il feed Navigazione in `data/gtfs/cache/navigation/`.
+
+Le entita della cache espongono `service` e `mode` (`automobilistico/bus` oppure
+`navigation/water`), oltre ai colori GTFS normalizzati. Un errore nel secondo
+feed non invalida la cache autobus.
