@@ -641,6 +641,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Pool di fetch e Caricamento ───────────────────────────
 
     async function loadNavigationVehicles() {
+        window.ACTVPerf?.mark('navigation-load-start');
         if (serviceMode === 'automobilistico') { clearNavigationMarkers(); return; }
         try {
             await loadNavigationColors();
@@ -669,6 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 navigationMarkers.set(id, marker);
             });
             navigationMarkers.forEach((marker, id) => { if (!active.has(id)) { map.removeLayer(marker); navigationMarkers.delete(id); } });
+            window.ACTVPerf?.mark('navigation-load-end', { vehicles: navigationMarkers.size });
         } catch (error) {
             console.warn('Veicoli Navigazione non disponibili:', error);
         }
@@ -690,6 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function loadRealtimeBusVehicles(signal) {
+        window.ACTVPerf?.mark('realtime-bus-load-start');
         const response = await fetch('/api/realtime/vehicles?service=automobilistico', { signal, cache: 'no-store' });
         if (!response.ok) return false;
         const payload = await response.json();
@@ -727,10 +730,12 @@ document.addEventListener('DOMContentLoaded', () => {
         spinnerEl.classList.add('hidden');
         counterText.textContent = `${shown} bus realtime sulla mappa`;
         lastUpdateEl.textContent = `Agg. ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+        window.ACTVPerf?.mark('realtime-bus-load-end', { vehicles: shown });
         return true;
     }
 
     async function loadBuses() {
+        window.ACTVPerf?.mark('bus-load-start', { service: serviceMode });
         if (serviceMode === 'navigation') { clearBusMarkers(); counterText.textContent = 'Solo navigazione'; spinnerEl.classList.add('hidden'); return; }
         if (abortCtrl) abortCtrl.abort();
         abortCtrl = new AbortController();
@@ -935,6 +940,7 @@ document.addEventListener('DOMContentLoaded', () => {
             spinnerEl.classList.add('hidden');
             counterText.textContent = `${busMarkers.size} bus sulla mappa`;
             lastUpdateEl.textContent = `Agg. ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+            window.ACTVPerf?.mark('bus-load-end', { markers: busMarkers.size, nonRealtime: finalNonRtCount });
 
         } catch (e) {
             if (e.name !== 'AbortError') {

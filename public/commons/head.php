@@ -32,6 +32,10 @@
 	<script src="/js/offline.js"></script>
 	<script src="/js/ui-feedback.js"></script>
 	<script src="/js/app-shell.js" defer></script>
+	<script>
+		window.ACTV_PERF_DIAGNOSTICS = <?= !empty(ENV['ACTV_PERF_DIAGNOSTICS']) && ENV['ACTV_PERF_DIAGNOSTICS'] === '1' ? 'true' : 'false' ?>;
+	</script>
+	<script src="/js/perfDiagnostics.js" defer></script>
 
 <?php 
 //Send globals to JS
