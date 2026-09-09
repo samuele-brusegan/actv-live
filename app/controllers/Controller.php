@@ -124,6 +124,11 @@ class Controller {
         require_once BASE_PATH . '/app/views/admin/gtfsUpdate.php';
     }
 
+    function adminGtfsRealtimeInspector() {
+        AdminAuth::requireAuth();
+        require_once BASE_PATH . '/app/views/admin/gtfsRtInspector.php';
+    }
+
 
 
     function liveMap() {

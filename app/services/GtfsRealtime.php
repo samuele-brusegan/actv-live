@@ -31,6 +31,30 @@ class GtfsRealtime
         return $kind === 'vehicles' ? self::vehicles($raw, $service) : self::updates($raw, $service);
     }
 
+    /**
+     * Scarica un feed senza usare la cache e restituisce il payload protobuf
+     * insieme alla sua rappresentazione decodificata per l'inspector admin.
+     */
+    public static function inspect(string $kind, string $service = 'navigation'): array
+    {
+        if (!isset(self::URLS[$service][$kind])) {
+            throw new InvalidArgumentException('Feed GTFS-RT non valido');
+        }
+
+        $raw = self::download(self::URLS[$service][$kind]);
+        return [
+            'service' => $service,
+            'kind' => $kind,
+            'url' => self::URLS[$service][$kind],
+            'fetched_at' => date(DATE_ATOM),
+            'bytes' => strlen($raw),
+            'sha256' => hash('sha256', $raw),
+            'raw_base64' => base64_encode($raw),
+            'raw_hex_preview' => strtoupper(implode(' ', str_split(bin2hex(substr($raw, 0, 256)), 2))),
+            'decoded' => self::decode($kind, $raw, $service),
+        ];
+    }
+
     private static function download(string $url): string
     {
         $ch = curl_init($url);

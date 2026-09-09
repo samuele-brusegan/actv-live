@@ -76,6 +76,37 @@ class ApiController {
         }
     }
 
+    function adminGtfsRealtimeInspect() {
+        if (!$this->requireAdminJson()) return;
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, max-age=0');
+
+        $service = (string)($_GET['service'] ?? 'automobilistico');
+        $kind = (string)($_GET['kind'] ?? 'vehicles');
+        if (!in_array($service, ['automobilistico', 'navigation'], true)
+            || !in_array($kind, ['vehicles', 'updates'], true)) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'error' => 'Servizio o feed GTFS-RT non valido']);
+            return;
+        }
+
+        try {
+            require_once BASE_PATH . '/app/services/GtfsRealtime.php';
+            echo json_encode([
+                'success' => true,
+                'data' => GtfsRealtime::inspect($kind, $service),
+            ], JSON_INVALID_UTF8_SUBSTITUTE);
+        } catch (Throwable $e) {
+            http_response_code(502);
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'service' => $service,
+                'kind' => $kind,
+            ], JSON_INVALID_UTF8_SUBSTITUTE);
+        }
+    }
+
     private function ensureFeedbackTable(): void {
         $this->getDb()->query("CREATE TABLE IF NOT EXISTS feedback (
             id INT AUTO_INCREMENT PRIMARY KEY,

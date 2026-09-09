@@ -18,6 +18,7 @@
             </div>
             <div class="gtfs-actions">
                 <a href="/admin/dashboard" class="gtfs-button secondary">Dashboard</a>
+                <a href="/admin/gtfs-rt-inspector" class="gtfs-button secondary">GTFS-RT Inspector</a>
                 <a href="/admin/logout" class="gtfs-button secondary">Logout</a>
             </div>
         </div>

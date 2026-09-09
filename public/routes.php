@@ -29,6 +29,7 @@ $router->add('/admin/logout'            , 'Controller', 'adminLogout');
 $router->add('/admin/logs'              , 'Controller', 'logs');
 $router->add('/admin/dashboard'         , 'Controller', 'adminDashboard');
 $router->add('/admin/gtfs-update'       , 'Controller', 'adminGtfsUpdate');
+$router->add('/admin/gtfs-rt-inspector' , 'Controller', 'adminGtfsRealtimeInspector');
 $router->add('/admin/feedback'          , 'Controller', 'adminFeedback');
 
 // === API ===
@@ -56,6 +57,7 @@ $router->add('/api/feedback'            , 'ApiController', 'feedback');
 $router->add('/api/admin/gtfs-update/status', 'ApiController', 'adminGtfsUpdateStatus');
 $router->add('/api/admin/gtfs-update/config', 'ApiController', 'adminGtfsUpdateConfig');
 $router->add('/api/admin/gtfs-update/start', 'ApiController', 'adminGtfsUpdateStart');
+$router->add('/api/admin/gtfs-rt-inspector', 'ApiController', 'adminGtfsRealtimeInspect');
 
 // === API GTFS ===
 $router->add('/api/gtfs-identify'       , 'ApiController', 'api_gtfsIdentify');
