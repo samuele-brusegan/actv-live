@@ -9,6 +9,7 @@ window.history.pushState({}, 'Test', '?tripId=123');
 const {
     formatMinutesRemaining,
     getContrastTextColor,
+    getMapStopArrowRotation,
     mergeStops,
     normalizeMapColor,
     normalizeStopName,
@@ -162,6 +163,14 @@ describe('trip map route colors', () => {
     test('sceglie il testo con contrasto migliore', () => {
         expect(getContrastTextColor('#ffffff')).toBe('#111827');
         expect(getContrastTextColor('#087f5b')).toBe('#fff');
+    });
+});
+
+describe('trip map stop arrows', () => {
+    test('allinea il chevron con il bearing geografico', () => {
+        expect(getMapStopArrowRotation(0)).toBe(-90);
+        expect(getMapStopArrowRotation(90)).toBe(0);
+        expect(getMapStopArrowRotation(180)).toBe(90);
     });
 });
 

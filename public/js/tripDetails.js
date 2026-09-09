@@ -41,6 +41,7 @@ let tripMapGeoWatchId = null;
 let tripMapSelectedStopId = null;
 let tripMapStops = [];
 let tripMapProgress = null;
+let tripMapNextStopScrolled = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -597,15 +598,48 @@ function mapStopBearing(stops, index) {
     return (bearing + 360) % 360;
 }
 
-function createMapStopIcon(selected, bearing) {
-    const className = selected ? ' trip-map-stop-icon-selected' : '';
-    const color = selected ? '#075bbb' : '#087f5b';
+function getMapStopArrowRotation(bearing) {
+    const normalizedBearing = Number(bearing);
+    return Number.isFinite(normalizedBearing) ? normalizedBearing - 90 : -90;
+}
+
+function createMapStopIcon(selected, bearing, visited = false) {
+    const className = `${selected ? ' trip-map-stop-icon-selected' : ''}${visited ? ' trip-map-stop-icon-visited' : ''}`;
+    const color = visited ? '#8b949e' : (selected ? '#075bbb' : '#087f5b');
     return L.divIcon({
         className: 'trip-map-stop-icon',
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
-        html: `<span class="trip-map-stop-badge${className}" style="--stop-color:${color}"><svg viewBox="0 0 24 24" style="transform:rotate(${bearing}deg)" aria-hidden="true"><path d="M8 5l7 7-7 7"/></svg></span>`
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        html: `<span class="trip-map-stop-badge${className}" style="--stop-color:${color}"><svg viewBox="0 0 24 24" style="transform:rotate(${getMapStopArrowRotation(bearing)}deg)" aria-hidden="true"><path d="M8 5l7 7-7 7"/></svg></span>`
     });
+}
+
+function updateMapStopMarkers() {
+    tripMapStopMarkers.forEach((marker, index) => {
+        const stop = tripMapStops[index];
+        if (!stop) return;
+        marker.setIcon(createMapStopIcon(
+            isSelectedMapStop(stop),
+            mapStopBearing(tripMapStops, index),
+            isVisitedMapStop(stop)
+        ));
+    });
+}
+
+function scrollMapToNextStopOnce(stops) {
+    if (tripMapNextStopScrolled || !tripMapProgress) return;
+    const list = document.getElementById('trip-map-stops-list');
+    if (!list) return;
+    const nextIndex = stops.findIndex(stop => !isVisitedMapStop(stop));
+    if (nextIndex < 0) return;
+    const next = list.querySelector(`[data-stop-index="${nextIndex}"]`);
+    if (!next) return;
+
+    tripMapNextStopScrolled = true;
+    const targetScrollTop = next.offsetTop - (list.clientHeight - next.offsetHeight) / 2;
+    const scrollTop = Math.max(0, targetScrollTop);
+    if (typeof list.scrollTo === 'function') list.scrollTo({ top: scrollTop, behavior: 'smooth' });
+    else list.scrollTop = scrollTop;
 }
 
 function renderMapStops(stops) {
@@ -616,9 +650,11 @@ function renderMapStops(stops) {
         const id = String(stop.stop_id || stop.id || '');
         const current = selectedIds.includes(id) || isSelectedMapStop(stop) ? ' current' : '';
         const visited = isVisitedMapStop(stop) ? ' visited' : '';
+        const nextVisited = stops[index + 1] ? isVisitedMapStop(stops[index + 1]) : false;
+        const passedSegment = visited && nextVisited ? ' passed-segment' : '';
         const name = escapeMapHtml(stop.name || stop.stop_name || '');
         const status = visited ? 'Già passata' : 'Da raggiungere';
-        return `<div class="trip-map-stop${current}${visited}" data-stop-index="${index}" role="button" tabindex="0" aria-label="${escapeMapHtml(name)} · ${status}"><span class="trip-map-stop-marker"></span><span class="trip-map-stop-name">${name}</span><time>${escapeMapHtml(mapStopPassageLabel(stop))}</time></div>`;
+        return `<div class="trip-map-stop${current}${visited}${passedSegment}" data-stop-index="${index}" role="button" tabindex="0" aria-label="${escapeMapHtml(name)} · ${status}"><span class="trip-map-stop-marker"></span><span class="trip-map-stop-name">${name}</span><time>${escapeMapHtml(mapStopPassageLabel(stop))}</time></div>`;
     }).join('');
 
     list.querySelectorAll('.trip-map-stop').forEach(item => {
@@ -634,6 +670,7 @@ function renderMapStops(stops) {
             }
         });
     });
+    scrollMapToNextStopOnce(stops);
 }
 
 async function loadTripMap() {
@@ -673,6 +710,7 @@ async function loadTripMap() {
         const stops = Array.isArray(tripMapShape.path) ? tripMapShape.path : state.stopsGTFS;
         tripMapStops = stops || [];
         tripMapProgress = null;
+        tripMapNextStopScrolled = false;
         const selectedStop = state.stopsGTFS.find(stop =>
             String(state.currentStopId || '').split('-').includes(String(stop.stop_id))
         );
@@ -798,6 +836,7 @@ function updateTripMapProgress(position) {
     if (tripMapCompletedRoute) tripMapCompletedRoute.setLatLngs(passed);
     else tripMapCompletedRoute = L.polyline(passed, { color: '#8b949e', weight: 7, opacity: 0.95 }).addTo(tripMap);
     if (tripMapRemainingRoute) tripMapRemainingRoute.setLatLngs(remaining);
+    updateMapStopMarkers();
     renderMapStops(tripMapStops);
 }
 
@@ -1194,6 +1233,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         formatMinutesRemaining,
         getContrastTextColor,
+        getMapStopArrowRotation,
         mergeStops,
         normalizeMapColor,
         normalizeStopName,
