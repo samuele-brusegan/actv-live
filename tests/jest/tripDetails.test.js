@@ -10,6 +10,7 @@ const {
     formatMinutesRemaining,
     getContrastTextColor,
     getMapStopArrowRotation,
+    isMapTerminalStop,
     mergeStops,
     normalizeMapColor,
     normalizeStopName,
@@ -171,6 +172,13 @@ describe('trip map stop arrows', () => {
         expect(getMapStopArrowRotation(0)).toBe(-90);
         expect(getMapStopArrowRotation(90)).toBe(0);
         expect(getMapStopArrowRotation(180)).toBe(90);
+    });
+
+    test('identifica solo il primo e l ultimo capolinea', () => {
+        const stops = [{ stop_id: 'a' }, { stop_id: 'b' }, { stop_id: 'c' }];
+        expect(isMapTerminalStop(stops, 0)).toBe(true);
+        expect(isMapTerminalStop(stops, 1)).toBe(false);
+        expect(isMapTerminalStop(stops, 2)).toBe(true);
     });
 });
 

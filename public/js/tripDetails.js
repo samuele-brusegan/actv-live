@@ -603,14 +603,21 @@ function getMapStopArrowRotation(bearing) {
     return Number.isFinite(normalizedBearing) ? normalizedBearing - 90 : -90;
 }
 
-function createMapStopIcon(selected, bearing, visited = false) {
-    const className = `${selected ? ' trip-map-stop-icon-selected' : ''}${visited ? ' trip-map-stop-icon-visited' : ''}`;
+function isMapTerminalStop(stops, index) {
+    return stops.length > 0 && (index === 0 || index === stops.length - 1);
+}
+
+function createMapStopIcon(selected, bearing, visited = false, terminal = false) {
+    const className = `${selected ? ' trip-map-stop-icon-selected' : ''}${visited ? ' trip-map-stop-icon-visited' : ''}${terminal ? ' trip-map-stop-icon-terminal' : ''}`;
     const color = visited ? '#8b949e' : (selected ? '#075bbb' : '#087f5b');
+    const symbol = terminal
+        ? '<circle cx="12" cy="12" r="4"/>'
+        : `<path d="M8 5l7 7-7 7" style="transform:rotate(${getMapStopArrowRotation(bearing)}deg);transform-origin:12px 12px"/>`;
     return L.divIcon({
         className: 'trip-map-stop-icon',
         iconSize: [24, 24],
         iconAnchor: [12, 12],
-        html: `<span class="trip-map-stop-badge${className}" style="--stop-color:${color}"><svg viewBox="0 0 24 24" style="transform:rotate(${getMapStopArrowRotation(bearing)}deg)" aria-hidden="true"><path d="M8 5l7 7-7 7"/></svg></span>`
+        html: `<span class="trip-map-stop-badge${className}" style="--stop-color:${color}"><svg viewBox="0 0 24 24" aria-hidden="true">${symbol}</svg></span>`
     });
 }
 
@@ -621,7 +628,8 @@ function updateMapStopMarkers() {
         marker.setIcon(createMapStopIcon(
             isSelectedMapStop(stop),
             mapStopBearing(tripMapStops, index),
-            isVisitedMapStop(stop)
+            isVisitedMapStop(stop),
+            isMapTerminalStop(tripMapStops, index)
         ));
     });
 }
@@ -721,7 +729,7 @@ async function loadTripMap() {
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
             const selected = isSelectedMapStop(stop);
             const marker = L.marker([lat, lng], {
-                icon: createMapStopIcon(selected, mapStopBearing(stops, index)),
+                icon: createMapStopIcon(selected, mapStopBearing(stops, index), false, isMapTerminalStop(stops, index)),
                 zIndexOffset: selected ? 500 : 100
             }).addTo(tripMap).bindPopup(createMapStopPopup(stop, index));
             marker.on('click', () => marker.setPopupContent(createMapStopPopup(stop, index)));
@@ -1234,6 +1242,7 @@ if (typeof module !== 'undefined' && module.exports) {
         formatMinutesRemaining,
         getContrastTextColor,
         getMapStopArrowRotation,
+        isMapTerminalStop,
         mergeStops,
         normalizeMapColor,
         normalizeStopName,
