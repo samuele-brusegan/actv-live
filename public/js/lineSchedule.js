@@ -97,6 +97,8 @@
 
     let state = {
         line: '',
+        service: 'automobilistico',
+        catalog: [],
         selectedTrips: [], // trip_id rappresentativi del giro selezionato
     };
 
@@ -114,6 +116,38 @@
 
     function getDate() {
         return $('date-input').value || '';
+    }
+
+    function renderFeedMeta(updatedAt) {
+        const label = state.service === 'navigation' ? 'Navigazione' : 'Automobilistico';
+        const stale = updatedAt && (Date.now() - new Date(updatedAt).getTime() > 48 * 3600 * 1000);
+        $('feed-meta').className = 'small mb-3' + (stale ? ' feed-warning' : ' text-muted');
+        $('feed-meta').innerHTML = 'Servizio: <strong>' + esc(label) + '</strong> · Orari del ' + esc(getDate()) +
+            (updatedAt ? ' · Feed aggiornato: ' + esc(new Date(updatedAt).toLocaleString('it-IT')) + (stale ? ' · dati potenzialmente non aggiornati' : '') : ' · aggiornamento feed non disponibile');
+    }
+
+    async function loadCatalog() {
+        const select = $('line-input'); select.disabled = true; $('load-btn').disabled = true;
+        try {
+            const data = await fetchJson('/api/line-catalog?service=' + encodeURIComponent(state.service) + '&date=' + encodeURIComponent(getDate()));
+            if (!data.success) throw new Error(data.error || 'catalog');
+            state.catalog = data.lines || []; renderFeedMeta(data.updated_at);
+            if (data.feed_available === false) {
+                select.innerHTML = '<option value="">Feed non disponibile</option>';
+                setStatus(data.error || 'Feed non disponibile per questo servizio.', 'warning');
+                return;
+            }
+            const needle = ($('line-search').value || '').trim().toLocaleLowerCase('it');
+            const lines = state.catalog.filter(l => !needle || (l.line + ' ' + l.name).toLocaleLowerCase('it').includes(needle));
+            select.innerHTML = '<option value="">Seleziona una linea</option>' + lines.map(l => '<option value="' + esc(l.line) + '">' + esc(l.line) + ' — ' + esc(l.name || 'senza descrizione') + ' (' + l.variants_count + ' varianti, ' + l.trips_count + ' corse)</option>').join('');
+            if (lines.some(l => l.line === state.line)) select.value = state.line;
+            else { state.line = ''; $('variants').innerHTML = ''; $('variant-detail').innerHTML = ''; }
+            select.disabled = false; $('load-btn').disabled = !select.value;
+            if (select.value) loadVariants(); else setStatus('Seleziona una linea del servizio attivo.', 'info');
+        } catch (e) {
+            state.catalog = []; select.innerHTML = '<option value="">Catalogo non disponibile</option>';
+            setStatus('Catalogo linee non disponibile per questo servizio/data.', 'warning'); renderFeedMeta(null);
+        }
     }
 
     function getTime() {
@@ -159,6 +193,7 @@
 
         try {
             const data = await fetchJson('/api/line-variants?line=' + encodeURIComponent(line) +
+                '&service=' + encodeURIComponent(state.service) +
                 '&day=' + encodeURIComponent(getDay()) +
                 '&date=' + encodeURIComponent(getDate()));
             if (!data.success) { setStatus(data.error || 'Errore', 'danger'); return; }
@@ -356,6 +391,7 @@
 
         try {
             const url = '/api/line-schedule?line=' + encodeURIComponent(state.line) +
+                '&service=' + encodeURIComponent(state.service) +
                 '&trips=' + encodeURIComponent(state.selectedTrips.join(',')) +
                 '&day=' + encodeURIComponent(day) +
                 '&date=' + encodeURIComponent(getDate());
@@ -461,7 +497,7 @@
                 '</th>';
             runs.forEach(r => {
                 const t = r.times[ri];
-                body += '<td class="run-col ' + (t ? '' : 'empty') + '">' + (t ? esc(t) : '·') + '</td>';
+                body += '<td class="run-col ' + (t ? 'served' : 'not-served empty') + (ri === 0 && t ? ' first-stop' : '') + (ri === stops.length - 1 && t ? ' last-stop' : '') + '">' + (t ? esc(t) : '·') + '</td>';
             });
             body += '</tr>';
         });
@@ -518,12 +554,24 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        state.service = localStorage.getItem('actv-line-schedule-service') || 'automobilistico';
+        document.querySelectorAll('.service-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.service === state.service);
+            btn.addEventListener('click', () => {
+                if (state.service === btn.dataset.service) return;
+                state.service = btn.dataset.service;
+                localStorage.setItem('actv-line-schedule-service', state.service);
+                document.querySelectorAll('.service-btn').forEach(b => b.classList.toggle('active', b.dataset.service === state.service));
+                state.line = ''; $('line-search').value = ''; loadCatalog();
+            });
+        });
         updateWeekdayHint();
         $('load-btn').addEventListener('click', loadVariants);
-        $('line-input').addEventListener('keydown', e => { if (e.key === 'Enter') loadVariants(); });
+        $('line-input').addEventListener('change', () => { state.line = $('line-input').value; $('load-btn').disabled = !state.line; if (state.line) loadVariants(); });
+        $('line-search').addEventListener('input', loadCatalog);
         $('date-input').addEventListener('change', () => {
             updateWeekdayHint();
-            loadVariants();
+            loadCatalog();
         });
         $('time-input').addEventListener('change', () => {
             // Svuota il pannello "prossima ora": va ricaricato con il nuovo orario.
@@ -535,9 +583,9 @@
         // Pre-compila dalla querystring (?line=5E) se presente.
         const params = new URLSearchParams(window.location.search);
         if (params.get('line')) {
-            $('line-input').value = params.get('line');
-            loadVariants();
+            state.line = params.get('line'); $('line-search').value = params.get('line');
         }
+        loadCatalog();
     });
 })();
     }

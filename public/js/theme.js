@@ -22,7 +22,8 @@ function toggleTheme() {
  * Aggiorna gli attributi del documento e l'icona del selettore.
  */
 function updateTheme() {
-    const theme = localStorage.getItem("theme") || "light";
+    const savedTheme = localStorage.getItem("theme");
+    const theme = savedTheme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     const isDark = theme === "dark";
 
     // Imposta gli attributi per CSS e Bootstrap
@@ -39,4 +40,10 @@ function updateTheme() {
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { toggleTheme, updateTheme };
+}
+
+if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (!localStorage.getItem('theme')) updateTheme();
+    });
 }

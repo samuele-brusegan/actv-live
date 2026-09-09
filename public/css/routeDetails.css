@@ -119,6 +119,25 @@
     box-shadow: 0 4px 10px rgba(1, 82, 187, 0.3);
 }
 
+.route-icon {
+    width: 1.15em;
+    height: 1.15em;
+    display: inline-block;
+    vertical-align: -0.18em;
+}
+
+.walking-icon {
+    width: 20px;
+    height: 20px;
+    display: block;
+    margin: 0 auto;
+}
+
+.line-badge.badge-walking {
+    background: #F4B942 !important;
+    color: #101817 !important;
+}
+
 /* Pannello "parti da qui" */
 .leave-info {
     background: var(--color-white);

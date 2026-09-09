@@ -149,8 +149,9 @@
                 container.innerHTML = '<div class="hour-chart-bars">' + barsHtml + '</div>';
             }
 
-            function confirmClear() {
-                if (confirm('Sei sicuro di voler cancellare tutto lo storico ritardi?')) {
+            async function confirmClear() {
+                const confirmed = await actvConfirm('Lo storico locale verrà eliminato da questo dispositivo.', 'Cancella storico ritardi');
+                if (confirmed) {
                     clearDelayHistory();
                     renderStats();
                 }

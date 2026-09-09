@@ -291,7 +291,26 @@ function initPullToCancel(modalId, closeFunc) {
 
 function selectStation(type) {
     localStorage.setItem('route_selection_mode', type);
+    const panel = document.getElementById('station-picker-panel');
+    const frame = document.getElementById('station-picker-frame');
+    if (panel && frame) {
+        frame.src = `/station-selector?type=${encodeURIComponent(type)}&embedded=1`;
+        panel.classList.add('is-open');
+        panel.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('picker-open');
+        return;
+    }
     window.location.href = `/station-selector?type=${type}`;
+}
+
+function closeStationPicker() {
+    const panel = document.getElementById('station-picker-panel');
+    const frame = document.getElementById('station-picker-frame');
+    if (!panel) return;
+    panel.classList.remove('is-open');
+    panel.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('picker-open');
+    if (frame) frame.src = 'about:blank';
 }
 
 function swapStations() {
@@ -336,7 +355,7 @@ function persistState() {
 /** Avvia la ricerca percorsi */
 function searchRoutes() {
     if (!searchState.origin || !searchState.destination) {
-        alert('Inserisci sia la partenza che la destinazione.');
+        if (window.actvAlert) actvAlert('Inserisci sia la partenza che la destinazione.', 'Percorso incompleto');
         return;
     }
 
@@ -348,6 +367,7 @@ function searchRoutes() {
     localStorage.setItem('route_optimize', searchState.optimize);
     localStorage.setItem('route_return_trip', searchState.returnTrip ? '1' : '0');
     localStorage.setItem('route_return_time', returnTimeString());
+    localStorage.setItem('route_last_used_at', new Date().toISOString());
 
     window.location.href = '/route-results';
 }
@@ -440,6 +460,21 @@ function renderFavoriteRoutes() {
 
 // Inizializzazione al caricamento
 window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('message', (event) => {
+        if (event.origin !== window.location.origin) return;
+        if (event.data?.type === 'actv-station-picker-cancelled') {
+            closeStationPicker();
+            return;
+        }
+        if (event.data?.type !== 'actv-station-selected') return;
+        const selected = event.data.stop;
+        if (!selected) return;
+        if (event.data.selectionType === 'destination') searchState.destination = selected;
+        else searchState.origin = selected;
+        updateUI();
+        persistState();
+        closeStationPicker();
+    });
     // Carica dati salvati
     const savedOrigin = localStorage.getItem('route_origin');
     const savedDest = localStorage.getItem('route_destination');

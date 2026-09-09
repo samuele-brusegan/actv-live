@@ -11,21 +11,27 @@ define('BASE_PATH', dirname(__DIR__));
 
 // Load GTFSParser
 require_once BASE_PATH . '/app/services/GTFSParser.php';
+require_once BASE_PATH . '/app/services/ConnectionCacheBuilder.php';
 
 try {
-    $parser = new GTFSParser();
+    $profile = in_array('--navigation', $argv ?? [], true) ? 'navigation' : 'automobilistico';
+    $parser = new GTFSParser(null, null, $profile);
     
     // Check if cache is valid
     if ($parser->isCacheValid()) {
         echo "GTFS cache is still valid. Use --force to re-download.\n";
         
-        if (!isset($argv[1]) || $argv[1] !== '--force') {
+        if (!in_array('--force', $argv ?? [], true)) {
             exit(0);
         }
     }
     
     echo "Starting GTFS parsing...\n\n";
     $parser->parseAll();
+    $plannerCache = new ConnectionCacheBuilder();
+    $today = new DateTimeImmutable('today');
+    $plannerCache->ensure($today->format('Y-m-d'));
+    $plannerCache->ensure($today->modify('+1 day')->format('Y-m-d'));
     
     echo "\n✓ GTFS data successfully parsed and cached!\n";
     

@@ -53,7 +53,7 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
                 ],
                 "note" => "stopId==null shouldn't be a problem"
             ]);
-            exit;
+            return;
         }
         $trips = array_slice($trips, 0, $limit);
         if (isset($_GET["return"])) {
@@ -64,13 +64,13 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
             } else {
                 echo json_encode($trips);
             }
-            exit;
+            return;
         }
         if (isset($_GET["rtable"])) {
             header("Content-Type: text/html");
             echo "<style>table { border-collapse: collapse; } table, th, td { border: 1px solid black; } th, td { padding: 5px; text-align: left; } </style>";
             echo associativeArrayToTable($trips);
-            exit;
+            return;
         }
 
     } catch (Exception $e) {
@@ -88,7 +88,7 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
                 "stopId" => $stopId
             ],
         ]);
-        exit;
+        return;
     }
 }
 
@@ -105,16 +105,7 @@ function getPDOConnection() {
     return $pdo;
 }
 
-function queryBuilder($day, $hasStopId, $hasTime) {
-    // Match fermata: se abbiamo lo stopId ACTV facciamo un match esatto sul
-    // \"token\" dentro data_url (es. data_url \"4824-4825-web-aut\" -> token 4824,
-    // 4825) per evitare i falsi positivi del LIKE a sottostringa (337 ~ 1337).
-    if ($hasStopId) {
-        $stopQuery = "CONCAT('-', s.data_url, '-') LIKE CONCAT('%-', ?, '-%')";
-    } else {
-        $stopQuery = "s.stop_name LIKE CONCAT('%', ?, '%')";
-    }
-
+function queryBuilder($hasTime, int $stopCount, int $serviceCount) {
     // Pre-ordinamento solo per restringere il set: lo scoring definitivo
     // (similarità destinazione + prossimità temporale) è calcolato in PHP.
     if ($hasTime) {
@@ -126,34 +117,16 @@ function queryBuilder($day, $hasStopId, $hasTime) {
         $order = "ORDER BY st.arrival_time ASC";
     }
 
+    $stopPlaceholders = implode(',', array_fill(0, $stopCount, '?'));
+    $servicePlaceholders = implode(',', array_fill(0, $serviceCount, '?'));
     $q = "SELECT t.*, st.arrival_time, st.departure_time, r.route_short_name
         FROM trips t
         JOIN routes r ON t.route_id = r.route_id
         JOIN stop_times st ON t.trip_id = st.trip_id
-        JOIN stops s ON st.stop_id = s.stop_id
-        LEFT JOIN calendar c ON t.service_id = c.service_id
         WHERE
             r.route_short_name = ?
-            AND $stopQuery
-            AND (
-                (
-                    c.service_id IS NOT NULL
-                    AND c.{$day} = 1
-                    AND ? BETWEEN c.start_date AND c.end_date
-                    AND NOT EXISTS (
-                        SELECT 1 FROM calendar_dates cd_ex
-                        WHERE cd_ex.service_id = t.service_id
-                        AND cd_ex.date = ?
-                        AND cd_ex.exception_type = 2
-                    )
-                )
-                OR EXISTS (
-                    SELECT 1 FROM calendar_dates cd_in
-                    WHERE cd_in.service_id = t.service_id
-                    AND cd_in.date = ?
-                    AND cd_in.exception_type = 1
-                )
-            )
+            AND st.stop_id IN ($stopPlaceholders)
+            AND t.service_id IN ($servicePlaceholders)
             AND (st.pickup_type IN (0, 1) OR st.pickup_type IS NULL)
         $order
         LIMIT 60";
@@ -279,13 +252,38 @@ function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop
 
     $hasStopId = ($stopId && $stopId !== 'null' && $stopId !== 'undefined');
     $hasTime   = ($time !== null && $time !== '');
-    $paramStop = $hasStopId ? $stopId : $stop;
+    // Risoluzione fermata separata: evita CONCAT/LIKE durante il join sulla
+    // tabella stop_times, che è di gran lunga la tabella più grande.
+    if ($hasStopId) {
+        $stopStmt = $pdo->prepare("SELECT stop_id FROM stops WHERE CONCAT('-', data_url, '-') LIKE CONCAT('%-', ?, '-%')");
+        $stopStmt->execute([$stopId]);
+    } else {
+        $stopStmt = $pdo->prepare("SELECT stop_id FROM stops WHERE stop_name LIKE CONCAT('%', ?, '%')");
+        $stopStmt->execute([$stop]);
+    }
+    $stopIds = array_values(array_unique(array_column($stopStmt->fetchAll(), 'stop_id')));
+    if (!$stopIds) return [];
 
-    $query = queryBuilder($day, $hasStopId, $hasTime);
+    // Le eccezioni calendario vengono applicate una volta in PHP, non tramite
+    // EXISTS correlati per ogni corsa candidata.
+    $activeServices = [];
+    $serviceStmt = $pdo->prepare("SELECT service_id FROM calendar WHERE `{$day}` = 1 AND ? BETWEEN start_date AND end_date");
+    $serviceStmt->execute([$date]);
+    foreach ($serviceStmt->fetchAll() as $row) $activeServices[(string)$row['service_id']] = true;
+    $exceptionStmt = $pdo->prepare("SELECT service_id, exception_type FROM calendar_dates WHERE date = ?");
+    $exceptionStmt->execute([$date]);
+    foreach ($exceptionStmt->fetchAll() as $exception) {
+        $id = (string)$exception['service_id'];
+        if ((int)$exception['exception_type'] === 1) $activeServices[$id] = true;
+        elseif ((int)$exception['exception_type'] === 2) unset($activeServices[$id]);
+    }
+    $serviceIds = array_keys($activeServices);
+    if (!$serviceIds) return [];
+
+    $query = queryBuilder($hasTime, count($stopIds), count($serviceIds));
     $stmt = $pdo->prepare($query);
 
-    // Ordine parametri: route_short_name, stop, date (x3), [time, time per l'ORDER BY].
-    $params = [$busTrack, $paramStop, $date, $date, $date];
+    $params = array_merge([$busTrack], $stopIds, $serviceIds);
     if ($hasTime) {
         $params[] = $time;
         $params[] = $time;

@@ -2,7 +2,30 @@
  * Test per routeResults.js
  * Funzioni testate: safeParseJSON, getLineBadgeDetails, formatItalianDate, formatShortTime
  */
-const { safeParseJSON, getLineBadgeDetails, formatItalianDate, formatShortTime, getTransferCount, getWalkingMinutes, findBestValues } = require('../../public/js/routeResults');
+const { safeParseJSON, getLineBadgeDetails, formatItalianDate, formatShortTime, getTransferCount, getWalkingMinutes, findBestValues, distanceMeters, formatVehicleDistance, computeVehicleProgress } = require('../../public/js/routeResults');
+
+describe('posizione realtime del mezzo', () => {
+    test('calcola la distanza tra mezzo e fermata', () => {
+        expect(distanceMeters(45.4384, 12.3359, 45.4393, 12.3359)).toBeGreaterThan(90);
+        expect(distanceMeters(45.4384, 12.3359, 45.4393, 12.3359)).toBeLessThan(110);
+    });
+
+    test('formatta una distanza leggibile senza chiamarla ETA', () => {
+        expect(formatVehicleDistance(90)).toBe('in prossimità della fermata');
+        expect(formatVehicleDistance(640)).toBe('a circa 600 m dalla fermata');
+        expect(formatVehicleDistance(1420)).toBe('a circa 1,4 km dalla fermata');
+    });
+
+    test('calcola fermate mancanti e superamento della salita', () => {
+        const shape = { stops: [
+            { id: 'A', name: 'A', lat: 45.000, lng: 12 },
+            { id: 'B', name: 'B', lat: 45.010, lng: 12 },
+            { id: 'C', name: 'C', lat: 45.020, lng: 12 }
+        ] };
+        expect(computeVehicleProgress({ lat: 45.0001, lon: 12 }, shape, 'C').stopsToBoarding).toBe(2);
+        expect(computeVehicleProgress({ lat: 45.0201, lon: 12 }, shape, 'B').boardingPassed).toBe(true);
+    });
+});
 
 describe('safeParseJSON', () => {
     let consoleSpy;

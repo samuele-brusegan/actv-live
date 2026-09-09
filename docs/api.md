@@ -35,6 +35,7 @@ curl 'https://example.test/api/stop-lines?stop=1234&time=14:30'
 | `GET` | `/api/gtfs-bnr` | Corse attive vicino a un orario |
 | `GET` | `/api/line-variants` | Varianti di percorso di una linea |
 | `GET` | `/api/line-schedule` | Orario giornaliero di una o più varianti |
+| `GET` | `/api/line-catalog` | Catalogo linee filtrato per servizio e data |
 | `GET` | `/api/stop-upcoming` | Passaggi previsti nella prossima ora |
 | `GET` | `/api/gtfs-identify` | Ricerca del `trip_id` GTFS |
 | `GET` | `/api/gtfs-resolve` | Metadati di un `trip_id` |
@@ -42,6 +43,7 @@ curl 'https://example.test/api/stop-lines?stop=1234&time=14:30'
 | `GET` | `/api/gtfs-stop-translater` | Dati fermata e stop time di una corsa |
 | `GET` | `/api/gtfs-stops` | Elenco fermate GTFS legacy |
 | `GET` | `/api/gtfs-passages` | Passaggi GTFS previsti per fermata ACTV |
+| `POST` | `/api/feedback` | Invio feedback pubblico |
 | `POST` | `/api/log-js-error` | Registrazione di un errore frontend |
 | `GET` | `/api/admin/gtfs-update/status` | Stato aggiornamento GTFS |
 | `POST` | `/api/admin/gtfs-update/config` | Configurazione aggiornamento GTFS |
@@ -116,17 +118,22 @@ Calcola percorsi tra due fermate o coordinate geografiche.
 |---|---:|---|
 | `from` | sì | `stop_id` oppure coordinate `lat,lon` |
 | `to` | sì | `stop_id` oppure coordinate `lat,lon` |
+| `date` | no | Data di servizio `YYYY-MM-DD`; default: data server |
 | `time` | no | Partenza `HH:MM` o `HH:MM:SS`; default: ora server |
+| `from_service` | no | `automobilistico` o `navigation`, per ID ambigui |
+| `to_service` | no | `automobilistico` o `navigation`, per ID ambigui |
 | `optimize` | no | `time`, `transfers` o `walking`; default: `time` |
 | `debug` | no | Se presente restituisce dati diagnostici invece dei percorsi |
 
 ```bash
-curl 'https://example.test/api/plan-route?from=45.49,12.24&to=5678&time=14:30&optimize=time'
+curl 'https://example.test/api/plan-route?from=162&to=4609&date=2026-09-02&time=16:50&optimize=time'
 ```
 
 ```json
 {
   "success": true,
+  "date": "2026-09-02",
+  "planner": "connection-scan-v1",
   "optimize": "time",
   "routes": [
     {
@@ -418,16 +425,34 @@ quando il real-time non è disponibile.
   {
     "line": "10",
     "destination": "Venezia",
+    "trip_id": "AUT_ACTV_10_12345",
+    "gtfs_stop_id": "1234",
     "time": "14:35",
     "real": false,
     "stop": "1234",
     "lineId": "5011",
+    "stop_lat": 45.493,
+    "stop_lon": 12.242,
     "timingPoints": [
       {"stop": "Mestre Centro", "time": "14:35:00"}
     ]
   }
 ]
 ```
+
+`trip_id`, `gtfs_stop_id`, `stop_lat` e `stop_lon` permettono al frontend di associare il
+passaggio alla Vehicle Position GTFS-RT della stessa corsa e calcolare la
+distanza geografica del mezzo dalla fermata. La distanza non è un ETA e non
+viene mostrata quando il feed non contiene una corrispondenza esatta.
+
+## Feedback
+
+### `POST /api/feedback`
+
+Accetta un feedback pubblico senza autenticazione. `category` può essere
+`feature`, `bug`, `improvement`, `question` o `other`; `priority` può essere
+`low`, `normal` o `high`. `message` è obbligatorio (10–5000 caratteri), mentre
+nome, email e titolo sono facoltativi.
 
 ## Logging frontend
 

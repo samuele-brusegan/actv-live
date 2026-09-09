@@ -119,3 +119,34 @@ body {
     text-align: center;
     color: var(--color-text-gray);
 }
+
+body.trip-map-open { overflow: hidden; }
+.trip-map-dialog { position: fixed; inset: 0; z-index: 3000; background: var(--color-bg-light); font-family: var(--font-primary); }
+.trip-map-dialog[hidden] { display: none; }
+#trip-map { width: 100%; height: 100%; }
+.trip-map-header { position: absolute; z-index: 1100; inset: 0 0 auto; min-height: 92px; display: grid; grid-template-columns: 44px minmax(0,1fr); grid-template-areas: "back heading" "status status"; align-items: center; gap: 6px 12px; padding: 12px 16px 14px; color: var(--color-white); background: var(--color-primary-green); box-shadow: 0 3px 12px rgba(0,0,0,.2); }
+.trip-map-close { grid-area: back; width: 42px; height: 42px; border: 0; border-radius: 50%; background: rgba(255,255,255,.14); color: var(--color-white); font-size: 25px; line-height: 1; cursor: pointer; }
+.trip-map-heading { grid-area: heading; display: flex; min-width: 0; align-items: center; gap: 11px; }
+.trip-map-heading > div { min-width: 0; }
+.trip-map-heading strong, .trip-map-heading small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trip-map-heading strong { font-size: 17px; }
+.trip-map-heading small { margin-top: 2px; opacity: .86; font-size: 12px; }
+.trip-map-line-badge { display: grid; place-items: center; min-width: 43px; min-height: 36px; padding: 4px 8px; border: 2px solid var(--color-white); border-radius: var(--radius-sm, 5px); background: var(--color-actv-red); color: var(--color-white); font-size: 18px; font-weight: 800; }
+.trip-map-status { grid-area: status; display: flex; align-items: center; gap: 7px; min-height: 22px; font-size: 12px; font-weight: 600; opacity: .95; }
+.trip-map-live-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #7dffb2; box-shadow: 0 0 0 3px rgba(125,255,178,.18); }
+.trip-map-live-dot.offline { background: var(--color-gold); box-shadow: none; }
+.trip-map-dialog .leaflet-top { top: 108px; }
+.trip-map-stops { position: absolute; z-index: 1000; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); max-height: min(48vh, 430px); overflow: hidden; border: 1px solid var(--color-border-gray); border-radius: var(--radius-xl, 18px); background: var(--color-white); color: var(--color-text-dark); box-shadow: 0 5px 20px rgba(0,0,0,.24); transition: max-height .2s ease; }
+.trip-map-stops.collapsed { max-height: 50px; }
+.trip-map-stops-header { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 50px; padding: 0 18px; border: 0; border-bottom: 1px solid var(--color-border-gray); background: var(--color-white); color: var(--color-text-dark); font: inherit; font-weight: 750; cursor: pointer; }
+.trip-map-chevron { font-size: 22px; transition: transform .2s; }
+.trip-map-stops.collapsed .trip-map-chevron { transform: rotate(180deg); }
+.trip-map-stops-list { max-height: calc(min(48vh, 430px) - 50px); padding: 0 18px 14px; overflow-y: auto; }
+.trip-map-stop { position: relative; display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; align-items: center; min-height: 42px; color: var(--color-text-dark); }
+.trip-map-stop:not(:last-child)::after { content: ''; position: absolute; left: 7px; top: 28px; bottom: -14px; width: 3px; background: #087f5b; }
+.trip-map-stop-marker { width: 15px; height: 15px; z-index: 1; border: 3px solid #087f5b; border-radius: 50%; background: #fff; }
+.trip-map-stop.current .trip-map-stop-marker { border-color: #075bbb; box-shadow: 0 0 0 3px rgba(7,91,187,.18); }
+.trip-map-stop.current .trip-map-stop-name { font-weight: 800; }
+.trip-map-stop time { color: var(--color-text-muted); font-size: 12px; }
+.trip-map-bus-icon { display: grid; place-items: center; width: 38px !important; height: 38px !important; border: 3px solid #fff; border-radius: 50%; background: #087f5b; font-size: 21px; box-shadow: 0 3px 10px rgba(0,0,0,.4); }
+@media (min-width: 720px) { .trip-map-header { grid-template-columns: 44px minmax(0,1fr) auto; grid-template-areas: "back heading status"; min-height: 72px; } .trip-map-dialog .leaflet-top { top: 86px; } .trip-map-stops { left: auto; width: 390px; } }

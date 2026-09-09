@@ -202,6 +202,11 @@ body {
 .admin-table tbody tr:hover {
     background: #252525;
 }
+.feedback-filters { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
+.feedback-filters select { min-height:42px; padding:8px 12px; border:1px solid var(--border-color); border-radius:8px; background:#2a2a2a; color:#fff; }
+.feedback-tag { display:inline-block; padding:4px 8px; border-radius:999px; background:rgba(59,130,246,.2); color:#93c5fd; font-size:.78rem; font-weight:700; }
+.tag-bug { background:rgba(239,68,68,.2); color:#fca5a5; }.tag-feature { background:rgba(16,185,129,.2); color:#6ee7b7; }.tag-improvement { background:rgba(245,158,11,.2); color:#fcd34d; }
+.feedback-date { white-space:nowrap; color:var(--text-secondary); font-size:.85rem; }.feedback-message { max-width:460px; margin-top:6px; color:var(--text-secondary); line-height:1.45; white-space:normal; }
 
 .status-badge {
     padding: 4px 8px;

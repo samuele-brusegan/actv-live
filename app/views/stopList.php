@@ -92,7 +92,7 @@
                                 $lineAliases = array_map(function($line) {
                                     return htmlspecialchars($line['alias']);
                                 }, array_slice($station['lines'], 0, 4)); // Show max 5 lines
-                                $linesHtml = implode(', ', $lineAliases);
+                            $linesHtml = implode(', ', $lineAliases);
                                 if (count($station['lines']) > 4) {
                                     $linesHtml .= '...';
                                 }
@@ -108,12 +108,17 @@
                             }
                             // Create a data attribute with all IDs
                             $allIdsJson = htmlspecialchars(json_encode($station['ids']));
+                            $lineNamesJson = htmlspecialchars(json_encode(array_values(array_filter(array_map(function($line) {
+                                return (string)($line['alias'] ?? $line['line'] ?? '');
+                            }, $station['lines'] ?? [])))));
                         ?>
                         
                         <a href="/aut/stops/stop?id=<?= urlencode($strIds) ?>&name=<?= urlencode($station['name']) ?>" 
                         class="stop-card station-item" 
                         data-name="<?= htmlspecialchars(strtoupper($station['name'])) ?>"
-                        data-all-ids='<?= $allIdsJson ?>'>
+                        data-all-ids='<?= $allIdsJson ?>'
+                        data-service="bus"
+                        data-lines='<?= $lineNamesJson ?>'>
                             
                             <div class="d-flex align-items-center" style="width: 100%;">
                                 <!-- Stop IDs Container (vertically stacked badges) -->
@@ -143,15 +148,144 @@
         </div>
 
         <script>
+            function escapeStopListHtml(value) {
+                return String(value ?? '').replace(/[&<>\"']/g, character => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+                }[character]));
+            }
+
+            async function loadNavigationStations() {
+                try {
+                    const response = await fetch('/api/navigation/stops', { cache: 'no-store' });
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    if (!Array.isArray(data) || !data.length) return;
+
+                    const grouped = new Map();
+                    data.forEach(stop => {
+                        if (!stop || !stop.stop_id || !stop.stop_name) return;
+                        const name = String(stop.stop_name).trim();
+                        const key = name.toLocaleLowerCase('it-IT').replace(/\s+/g, ' ');
+                        if (!grouped.has(key)) grouped.set(key, { name, ids: [], lat: stop.stop_lat, lon: stop.stop_lon });
+                        const group = grouped.get(key);
+                        if (!group.ids.includes(String(stop.stop_id))) group.ids.push(String(stop.stop_id));
+                    });
+
+                    const list = document.getElementById('stations-list');
+                    if (!list) return;
+                    const emptyMessage = list.querySelector(':scope > p');
+                    if (emptyMessage && /Nessuna stazione/i.test(emptyMessage.textContent)) emptyMessage.remove();
+                    const heading = document.createElement('div');
+                    heading.className = 'section-title navigation-section-title';
+                    heading.textContent = 'Fermate Navigazione';
+                    list.appendChild(heading);
+
+                    grouped.forEach(stop => {
+                        const ids = stop.ids.join('-');
+                        const card = document.createElement('a');
+                        card.href = `/aut/stops/stop?id=${encodeURIComponent(ids)}&name=${encodeURIComponent(stop.name)}`;
+                        card.className = 'stop-card station-item navigation-station-item';
+                        card.dataset.name = stop.name.toUpperCase();
+                        card.dataset.allIds = JSON.stringify(stop.ids);
+                        card.dataset.service = 'navigation';
+                        card.dataset.lines = JSON.stringify(['' + 'Navigazione']);
+                        card.innerHTML = `
+                            <div class="d-flex align-items-center" style="width: 100%;">
+                                <div class="stop-ids-container">${stop.ids.map(id => `<div class="stop-id-badge">${escapeStopListHtml(id)}</div>`).join('')}</div>
+                                <div class="stop-info ms-3" style="flex-grow: 1;">
+                                    <span class="stop-name d-block">${escapeStopListHtml(stop.name)}</span>
+                                    <span class="stop-desc">Linea: ⛴ Navigazione</span>
+                                </div>
+                            </div>
+                            <div class="quick-action"><span style="font-size: 20px; color: #ccc;">&rsaquo;</span></div>`;
+                        list.appendChild(card);
+                    });
+                } catch (error) {
+                    console.warn('Elenco fermate Navigazione non disponibile:', error);
+                }
+            }
+
+            loadNavigationStations();
+
+            async function applyRouteColors() {
+                try {
+                    const response = await fetch('/api/line-colors', { cache: 'no-store' });
+                    if (!response.ok) return;
+                    const colors = await response.json();
+                    document.querySelectorAll('.station-item[data-lines]').forEach(card => {
+                        let lines = [];
+                        try { lines = JSON.parse(card.dataset.lines || '[]'); } catch (error) { return; }
+                        const service = card.dataset.service || 'bus';
+                        const html = lines.map(line => {
+                            const key = `${service}|${line}`;
+                            const color = colors[key] || colors[`bus|${line}`];
+                            if (!color) return `<span class="stop-line-badge">${escapeStopListHtml(line)}</span>`;
+                            return `<span class="stop-line-badge" style="background:${escapeStopListHtml(color.route_color)};color:${escapeStopListHtml(color.route_text_color)}">${escapeStopListHtml(line)}</span>`;
+                        }).join(' ');
+                        const description = card.querySelector('.stop-desc');
+                        if (description && html) description.innerHTML = `${service === 'navigation' ? 'Linea: ' : 'Linee: '}${html}`;
+                    });
+                } catch (error) {
+                    console.warn('Colori linee non disponibili:', error);
+                }
+            }
+            applyRouteColors();
+
+            function normalizeStopSearch(value) {
+                return String(value || '')
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    .toLowerCase().replace(/[’'`.-]/g, ' ').replace(/[^a-z0-9\s]/g, ' ')
+                    .split(/\s+/).filter(Boolean)
+                    .map(token => ({ santa: 's', san: 's' }[token] || token));
+            }
+
+            function stopSearchScore(name, query) {
+                const queryTokens = normalizeStopSearch(query);
+                const nameTokens = normalizeStopSearch(name);
+                if (!queryTokens.length) return 0;
+                let score = 0;
+                for (const queryToken of queryTokens) {
+                    let best = Infinity;
+                    nameTokens.forEach(nameToken => {
+                        if (nameToken === queryToken) best = 0;
+                        else if (nameToken.startsWith(queryToken) || queryToken.startsWith(nameToken)) best = Math.min(best, 1);
+                        else if (queryToken.length >= 4 && nameToken.length >= 4) {
+                            const distance = levenshteinDistance(queryToken, nameToken);
+                            if (distance <= Math.max(1, Math.floor(queryToken.length / 4))) best = Math.min(best, 2 + distance);
+                        }
+                    });
+                    if (best === Infinity) return Infinity;
+                    score += best;
+                }
+                return score;
+            }
+
+            function levenshteinDistance(a, b) {
+                const row = Array.from({ length: b.length + 1 }, (_, index) => index);
+                for (let i = 1; i <= a.length; i++) {
+                    let previous = row[0];
+                    row[0] = i;
+                    for (let j = 1; j <= b.length; j++) {
+                        const current = row[j];
+                        row[j] = Math.min(row[j] + 1, row[j - 1] + 1, previous + (a[i - 1] === b[j - 1] ? 0 : 1));
+                        previous = current;
+                    }
+                }
+                return row[b.length];
+            }
+
             function filterStations() {
                 let input = document.getElementById('search-input');
-                let filter = input.value.toUpperCase();
-                let cards = document.getElementsByClassName('station-item');
+                let filter = input.value.trim();
+                let cards = Array.from(document.getElementsByClassName('station-item'));
+                cards.sort((a, b) => stopSearchScore(a.getAttribute('data-name'), filter) - stopSearchScore(b.getAttribute('data-name'), filter));
+                const list = document.getElementById('stations-list');
+                cards.forEach(card => list?.appendChild(card));
 
                 for (let i = 0; i < cards.length; i++) {
                     let name = cards[i].getAttribute('data-name');
-                    let allIds = cards[i].getAttribute('data-all-ids');
-                    if (name.indexOf(filter) > -1 || allIds.indexOf(filter) > -1) {
+                    let allIds = cards[i].getAttribute('data-all-ids') || '';
+                    if (!filter || stopSearchScore(name, filter) !== Infinity || allIds.toUpperCase().indexOf(filter.toUpperCase()) > -1) {
                         cards[i].style.display = "flex";
                     } else {
                         cards[i].style.display = "none";

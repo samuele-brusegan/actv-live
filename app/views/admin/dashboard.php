@@ -3,12 +3,15 @@ require_once BASE_PATH . '/public/commons/head.php';
 ?>
 
 <link rel="stylesheet" href="/css/admin.css">
+<link rel="stylesheet" href="/css/admin-shell.css">
 
+<body class="admin-page">
 <div class="admin-container">
     <div class="admin-header">
         <h1>Dashboard Amministrazione</h1>
         <div class="d-flex align-items-center gap-2">
             <a href="/admin/gtfs-update" class="btn btn-sm btn-outline-primary">Aggiornamento GTFS</a>
+            <a href="/admin/feedback" class="btn btn-sm btn-outline-success">Feedback</a>
             <div class="last-update" id="last-update">In attesa di dati...</div>
         </div>
     </div>

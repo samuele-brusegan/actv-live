@@ -14,7 +14,7 @@
         <script src="/components/StopCard.js"></script>
         <script src="/js/stationSelector.js"></script>
     </head>
-    <body>
+    <body class="<?= (($_GET['embedded'] ?? '') === '1') ? 'embedded-picker' : '' ?>">
 
         <!-- Header -->
         <div class="header-green">
@@ -37,21 +37,21 @@
                 <input type="text" id="search-input" class="search-input" placeholder="🔍 Cerca fermata..." oninput="filterStops()">
             </div>
 
-            <!-- Favorites Section -->
-            <div id="favorites-section">
-                <div class="section-title">fermate preferite</div>
-                <div id="favorites-list"></div>
+            <!-- Recent Section -->
+            <div id="recent-section" style="display: none;">
+                <div class="picker-section-title">Recenti</div>
+                <div id="recent-list"></div>
             </div>
 
-            <!-- Recent Section -->
-            <div id="recent-section">
-                <div class="section-title">recenti</div>
-                <div id="recent-list"></div>
+            <!-- Favorites Section -->
+            <div id="favorites-section" style="display: none;">
+                <div class="picker-section-title">Preferite</div>
+                <div id="favorites-list"></div>
             </div>
 
             <!-- All Stops Section -->
             <div id="all-stops-section" style="display: none;">
-                <div class="section-title">tutte le fermate</div>
+                <div class="section-title">Tutte le fermate</div>
                 <div id="all-stops-list" style="margin-bottom: 10px;"></div>
             </div>
 

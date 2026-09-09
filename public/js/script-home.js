@@ -246,8 +246,35 @@ function showNoticeModal(title, content, link) {
     `;
 }
 
+function renderJourneyResume() {
+    const section = document.getElementById('journey-resume');
+    const label = document.getElementById('journey-resume-title');
+    const resume = document.getElementById('resume-journey');
+    if (!section || !label || !resume) return;
+
+    let origin = null;
+    let destination = null;
+    try {
+        origin = JSON.parse(localStorage.getItem('route_origin') || 'null');
+        destination = JSON.parse(localStorage.getItem('route_destination') || 'null');
+    } catch (error) {
+        return;
+    }
+    if (!origin?.name || !destination?.name) return;
+
+    label.textContent = `${origin.name} → ${destination.name}`;
+    resume.addEventListener('click', () => {
+        const now = new Date();
+        now.setMinutes(Math.ceil(now.getMinutes() / 5) * 5, 0, 0);
+        localStorage.setItem('route_departure_date', now.toISOString().split('T')[0]);
+        localStorage.setItem('route_departure_time', now.toTimeString().slice(0, 5));
+    }, { once: true });
+    section.classList.add('is-visible');
+}
+
 // Inizializzazione Completa
 window.onload = () => {
+    renderJourneyResume();
     initHomeMap();
     checkImportantNotices();
 };

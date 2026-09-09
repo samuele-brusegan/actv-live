@@ -4,9 +4,11 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Risultati Percorso - ACTV</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
         <?php require COMMON_HTML_HEAD; ?>
         <link rel="stylesheet" href="/css/structure/structure-routeResults.css">
         <link rel="stylesheet" href="/css/routeResults.css">
+        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
         <script src="/js/routeResults.js"></script>
     </head>
     <body>
@@ -93,6 +95,11 @@
                     <div class="modal-title">Confronto Percorsi</div>
                     <button class="modal-close" onclick="closeCompareModal()">&times;</button>
                 </div>
+                <div id="compare-map-shell" class="compare-map-shell">
+                    <div id="compare-map" class="compare-map" aria-label="Mappa dei percorsi confrontati"></div>
+                    <button type="button" class="compare-map-expand" onclick="toggleComparisonMap()" aria-label="Espandi mappa">⛶</button>
+                </div>
+                <div id="compare-map-status" class="compare-map-status">Caricamento mappa...</div>
                 <div id="compare-body"></div>
             </div>
         </div>

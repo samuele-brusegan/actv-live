@@ -3,6 +3,11 @@
     margin: 0 auto;
 }
 
+.service-switch { display: flex; gap: .5rem; }
+.service-btn.active { color: #fff; background: var(--bs-primary); }
+#line-input option { padding: .35rem; }
+.feed-warning { color: var(--bs-warning-text-emphasis, #997404); }
+
 .variant-card {
     cursor: default;
     transition: border-color 0.15s ease;
@@ -132,6 +137,11 @@
     z-index: 1;
     background: var(--bs-tertiary-bg, #f1f3f5);
 }
+
+.timetable td.served { color: var(--bs-body-color); }
+.timetable td.not-served { color: var(--bs-secondary-color); background: var(--bs-tertiary-bg); }
+.timetable td.first-stop { border-left: 2px solid var(--bs-success); }
+.timetable td.last-stop { border-right: 2px solid var(--bs-danger); }
 
 .timetable thead th.stop-col,
 .timetable thead th.zone-col {

@@ -39,8 +39,14 @@
 
 .stop-card.selected {
     border: 2px solid var(--color-primary-green);
-    background: #E8F5E9;
-    box-shadow: 0px 2px 12px rgba(0, 158, 97, 0.3);
+    background: #eef8f3 !important;
+    box-shadow: 0px 3px 18px rgba(0, 110, 70, 0.16);
+}
+
+[data-theme="dark"] .stop-card.selected {
+    background: #19372d !important;
+    border-color: #36c98b;
+    box-shadow: 0px 3px 18px rgba(32, 184, 120, 0.16);
 }
 
 .stop-card.selected::after {
@@ -89,3 +95,18 @@
     z-index: 2;
     padding: 10px;
 }
+
+/* The selector is also rendered inside the route-finder sheet. In that mode
+   the parent already provides the title and global navigation. */
+.embedded-picker { padding-bottom: 76px; }
+.embedded-picker .header-green,
+.embedded-picker .actv-bottom-nav,
+.embedded-picker .actv-more-menu { display: none !important; }
+.embedded-picker .main-content { width: 100%; margin: 0; padding: 18px 16px 96px; }
+.embedded-picker .search-container { margin-bottom: 18px; }
+.embedded-picker .section-title { margin-top: 22px; }
+.embedded-picker .action-buttons { display: flex; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--actv-surface); border-top: 1px solid var(--actv-border); }
+.embedded-picker .action-buttons button { flex: 1; margin: 0 !important; border-radius: 12px; }
+.picker-compact-title { margin: 0; color: var(--actv-ink); font-size: 17px !important; line-height: 1.2; font-weight: 750; letter-spacing: -.01em; }
+.picker-section-title { margin: 22px 0 10px; color: var(--actv-muted); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.embedded-picker .picker-section-title { margin-top: 20px; }

@@ -76,19 +76,74 @@ class ApiController {
         }
     }
 
+    private function ensureFeedbackTable(): void {
+        $this->getDb()->query("CREATE TABLE IF NOT EXISTS feedback (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            category VARCHAR(32) NOT NULL,
+            priority VARCHAR(16) NOT NULL DEFAULT 'normal',
+            status VARCHAR(16) NOT NULL DEFAULT 'new',
+            name VARCHAR(120) NULL,
+            email VARCHAR(190) NULL,
+            subject VARCHAR(180) NULL,
+            message TEXT NOT NULL,
+            ip_hash CHAR(64) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_feedback_status (status), INDEX idx_feedback_category (category), INDEX idx_feedback_created (created_at)
+        )");
+    }
+
+    function feedback() {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success'=>false,'error'=>'Metodo non consentito']); return; }
+        $data = json_decode((string) file_get_contents('php://input'), true);
+        if (!is_array($data)) $data = $_POST;
+        if (!empty($data['website'])) { echo json_encode(['success'=>true]); return; }
+        $categories = ['feature', 'bug', 'improvement', 'question', 'other'];
+        $priorities = ['low', 'normal', 'high'];
+        $category = trim((string)($data['category'] ?? ''));
+        $priority = trim((string)($data['priority'] ?? 'normal'));
+        $message = trim((string)($data['message'] ?? ''));
+        if (!in_array($category, $categories, true)) { http_response_code(422); echo json_encode(['success'=>false,'error'=>'Seleziona una categoria valida.']); return; }
+        if (!in_array($priority, $priorities, true)) $priority = 'normal';
+        if (mb_strlen($message) < 10 || mb_strlen($message) > 5000) { http_response_code(422); echo json_encode(['success'=>false,'error'=>'Il messaggio deve contenere tra 10 e 5000 caratteri.']); return; }
+        $email = trim((string)($data['email'] ?? ''));
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) { http_response_code(422); echo json_encode(['success'=>false,'error'=>'Inserisci un indirizzo email valido oppure lascia il campo vuoto.']); return; }
+        try {
+            $db = $this->getDb();
+            $this->ensureFeedbackTable();
+            $db->query('INSERT INTO feedback (category, priority, name, email, subject, message, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?)', [
+                $category, $priority, trim((string)($data['name'] ?? '')) ?: null, $email ?: null,
+                trim((string)($data['subject'] ?? '')) ?: null, $message,
+                hash('sha256', (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown'))
+            ]);
+            echo json_encode(['success'=>true,'message'=>'Grazie, il tuo feedback è stato inviato.']);
+        } catch (Throwable $e) {
+            http_response_code(500); echo json_encode(['success'=>false,'error'=>'Impossibile salvare il feedback in questo momento.']);
+            Logger::log('EXCEPTION', 'Feedback insert: ' . $e->getMessage(), __FILE__, __LINE__);
+        }
+    }
+
     // Refactored from dbControll::api_gtfsIdentify
     function api_gtfsIdentify() {
-        $tableJoins = "
-            INNER JOIN trips ON routes.route_id = trips.route_id
-            INNER JOIN stop_times ON trips.trip_id = stop_times.trip_id
-            INNER JOIN stops ON stop_times.stop_id = stops.stop_id
-            INNER JOIN calendar ON trips.service_id = calendar.service_id
-            ";
-
-        // The view expects $db variable to be available
-        $db = $this->getDb($tableJoins);
-
-        require_once BASE_PATH . '/app/views/gtfsIdentify.php';
+        if (!isset($_GET['return'])) {
+            require BASE_PATH . '/app/views/gtfsIdentify.php';
+            return;
+        }
+        header('Content-Type: application/json');
+        header('Cache-Control: public, max-age=300, stale-while-revalidate=900');
+        require_once BASE_PATH . '/app/services/ResponseCache.php';
+        $keys = ['time', 'busTrack', 'busDirection', 'day', 'stop', 'lineId', 'stopId', 'limit'];
+        $arguments = [];
+        foreach ($keys as $key) $arguments[$key] = (string)($_GET[$key] ?? '');
+        $payload = ResponseCache::remember('gtfs-identify|' . hash('sha256', json_encode($arguments)), 300, function () {
+            ob_start();
+            require BASE_PATH . '/app/views/gtfsIdentify.php';
+            $json = (string)ob_get_clean();
+            $decoded = json_decode($json, true);
+            return is_array($decoded) ? $decoded : ['error' => 'Risposta GTFS non valida'];
+        });
+        echo json_encode($payload, JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     // Refactored from dbControll::gtfsTripBuilder
@@ -96,6 +151,7 @@ class ApiController {
         $tripId = $_GET['trip_id'] ?? '';
 
         header("Content-Type: application/json");
+        header('Cache-Control: public, max-age=3600, stale-while-revalidate=86400');
         if ($tripId === '') {
             header('HTTP/1.1 400 Bad Request');
             echo json_encode(['error' => 'Missing trip_id parameter']);
@@ -160,12 +216,52 @@ class ApiController {
 
     // Moved from Controller::stopsJson and renamed
     function stops() {
-        $db = $this->getDb();
-
         header("Content-Type: application/json");
+        try {
+            $db = $this->getDb();
+            $stops = $db->query("SELECT * FROM stops");
+            $stops = $this->mergeNavigationStops($stops);
+            echo json_encode($stops, JSON_INVALID_UTF8_SUBSTITUTE);
+        } catch (Throwable $e) {
+            // La cache GTFS è sufficiente per la ricerca fermate e mantiene
+            // l'endpoint JSON funzionante anche durante un'interruzione DB.
+            $cacheFile = BASE_PATH . '/data/gtfs/cache/stops.json';
+            $cached = is_file($cacheFile)
+                ? json_decode((string) file_get_contents($cacheFile), true)
+                : null;
+            if (is_array($cached)) {
+                $stops = [];
+                foreach ($cached as $stop) {
+                    if (!is_array($stop) || !isset($stop['id'], $stop['name'], $stop['lat'], $stop['lon'])) continue;
+                    $stops[] = [
+                        'stop_id' => (string) $stop['id'],
+                        'stop_name' => (string) $stop['name'],
+                        'stop_lat' => (float) $stop['lat'],
+                        'stop_lon' => (float) $stop['lon']
+                    ];
+                }
+                $stops = $this->mergeNavigationStops($stops);
+                echo json_encode($stops, JSON_INVALID_UTF8_SUBSTITUTE);
+                return;
+            }
 
-        $stops = $db->query("SELECT * FROM stops");
-        echo json_encode($stops);
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Errore nel caricamento delle fermate'], JSON_INVALID_UTF8_SUBSTITUTE);
+            Logger::log('PHP_ERROR', 'stops: ' . $e->getMessage());
+        }
+    }
+
+    private function mergeNavigationStops(array $stops): array {
+        $file = BASE_PATH . '/data/gtfs/cache/navigation/stops.json';
+        $navigation = is_file($file) ? json_decode((string)file_get_contents($file), true) : [];
+        foreach (is_array($navigation) ? $navigation : [] as $stop) {
+            if (!is_array($stop)) continue;
+            $stops[] = ['stop_id' => (string)($stop['id'] ?? ''), 'stop_name' => (string)($stop['name'] ?? ''), 'stop_lat' => (float)($stop['lat'] ?? 0), 'stop_lon' => (float)($stop['lon'] ?? 0), 'service' => 'navigation', 'mode' => 'water'];
+        }
+        foreach ($stops as &$stop) {
+            if (!isset($stop['service'])) { $stop['service'] = 'automobilistico'; $stop['mode'] = 'bus'; }
+        }
+        return $stops;
     }
 
     /**
@@ -190,12 +286,28 @@ class ApiController {
     }
 
     function planRoute() {
+        // Evita che notice/warning emessi da librerie o dati GTFS contaminino
+        // la risposta dell'API e provochino un JSON.parse nel browser.
+        ini_set('memory_limit', '512M');
+        set_time_limit(120);
+        $outputLevel = ob_get_level();
+        ob_start();
         require_once BASE_PATH . '/app/services/RoutePlanner.php';
+        require_once BASE_PATH . '/app/services/ConnectionScanPlanner.php';
 
         $origin = $_GET['from'] ?? '';
         $dest = $_GET['to'] ?? '';
         $time = $_GET['time'] ?? date('H:i:s');
+        $dateInput = (string)($_GET['date'] ?? date('Y-m-d'));
+        $dateObject = DateTimeImmutable::createFromFormat('!Y-m-d', $dateInput);
+        $date = $dateObject && $dateObject->format('Y-m-d') === $dateInput ? $dateInput : null;
+        $originService = in_array($_GET['from_service'] ?? null, ['automobilistico', 'navigation'], true)
+            ? (string)$_GET['from_service'] : null;
+        $destService = in_array($_GET['to_service'] ?? null, ['automobilistico', 'navigation'], true)
+            ? (string)$_GET['to_service'] : null;
         $optimize = $_GET['optimize'] ?? 'time';
+        // Il planner multimodale e sempre attivo: bus, navigazione e cambi.
+        $mode = 'all';
         if (!in_array($optimize, ['time', 'transfers', 'walking'], true)) {
             $optimize = 'time';
         }
@@ -206,6 +318,8 @@ class ApiController {
         }
 
         try {
+            if ($origin === '' || $dest === '') throw new InvalidArgumentException('Origine e destinazione sono obbligatorie');
+            if ($date === null) throw new InvalidArgumentException('La data deve essere nel formato YYYY-MM-DD');
             $planner = new RoutePlanner();
             $startWalk = null;
             $endWalk = null;
@@ -219,6 +333,7 @@ class ApiController {
 
                 if ($nearest) {
                     $planningOrigin = $nearest['id'];
+                    $originService = $nearest['service'] ?? $originService;
                     $startWalk = [
                         'type' => 'walking',
                         'distance' => $nearest['distance'],
@@ -238,6 +353,7 @@ class ApiController {
 
                 if ($nearest) {
                     $planningDest = $nearest['id'];
+                    $destService = $nearest['service'] ?? $destService;
                     $endWalk = [
                         'stop_info' => $nearest
                     ];
@@ -248,7 +364,7 @@ class ApiController {
             if (isset($_GET['debug'])) {
                 header('Content-Type: application/json');
                 $out = [
-                    'received' => ['from' => $origin, 'to' => $dest, 'time' => $time],
+                    'received' => ['from' => $origin, 'to' => $dest, 'date' => $date, 'time' => $time],
                     'resolved' => ['origin' => $planningOrigin, 'dest' => $planningDest, 'time' => $planningTime],
                     'cache' => $planner->getCacheStats(),
                 ];
@@ -261,7 +377,15 @@ class ApiController {
                 return;
             }
 
-            $routes = $planner->findRoutesMulti($planningOrigin, $planningDest, $planningTime);
+            $connectionPlanner = new ConnectionScanPlanner();
+            $routes = $connectionPlanner->planAlternatives(
+                (string)$planningOrigin,
+                (string)$planningDest,
+                $date,
+                $planningTime,
+                $originService,
+                $destService
+            );
 
             // Post-process routes to inject walking legs
             foreach ($routes as &$route) {
@@ -311,8 +435,8 @@ class ApiController {
             if ($optimize !== 'time') {
                 usort($routes, function($a, $b) use ($optimize) {
                     if ($optimize === 'transfers') {
-                        $ta = ($a['type'] ?? '') === 'transfer' ? 1 : 0;
-                        $tb = ($b['type'] ?? '') === 'transfer' ? 1 : 0;
+                        $ta = max(0, count(array_filter($a['legs'] ?? [], fn($leg) => ($leg['type'] ?? '') !== 'walking')) - 1);
+                        $tb = max(0, count(array_filter($b['legs'] ?? [], fn($leg) => ($leg['type'] ?? '') !== 'walking')) - 1);
                         if ($ta !== $tb) return $ta - $tb;
                         return ($a['duration'] ?? 0) - ($b['duration'] ?? 0);
                     }
@@ -332,17 +456,348 @@ class ApiController {
             }
 
             header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'routes' => $routes, 'optimize' => $optimize]);
+            ob_end_clean();
+            echo json_encode([
+                'success' => true,
+                'routes' => $routes,
+                'date' => $date,
+                'optimize' => $optimize,
+                'mode' => $mode,
+                'planner' => 'connection-scan-v1'
+            ]);
 
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
+            while (ob_get_level() > $outputLevel) ob_end_clean();
             Logger::log('EXCEPTION', $e->getMessage(), $e->getFile(), $e->getLine(), $e->getTraceAsString());
             header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Errore durante la pianificazione del percorso']);
+            $clientError = $e instanceof InvalidArgumentException;
+            http_response_code($clientError ? 400 : 500);
+            echo json_encode([
+                'success' => false,
+                'code' => $clientError ? 'INVALID_REQUEST' : 'PLANNER_ERROR',
+                'error' => $clientError ? $e->getMessage() : 'Errore durante la pianificazione del percorso',
+                'retryable' => !$clientError
+            ]);
         }
+    }
+
+    private function navigationPlanner(): RoutePlanner {
+        require_once BASE_PATH . '/app/services/RoutePlanner.php';
+        return new RoutePlanner('navigation');
+    }
+
+    function navigationStops() {
+        header('Content-Type: application/json');
+        $planner = $this->navigationPlanner();
+        $stops = [];
+        foreach ($planner->getStops() as $stop) {
+            $stops[] = [
+                'stop_id' => (string)($stop['id'] ?? ''),
+                'stop_name' => (string)($stop['name'] ?? ''),
+                'stop_lat' => (float)($stop['lat'] ?? 0),
+                'stop_lon' => (float)($stop['lon'] ?? 0),
+                'service' => 'navigation',
+                'mode' => 'water'
+            ];
+        }
+        echo json_encode($stops, JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    function navigationLines() {
+        header('Content-Type: application/json');
+        $cache = BASE_PATH . '/data/gtfs/cache/navigation/routes.json';
+        $routes = is_file($cache) ? json_decode((string)file_get_contents($cache), true) : [];
+        echo json_encode(array_values(is_array($routes) ? $routes : []), JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    function lineColors() {
+        header('Content-Type: application/json');
+        $colors = [];
+        try {
+            ob_start();
+            try {
+                $rows = $this->getDb()->query("SELECT route_short_name, route_color, route_text_color FROM routes WHERE route_short_name IS NOT NULL AND route_short_name <> ''");
+            } finally {
+                ob_end_clean();
+            }
+            foreach ($rows as $row) {
+                $colors['bus|' . $row['route_short_name']] = [
+                    'route_color' => $this->normalizeRouteColor($row['route_color'] ?? null),
+                    'route_text_color' => $this->normalizeRouteColor($row['route_text_color'] ?? null, '#FFFFFF')
+                ];
+            }
+        } catch (Throwable $e) {
+            $cache = BASE_PATH . '/data/gtfs/cache/routes.json';
+            $routes = is_file($cache) ? json_decode((string)file_get_contents($cache), true) : [];
+            foreach (is_array($routes) ? $routes : [] as $route) {
+                $short = $route['short_name'] ?? $route['route_short_name'] ?? '';
+                if ($short !== '') $colors['bus|' . $short] = ['route_color' => $this->normalizeRouteColor($route['route_color'] ?? $route['color'] ?? null), 'route_text_color' => $this->normalizeRouteColor($route['route_text_color'] ?? $route['text_color'] ?? null, '#FFFFFF')];
+            }
+        }
+        $nav = BASE_PATH . '/data/gtfs/cache/navigation/routes.json';
+        $navRoutes = is_file($nav) ? json_decode((string)file_get_contents($nav), true) : [];
+        foreach (is_array($navRoutes) ? $navRoutes : [] as $route) {
+            $short = $route['short_name'] ?? $route['route_short_name'] ?? '';
+            if ($short !== '') $colors['navigation|' . $short] = ['route_color' => $this->normalizeRouteColor($route['route_color'] ?? $route['color'] ?? null, '#5B5B5B'), 'route_text_color' => $this->normalizeRouteColor($route['route_text_color'] ?? $route['text_color'] ?? null, '#FFFFFF')];
+        }
+        echo json_encode($colors, JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    private function normalizeRouteColor($value, string $fallback = '#5B5B5B'): string {
+        $value = ltrim(trim((string)$value), '#');
+        return preg_match('/^[0-9a-fA-F]{6}$/', $value) ? '#' . strtoupper($value) : $fallback;
+    }
+
+    function navigationPassages() {
+        header('Content-Type: application/json');
+        $stop = (string)($_GET['stop_id'] ?? $_GET['stop'] ?? '');
+        $time = (string)($_GET['time'] ?? date('H:i:s'));
+        if (strlen($time) === 5) $time .= ':00';
+        echo json_encode($this->navigationPlanner()->getLinesForStop($stop, $time), JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    function navigationVehicles() {
+        header('Content-Type: application/json');
+        header('Cache-Control: public, max-age=2, stale-while-revalidate=8');
+        require_once BASE_PATH . '/app/services/GtfsRealtime.php';
+        require_once BASE_PATH . '/app/services/ResponseCache.php';
+        // La mappa ha bisogno solo delle posizioni. Il feed tripUpdates è
+        // separato e può impiegare fino al timeout del download: scaricarlo
+        // qui raddoppiava il tempo di risposta dell'intera mappa.
+        $vehicles = ResponseCache::remember('realtime-vehicles-navigation', 3, fn() => GtfsRealtime::read('vehicles'));
+        $vehicles = $this->filterRequestedVehicles($vehicles);
+        $tripsFile = BASE_PATH . '/data/gtfs/cache/navigation/trips.json';
+        $routesFile = BASE_PATH . '/data/gtfs/cache/navigation/routes.json';
+        $trips = is_file($tripsFile) ? json_decode((string) file_get_contents($tripsFile), true) : [];
+        $routes = is_file($routesFile) ? json_decode((string) file_get_contents($routesFile), true) : [];
+        foreach ($vehicles as &$vehicle) {
+            $knownRoute = $routes[(string)($vehicle['route_id'] ?? '')] ?? [];
+            $knownColor = $knownRoute['route_color'] ?? $knownRoute['color'] ?? '';
+            if ($knownColor !== '') $vehicle['route_color'] = '#' . ltrim((string)$knownColor, '#');
+            if (($vehicle['route_short_name'] ?? '') !== '') continue;
+            $trip = $trips[$vehicle['trip_id'] ?? ''] ?? null;
+            $routeId = $trip['route_id'] ?? '';
+            $route = $routes[$routeId] ?? null;
+            if ($route) {
+                $vehicle['route_id'] = $routeId;
+                $vehicle['route_short_name'] = $route['short_name'] ?? $route['route_short_name'] ?? '';
+            }
+        }
+        unset($vehicle);
+        echo json_encode($vehicles, JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    function realtimeVehicles() {
+        header('Content-Type: application/json');
+        header('Cache-Control: public, max-age=2, stale-while-revalidate=8');
+        $service = ($_GET['service'] ?? '') === 'automobilistico' ? 'automobilistico' : (($_GET['service'] ?? '') === 'navigation' ? 'navigation' : null);
+        if ($service === null) { http_response_code(400); echo json_encode(['success'=>false,'error'=>'Servizio non valido']); return; }
+        require_once BASE_PATH . '/app/services/GtfsRealtime.php';
+        require_once BASE_PATH . '/app/services/ResponseCache.php';
+        $vehicles = ResponseCache::remember('realtime-vehicles-' . $service, 3, function () use ($service) {
+            $items = GtfsRealtime::read('vehicles', $service);
+            return $service === 'automobilistico' ? $this->guessBusRoutes($items) : $items;
+        });
+        $vehicles = $this->filterRequestedVehicles($vehicles);
+        echo json_encode(['success'=>true, 'service'=>$service, 'vehicles'=>$vehicles], JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    private function requestedTripIds(): array {
+        $raw = (string)($_GET['tripIds'] ?? $_GET['tripId'] ?? '');
+        return array_slice(array_values(array_unique(array_filter(array_map('trim', explode(',', $raw))))), 0, 100);
+    }
+
+    private function filterRequestedVehicles(array $vehicles): array {
+        $trips = $this->requestedTripIds();
+        $routes = array_slice(array_values(array_unique(array_filter(array_map(
+            'trim', explode(',', (string)($_GET['routeIds'] ?? $_GET['routeId'] ?? ''))
+        )))), 0, 50);
+        if (!$trips && !$routes) return $vehicles;
+        $wantedTrips = array_fill_keys($trips, true);
+        $wantedRoutes = array_fill_keys($routes, true);
+        return array_values(array_filter($vehicles, static function ($vehicle) use ($wantedTrips, $wantedRoutes) {
+            return isset($wantedTrips[(string)($vehicle['trip_id'] ?? '')])
+                || isset($wantedRoutes[(string)($vehicle['route_id'] ?? '')]);
+        }));
+    }
+
+    private function guessBusRoutes(array $vehicles): array {
+        $base = BASE_PATH . '/data/gtfs/cache';
+        $stops = is_file($base . '/stops.json') ? json_decode((string)file_get_contents($base . '/stops.json'), true) : [];
+        $index = is_file($base . '/stop_routes_index.json') ? json_decode((string)file_get_contents($base . '/stop_routes_index.json'), true) : [];
+        $routes = is_file($base . '/routes.json') ? json_decode((string)file_get_contents($base . '/routes.json'), true) : [];
+        if (!is_array($stops) || !is_array($index) || !is_array($routes)) return $vehicles;
+        // Griglia di circa 220 m: la ricerca usa solo la cella del mezzo e le
+        // otto adiacenti invece di scansionare tutte le fermate.
+        $grid = [];
+        foreach ($stops as $stopId => $stop) {
+            $lat = (float)($stop['lat'] ?? $stop['stop_lat'] ?? 0);
+            $lon = (float)($stop['lon'] ?? $stop['stop_lon'] ?? 0);
+            if (!$lat || !$lon) continue;
+            $grid[(int)floor($lat / .002) . ':' . (int)floor($lon / .003)][] = [(string)$stopId, $lat, $lon];
+        }
+        foreach ($vehicles as &$vehicle) {
+            if (($vehicle['route_short_name'] ?? '') !== '') continue;
+            $lat = (float)($vehicle['vehicle_position']['lat'] ?? 0);
+            $lon = (float)($vehicle['vehicle_position']['lon'] ?? 0);
+            if (!$lat || !$lon) continue;
+            $nearest = null; $distance = PHP_FLOAT_MAX;
+            $cellLat = (int)floor($lat / .002); $cellLon = (int)floor($lon / .003);
+            for ($dy = -1; $dy <= 1; $dy++) for ($dx = -1; $dx <= 1; $dx++) {
+                foreach ($grid[($cellLat + $dy) . ':' . ($cellLon + $dx)] ?? [] as [$stopId, $stopLat, $stopLon]) {
+                    $dLat = ($lat - $stopLat) * 111320; $dLon = ($lon - $stopLon) * 111320 * cos(deg2rad($lat));
+                    $d = hypot($dLat, $dLon);
+                    if ($d < $distance) { $distance = $d; $nearest = $stopId; }
+                }
+            }
+            $candidate = $nearest !== null ? ($index[$nearest] ?? []) : [];
+            if ($distance <= 180 && is_array($candidate) && count($candidate)) {
+                $routeId = (string)reset($candidate); $route = $routes[$routeId] ?? [];
+                $short = $route['short_name'] ?? $route['route_short_name'] ?? '';
+                if ($short !== '') {
+                    $vehicle['route_id'] = $routeId; $vehicle['route_short_name'] = $short;
+                    $vehicle['route_color'] = '#' . ltrim((string)($route['route_color'] ?? $route['color'] ?? ''), '#');
+                    $vehicle['route_guess'] = true; $vehicle['route_guess_distance_m'] = round($distance);
+                }
+            }
+        }
+        unset($vehicle);
+        return $vehicles;
+    }
+
+    /**
+     * Fallback per la mappa quando il database non è raggiungibile.
+     * I dati GTFS già presenti in cache contengono comunque le fermate ordinate
+     * di ogni corsa e permettono di disegnare una geometria fermata-fermata.
+     */
+    private function linesShapesFromCache(): array {
+        $service = ($_GET['service'] ?? '') === 'navigation' ? 'navigation' : 'automobilistico';
+        $cacheDir = BASE_PATH . '/data/gtfs/cache/' . $service;
+        if ($service === 'automobilistico' && !is_file($cacheDir . '/routes.json')) $cacheDir = BASE_PATH . '/data/gtfs/cache';
+        $routesFile = $cacheDir . '/routes.json';
+        $stopsFile = $cacheDir . '/stops.json';
+        $tripsDir = $cacheDir . '/routes';
+
+        if (!is_file($routesFile) || !is_file($stopsFile) || !is_dir($tripsDir)) {
+            return [];
+        }
+
+        $routes = json_decode((string) file_get_contents($routesFile), true);
+        $stops = json_decode((string) file_get_contents($stopsFile), true);
+        $tripsFile = $cacheDir . '/trips.json';
+        $tripsCache = is_file($tripsFile) ? json_decode((string) file_get_contents($tripsFile), true) : [];
+        if (!is_array($routes) || !is_array($stops)) return [];
+        if (!is_array($tripsCache)) $tripsCache = [];
+
+        $targetLine = trim((string) ($_GET['line'] ?? ''));
+        $targetTripId = trim((string) ($_GET['tripId'] ?? $_GET['trip_id'] ?? ''));
+        $targetTripIds = array_values(array_unique(array_filter(array_map(
+            'trim', explode(',', (string) ($_GET['tripIds'] ?? ''))
+        ), fn($id) => $id !== '')));
+        if ($targetTripId !== '') array_unshift($targetTripIds, $targetTripId);
+        $targetTripIds = array_values(array_unique($targetTripIds));
+
+        $tripGroupById = [];
+        foreach (array_values(array_filter(explode('|', (string) ($_GET['tripGroups'] ?? '')))) as $index => $group) {
+            $number = $index + 1;
+            if (preg_match('/^(\d+):(.*)$/', $group, $matches)) {
+                $number = (int) $matches[1];
+                $group = $matches[2];
+            }
+            foreach (array_filter(array_map('trim', explode(',', $group))) as $id) {
+                $tripGroupById[$id] = $number;
+            }
+        }
+
+        $result = [];
+        foreach ($routes as $routeId => $route) {
+            if (!is_array($route)) continue;
+            $shortName = (string) ($route['short_name'] ?? '');
+            if ($targetLine !== '' && $shortName !== $targetLine) continue;
+
+            $safeRouteId = preg_replace('/[^a-zA-Z0-9_-]/', '_', (string)$routeId);
+            $file = $tripsDir . '/route_' . $safeRouteId . '.json';
+            if (!is_file($file)) continue;
+            $trips = json_decode((string) file_get_contents($file), true);
+            if (!is_array($trips)) continue;
+
+            $selected = $targetTripIds
+                ? array_intersect_key($trips, array_fill_keys($targetTripIds, true))
+                : array_slice($trips, 0, 1, true);
+
+            foreach ($selected as $tripId => $tripStops) {
+                if (!is_array($tripStops)) continue;
+                $path = [];
+                usort($tripStops, fn($a, $b) => ((int) ($a['stop_sequence'] ?? 0)) <=> ((int) ($b['stop_sequence'] ?? 0)));
+                foreach ($tripStops as $tripStop) {
+                    $stopId = (string) ($tripStop['stop_id'] ?? '');
+                    $stop = $stops[$stopId] ?? null;
+                    if (!is_array($stop) || !isset($stop['lat'], $stop['lon'])) continue;
+                    $path[] = [
+                        'stop_id' => $stopId,
+                        'lat' => (float) $stop['lat'],
+                        'lng' => (float) $stop['lon'],
+                        'name' => (string) ($stop['name'] ?? ''),
+                        'arrival_time' => $tripStop['arrival_time'] ?? null,
+                        'departure_time' => $tripStop['departure_time'] ?? null
+                    ];
+                }
+                if (count($path) < 2) continue;
+                $tripMeta = is_array($tripsCache[$tripId] ?? null) ? $tripsCache[$tripId] : [];
+                $shapeId = (string) ($tripMeta['shape_id'] ?? '');
+                $shape = [];
+                if ($shapeId !== '') {
+                    $safeShapeId = preg_replace('/[^a-zA-Z0-9_-]/', '_', $shapeId);
+                    $shapeFile = $cacheDir . '/shapes/shape_' . $safeShapeId . '.json';
+                    if (is_file($shapeFile)) {
+                        $shape = json_decode((string) file_get_contents($shapeFile), true) ?: [];
+                    }
+                }
+                $key = (string) $routeId . '|' . (string) $tripId;
+                $result[$key] = [
+                    'route_id' => (string) $routeId,
+                    'trip_id' => (string) $tripId,
+                    'group_number' => $tripGroupById[(string) $tripId] ?? null,
+                    'route_short_name' => $shortName,
+                    'route_long_name' => (string) ($route['long_name'] ?? ''),
+                    'service' => $route['service'] ?? $service,
+                    'mode' => $route['mode'] ?? ($service === 'navigation' ? 'water' : 'bus'),
+                    'route_color' => $route['route_color'] ?? $route['color'] ?? null,
+                    'shape_id' => $shapeId !== '' ? $shapeId : null,
+                    'path' => $path,
+                    'shape' => $shape
+                ];
+            }
+        }
+
+        return array_values($result);
     }
 
     // Refactored from Controller::linesShapes to use DB
     function linesShapes() {
+        $outputLevel = ob_get_level();
+        ob_start();
+        $emitJson = static function ($payload) use ($outputLevel): void {
+            while (ob_get_level() > $outputLevel) ob_end_clean();
+            echo json_encode($payload, JSON_INVALID_UTF8_SUBSTITUTE);
+        };
+        header('Content-Type: application/json');
+        if (($_GET['cache'] ?? '') === '1') {
+            header('Cache-Control: public, max-age=3600, stale-while-revalidate=86400');
+            $emitJson($this->linesShapesFromCache());
+            return;
+        }
+        if (($_GET['service'] ?? '') === 'navigation') {
+            try {
+                $emitJson($this->linesShapesFromCache());
+            } catch (Throwable $e) {
+                http_response_code(500);
+                $emitJson(['success' => false, 'error' => 'Cache Navigazione non disponibile']);
+            }
+            return;
+        }
+        try {
+        require_once BASE_PATH . '/app/services/RoadSnapper.php';
         ini_set('memory_limit', '256M');
         set_time_limit(120); // Give DB more time if needed
 
@@ -389,9 +844,13 @@ class ApiController {
                     r.route_id,
                     r.route_short_name,
                     r.route_long_name,
+                    r.route_color AS route_color,
                     t.shape_id AS shape_id,
+                    st.stop_id AS stop_id,
                     s.stop_lat AS lat,
                     s.stop_lon AS lng,
+                    st.arrival_time AS arrival_time,
+                    st.departure_time AS departure_time,
                     s.stop_name AS name
                 FROM trips t
                 JOIN routes r ON t.route_id = r.route_id
@@ -409,9 +868,13 @@ class ApiController {
                     r.route_id,
                     r.route_short_name,
                     r.route_long_name,
+                    r.route_color AS route_color,
                     tr.shape_id AS shape_id,
+                    st.stop_id AS stop_id,
                     s.stop_lat AS lat,
                     s.stop_lon AS lng,
+                    st.arrival_time AS arrival_time,
+                    st.departure_time AS departure_time,
                     s.stop_name AS name
                 FROM routes r
                 JOIN (
@@ -434,8 +897,12 @@ class ApiController {
                     r.route_id,
                     r.route_short_name,
                     r.route_long_name,
+                    r.route_color AS route_color,
+                    st.stop_id AS stop_id,
                     s.stop_lat AS lat,
                     s.stop_lon AS lng,
+                    st.arrival_time AS arrival_time,
+                    st.departure_time AS departure_time,
                     s.stop_name AS name
                 FROM routes r
                 JOIN (
@@ -468,6 +935,7 @@ class ApiController {
                     'group_number' => isset($row['trip_id']) ? ($tripGroupById[(string) $row['trip_id']] ?? null) : null,
                     'route_short_name' => $row['route_short_name'],
                     'route_long_name' => $row['route_long_name'],
+                    'route_color' => $row['route_color'] ?? null,
                     'shape_id' => $row['shape_id'] ?? null,
                     'path' => []
                 ];
@@ -475,9 +943,12 @@ class ApiController {
 
             // Aggiungiamo la fermata all'array 'path' della rotta corrente
             $routesMap[$routeKey]['path'][] = [
+                'stop_id' => (string) ($row['stop_id'] ?? ''),
                 'lat' => $row['lat'],
                 'lng' => $row['lng'],
-                'name' => $row['name']
+                'name' => $row['name'],
+                'arrival_time' => $row['arrival_time'] ?? null,
+                'departure_time' => $row['departure_time'] ?? null
             ];
         }
 
@@ -519,9 +990,84 @@ class ApiController {
         // 3. Reset delle chiavi dell'array per ottenere un JSON array pulito (es. [ {...}, {...} ])
         $shapes = array_values($routesMap);
 
+        // Se il database non contiene ancora la corsa appena usata dal
+        // planner, usa la cache GTFS per non perdere la geometria del bus.
+        if ($isFiltered && !empty($targetTripIds)) {
+            $fallback = $this->linesShapesFromCache();
+            $foundTripIds = array_flip(array_map(fn($shape) => (string) ($shape['trip_id'] ?? ''), $shapes));
+            foreach ($fallback as $shape) {
+                $tripId = (string) ($shape['trip_id'] ?? '');
+                if ($tripId !== '' && !isset($foundTripIds[$tripId])) {
+                    $shapes[] = $shape;
+                }
+            }
+            if (!empty($shapes)) {
+                $shapes = array_values($shapes);
+            }
+        }
 
-        header('Content-Type: application/json');
-        echo json_encode($shapes);
+        // Preferisce la shape stradale già presente. Solo se manca, prova lo
+        // snapping on-the-fly e persiste il risultato per le richieste future.
+        foreach ($shapes as &$shape) {
+            if (($shape['service'] ?? 'automobilistico') === 'navigation') continue;
+            if (!empty($shape['shape']) || count($shape['path'] ?? []) < 2) continue;
+
+            $shapeId = (string) ($shape['shape_id'] ?? '');
+            if ($shapeId === '') {
+                $shapeId = 'onfly_' . sha1((string) ($shape['trip_id'] ?? $shape['route_id'] ?? ''));
+                $shape['shape_id'] = $shapeId;
+            }
+            $snapped = RoadSnapper::snap($shape['path']);
+            if (!$snapped) continue;
+            $shape['shape'] = $snapped;
+
+            try {
+                $db->query("CREATE TABLE IF NOT EXISTS shapes_refined (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    shape_id VARCHAR(100) NOT NULL,
+                    lat DECIMAL(10,8) NOT NULL,
+                    lng DECIMAL(11,8) NOT NULL,
+                    sequence INT NOT NULL,
+                    dist_traveled DOUBLE NULL,
+                    INDEX idx_shape_id (shape_id)
+                )");
+                $existing = $db->query("SELECT shape_id FROM shapes_refined WHERE shape_id = ? LIMIT 1", [$shapeId]);
+                if (empty($existing)) {
+                    foreach ($snapped as $sequence => $point) {
+                        $db->query(
+                            "INSERT INTO shapes_refined (shape_id, lat, lng, sequence, dist_traveled) VALUES (?, ?, ?, ?, ?)",
+                            [$shapeId, $point['lat'], $point['lng'], $sequence, null]
+                        );
+                    }
+                }
+            } catch (Throwable $persistError) {
+                Logger::log('PHP_ERROR', 'Road snap persist: ' . $persistError->getMessage());
+            }
+        }
+        unset($shape);
+
+        $payload = json_encode($shapes, JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($payload === false) {
+            throw new RuntimeException('Impossibile serializzare le geometrie delle linee');
+        }
+        $emitJson($shapes);
+        } catch (Throwable $e) {
+            Logger::log('PHP_ERROR', 'linesShapes: ' . $e->getMessage());
+            try {
+                $fallback = $this->linesShapesFromCache();
+                if (!empty($fallback)) {
+                    $emitJson($fallback);
+                    return;
+                }
+            } catch (Throwable $fallbackError) {
+                Logger::log('PHP_ERROR', 'linesShapes fallback: ' . $fallbackError->getMessage());
+            }
+            http_response_code(500);
+            $emitJson([
+                'success' => false,
+                'error' => 'Errore nel caricamento delle geometrie delle linee'
+            ]);
+        }
     }
 
     // Refactored from Controller::tripStops to use DB
@@ -840,8 +1386,20 @@ class ApiController {
     }
 
     function gtfsPassages() {
+        header('Content-Type: application/json');
+        header('Cache-Control: public, max-age=10, stale-while-revalidate=20');
         $db = $this->getDb();
-        require_once BASE_PATH . '/app/models/gtfsPassages.php';
+        require_once BASE_PATH . '/app/services/ResponseCache.php';
+        $stop = trim((string)($_GET['stop'] ?? ''));
+        $bucket = (int)floor(time() / 10);
+        $payload = ResponseCache::remember('gtfs-passages|' . $stop . '|' . $bucket, 12, function () use ($db) {
+            ob_start();
+            require BASE_PATH . '/app/models/gtfsPassages.php';
+            $json = (string)ob_get_clean();
+            $decoded = json_decode($json, true);
+            return is_array($decoded) ? $decoded : [];
+        });
+        echo json_encode($payload, JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     function stopLines() {
@@ -888,6 +1446,48 @@ class ApiController {
         return in_array($day, $allowedDays, true) ? $day : null;
     }
 
+    private function lineService(): ?string {
+        $service = strtolower(trim((string) ($_GET['service'] ?? 'automobilistico')));
+        return in_array($service, ['automobilistico', 'navigation'], true) ? $service : null;
+    }
+
+    private function lineDate(): string {
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['date'] ?? '') ? $_GET['date'] : date('Y-m-d');
+    }
+
+    function lineCatalog() {
+        header('Content-Type: application/json');
+        $service = $this->lineService();
+        if ($service === null) { echo json_encode(['success'=>false, 'error'=>'Servizio non valido']); return; }
+        $date = $this->lineDate();
+        try {
+            if ($service === 'navigation') {
+                require_once BASE_PATH . '/app/services/LineScheduleProvider.php';
+                $provider = new LineScheduleProvider();
+                echo json_encode(['success'=>true, 'service'=>$service, 'updated_at'=>$provider->updatedAt(), 'lines'=>$provider->catalog($date)]);
+                return;
+            }
+            $db = $this->getDb(); $dateDb = str_replace('-', '', $date); $day = strtolower(date('l', strtotime($date)));
+            $sql = "SELECT r.route_short_name AS line, MAX(r.route_long_name) AS name,
+                           COUNT(DISTINCT t.trip_id) AS trips_count,
+                           COUNT(DISTINCT CONCAT(COALESCE(t.shape_id,''),'|',COALESCE(t.trip_headsign,''))) AS variants_count
+                    FROM routes r JOIN trips t ON t.route_id=r.route_id
+                    WHERE ((t.service_id IN (SELECT service_id FROM calendar WHERE {$day}=1 AND start_date<=? AND end_date>=?))
+                       OR t.service_id IN (SELECT service_id FROM calendar_dates WHERE date=? AND exception_type=1))
+                      AND t.service_id NOT IN (SELECT service_id FROM calendar_dates WHERE date=? AND exception_type=2)
+                    GROUP BY r.route_short_name ORDER BY r.route_short_name";
+            $lines = array_map(fn($r)=>['line'=>$r['line'], 'name'=>$r['name'] ?? '', 'variants_count'=>(int)$r['variants_count'], 'trips_count'=>(int)$r['trips_count']], $db->query($sql, [$dateDb,$dateDb,$dateDb,$dateDb]));
+            $mtime = @filemtime(BASE_PATH . '/data/gtfs/routes.txt');
+            echo json_encode(['success'=>true, 'service'=>$service, 'updated_at'=>$mtime ? date(DATE_ATOM,$mtime) : null, 'lines'=>$lines]);
+        } catch (Throwable $e) {
+            error_log('lineCatalog automobilistico: ' . $e->getMessage());
+            // Gli orari programmati possono essere temporaneamente irraggiungibili:
+            // il client deve poter mostrare uno stato feed non disponibile senza
+            // trattare la pagina come un errore HTTP non gestibile.
+            echo json_encode(['success'=>true, 'service'=>$service, 'updated_at'=>null, 'feed_available'=>false, 'lines'=>[], 'error'=>'Feed automobilistico non disponibile']);
+        }
+    }
+
     /**
      * Restituisce gli id (route_id) di tutte le rotte con quel route_short_name.
      */
@@ -905,6 +1505,16 @@ class ApiController {
      */
     function lineVariants() {
         header('Content-Type: application/json');
+
+        $service = $this->lineService();
+        if ($service === null) { echo json_encode(['success'=>false, 'error'=>'Servizio non valido']); return; }
+        if ($service === 'navigation') {
+            require_once BASE_PATH . '/app/services/LineScheduleProvider.php';
+            $line = trim($_GET['line'] ?? '');
+            if ($line === '') { echo json_encode(['success'=>false,'error'=>'Parametro line mancante']); return; }
+            $provider = new LineScheduleProvider(); $variants = $provider->variants($line, $this->lineDate());
+            echo json_encode(['success'=>true,'service'=>$service,'line'=>$line,'updated_at'=>$provider->updatedAt(),'variants'=>$variants]); return;
+        }
 
         $line = trim($_GET['line'] ?? '');
         $day = $this->dayColumn($_GET['day'] ?? date('l'));
@@ -997,6 +1607,7 @@ class ApiController {
 
         echo json_encode([
             'success'  => true,
+            'service'  => 'automobilistico',
             'line'     => $line,
             'variants' => $result,
         ]);
@@ -1010,6 +1621,17 @@ class ApiController {
      */
     function lineSchedule() {
         header('Content-Type: application/json');
+
+        $service = $this->lineService();
+        if ($service === null) { echo json_encode(['success'=>false, 'error'=>'Servizio non valido']); return; }
+        if ($service === 'navigation') {
+            require_once BASE_PATH . '/app/services/LineScheduleProvider.php';
+            $line = trim($_GET['line'] ?? '');
+            $ids = array_values(array_filter(array_map('trim', explode(',', (string)($_GET['trips'] ?? '')))));
+            if ($line === '' || !$ids) { echo json_encode(['success'=>false,'error'=>'Parametri line/trips mancanti']); return; }
+            $provider = new LineScheduleProvider(); $result = $provider->schedule($line, $ids, $this->lineDate());
+            echo json_encode(array_merge(['success'=>true,'service'=>$service,'line'=>$line,'updated_at'=>$provider->updatedAt()], $result)); return;
+        }
 
         $line   = trim($_GET['line'] ?? '');
         $representativeIds = array_values(array_unique(array_filter(array_map(
@@ -1210,6 +1832,7 @@ class ApiController {
 
         echo json_encode([
             'success'  => true,
+            'service'  => 'automobilistico',
             'line'     => $line,
             'day'      => $day,
             'headsign' => $headsign,

@@ -151,4 +151,39 @@ class Controller {
     function deleteCookie() {
         require_once BASE_PATH . '/app/views/deleteCookie.php';
     }
+
+    function feedback() {
+        require_once BASE_PATH . '/app/views/feedback.php';
+    }
+
+    function adminFeedback() {
+        AdminAuth::requireAuth();
+        if (!class_exists('databaseConnector')) require_once BASE_PATH . '/app/models/databaseConnector.php';
+        $db = databaseConnector::getInstance();
+        $db->connect(ENV['DB_USER'], ENV['DB_PASS'], ENV['DB_HOST'], ENV['DB_NAME']);
+        $db->query("CREATE TABLE IF NOT EXISTS feedback (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            category VARCHAR(32) NOT NULL,
+            priority VARCHAR(16) NOT NULL DEFAULT 'normal',
+            status VARCHAR(16) NOT NULL DEFAULT 'new',
+            name VARCHAR(120) NULL,
+            email VARCHAR(190) NULL,
+            subject VARCHAR(180) NULL,
+            message TEXT NOT NULL,
+            ip_hash CHAR(64) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_feedback_status (status),
+            INDEX idx_feedback_category (category),
+            INDEX idx_feedback_created (created_at)
+        )");
+        $category = $_GET['category'] ?? '';
+        $status = $_GET['status'] ?? '';
+        $where = [];
+        $params = [];
+        if (in_array($category, ['feature', 'bug', 'improvement', 'question', 'other'], true)) { $where[] = 'category = ?'; $params[] = $category; }
+        if (in_array($status, ['new', 'in_progress', 'resolved', 'archived'], true)) { $where[] = 'status = ?'; $params[] = $status; }
+        $sql = 'SELECT * FROM feedback' . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' ORDER BY created_at DESC LIMIT 250';
+        $feedback = $db->query($sql, $params);
+        require_once BASE_PATH . '/app/views/admin/feedback.php';
+    }
 }

@@ -11,6 +11,13 @@ require_once dirname(__DIR__) . '/app/bootstrap.php';
 
 session_start();
 
+// Le API pubbliche non modificano la sessione: rilasciane subito il lock per
+// permettere al browser di eseguire realmente più richieste in parallelo.
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if (str_starts_with($requestPath, '/api/') && !str_starts_with($requestPath, '/api/admin/')) {
+    session_write_close();
+}
+
 
 // Inizializza il router
 $router = new Router();
@@ -35,5 +42,23 @@ if (
 
 // Ottieni l'URL richiesto e fai partire il router
 $url = $_SERVER['REQUEST_URI'];
-$router->dispatch($url);
+$perfEnabled = !empty(ENV['ACTV_PERF_DIAGNOSTICS'])
+    && ENV['ACTV_PERF_DIAGNOSTICS'] === '1'
+    && (($_GET['perf'] ?? '') === '1');
+
+if ($perfEnabled) {
+    $perfStart = microtime(true);
+    ob_start();
+    $router->dispatch($url);
+    $responseBody = ob_get_clean();
+    $durationMs = round((microtime(true) - $perfStart) * 1000, 2);
+    header('Server-Timing: app;dur=' . $durationMs);
+    header('X-ACTV-Perf: ' . json_encode([
+        'duration_ms' => $durationMs,
+        'path' => parse_url($url, PHP_URL_PATH)
+    ], JSON_INVALID_UTF8_SUBSTITUTE));
+    echo $responseBody;
+} else {
+    $router->dispatch($url);
+}
 ?>

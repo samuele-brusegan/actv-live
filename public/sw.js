@@ -1,10 +1,10 @@
 /**
  * Service Worker per ACTV Live
  * Gestisce cache offline per asset statici, dati GTFS e API responses.
- * Strategia: Network-first per API, Cache-first per asset statici.
+ * Strategia: Network-first per pagine e asset, fallback cache quando offline.
  */
 
-const CACHE_VERSION = 'v2.1';
+const CACHE_VERSION = 'v2.9-vehicle-positions';
 const STATIC_CACHE = `actv-static-${CACHE_VERSION}`;
 const DATA_CACHE = `actv-data-${CACHE_VERSION}`;
 const API_CACHE = `actv-api-${CACHE_VERSION}`;
@@ -26,6 +26,8 @@ const STATIC_ASSETS = [
     '/css/stationSelector.css',
     '/css/structure/structure-stationSelector.css',
     '/css/cookie-notice.css',
+    '/css/app-shell.css',
+    '/css/admin-shell.css',
     '/css/delayStats.css',
     '/js/utils.js',
     '/js/script-home.js',
@@ -40,6 +42,10 @@ const STATIC_ASSETS = [
     '/js/widget.js',
     '/js/delayHistory.js',
     '/js/offline.js',
+    '/js/app-shell.js',
+    '/js/ui-feedback.js',
+    '/js/feedback.js',
+    '/css/feedback.css',
     '/pwa/web-app-manifest-192x192.png',
     '/pwa/web-app-manifest-512x512.png',
     '/pwa/favicon-96x96.png',
@@ -52,6 +58,11 @@ const CACHEABLE_API_PATTERNS = [
     '/api/stop-lines',
     '/api/plan-route',
     '/api/gtfs-stops'
+    ,'/api/navigation/stops'
+    ,'/api/navigation/lines'
+    ,'/api/navigation/passages'
+    ,'/api/navigation/vehicles'
+    ,'/api/line-colors'
 ];
 
 // Install: pre-cache static assets
@@ -107,9 +118,10 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Static assets: Cache-first, fallback to network
+    // Asset statici: prima rete, così CSS/JS aggiornati sostituiscono subito
+    // la copia precedente. La cache resta disponibile offline.
     if (isStaticAsset(url)) {
-        event.respondWith(cacheFirstStrategy(event.request, STATIC_CACHE));
+        event.respondWith(networkFirstStrategy(event.request, STATIC_CACHE));
         return;
     }
 
@@ -186,11 +198,20 @@ self.addEventListener('message', (event) => {
 
 async function networkFirstStrategy(request, cacheName) {
     try {
-        const response = await fetch(request);
+        // Bypassa anche l'HTTP cache del browser: la rete deve avere la prima
+        // occasione di fornire l'ultima versione disponibile.
+        const freshRequest = new Request(request, { cache: 'no-store' });
+        const response = await fetch(freshRequest);
         if (response.ok) {
             const cache = await caches.open(cacheName);
-            cache.put(request, response.clone());
+            await cache.put(request, response.clone());
+            return response;
         }
+
+        // Un errore HTTP non è una versione utilizzabile della pagina:
+        // prova quindi la copia precedente prima del fallback offline.
+        const cached = await caches.match(request);
+        if (cached) return cached;
         return response;
     } catch (error) {
         const cached = await caches.match(request);

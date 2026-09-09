@@ -1,80 +1,59 @@
 # Route finder — planning algorithm
 
-Implemented in [`app/services/RoutePlanner.php`](../../../app/services/RoutePlanner.php).
-The planner works purely on the JSON cache (see [../gtfs-pipeline.md](../gtfs-pipeline.md)).
+The production planner is implemented by
+[`ConnectionScanPlanner.php`](../../../app/services/ConnectionScanPlanner.php).
+`RoutePlanner.php` is retained for diagnostics and compatibility but is no
+longer used for normal `/api/plan-route` requests.
 
-## Entry points
+## Date-specific connection cache
 
-- `findRoutesMulti($originId, $destId, $departureTime)` — the public entry point used
-  by the API.
-- `findRoutes($originId, $destId, $departureTime)` — the single-stop-pair core.
+[`ConnectionCacheBuilder.php`](../../../app/services/ConnectionCacheBuilder.php)
+combines the bus and navigation feeds into one ordered connection list for each
+service date. A connection is one scheduled hop between consecutive stops and
+contains its service, mode, route and trip identifiers.
 
-### Why `findRoutesMulti` exists
+Before publishing a date cache, the builder applies both `calendar.txt` and
+`calendar_dates.txt`. GTFS times above `24:00:00` remain valid integer seconds.
+The cache is rebuilt automatically when either source feed changes and is
+published atomically under `data/gtfs/cache/planner/`.
 
-In the ACTV GTFS a physical stop has **several `stop_id`s** (one per direction /
-platform). Searching only the selected id often misses valid connections. So
-`findRoutesMulti`:
+## Connection Scan
 
-1. expands origin and destination into all **sibling stop ids** that share the same
-   normalized name (`getSiblingStopIds()` builds a name → ids index lazily);
-2. runs `findRoutes()` for every origin×destination pair;
-3. de-duplicates by `(departure, arrival, route, type)`;
-4. re-sorts and returns the top 10.
+The planner scans connections in departure order. For every reachable stop it
+stores the earliest arrival and the time at which another vehicle may be
+boarded. A trip-specific immutable label distinguishes staying aboard from
+boarding the same trip at another stop, preventing impossible transfers.
 
-## `findRoutes` — the core search
+This is service agnostic: bus and water are route metadata, so chains such as
+`bus -> water -> bus -> ...` need no special cases or recursive route search.
+The scan stops as soon as all later departures occur after the best destination
+arrival.
 
-Both endpoints are looked up in `stop_routes_index.json`; if either is absent the
-result is empty.
+## Stops and walking transfers
 
-### 1. Direct connections
-Intersect the routes serving the origin with those serving the destination
-(`array_intersect`). For each common route, `findTripsForRoute()` returns every trip
-where the origin's `stop_sequence` precedes the destination's and the origin
-`departure_time >= requested time`.
+Raw stop IDs are namespaced by service. Platforms whose names differ only by a
+platform suffix (for example Mestre FS C1/C3/C4) are grouped when geographically
+compatible. Bus/navigation stops within 300 metres are connected by a walking
+edge. Walking duration uses distance and a minimum transfer allowance.
 
-### 2. One-transfer connections
-For each non-direct origin route (capped at `maxRoutesToCheck = 50` for safety):
+## API contract
 
-- enumerate stops reachable after the origin (`getRouteStopsAfter()`);
-- if a reachable stop is served by any **destination** route, it's a transfer point;
-- build **leg 1** (origin → transfer) and take the earliest valid trip;
-- build **leg 2** (transfer → destination) departing after leg-1 arrival **+ 2 min**
-  buffer (`addMinutes`), choosing the connecting route with the earliest arrival.
+The planner receives origin, destination, service date, departure time and
+optional endpoint services. It also scans the next service day, preserving GTFS
+times across midnight. The response exposes every transit and walking leg in
+chronological order.
 
-A transfer itinerary records both legs, a combined `route_short_name`
-(`"A → B"`), the transfer stop name and total `stops_count`.
+## Cache generation
 
-### 3. Next-day fallback
-If **no** results were found for today, the same direct + transfer search is repeated
-from `00:00:00` with `day_offset = 1` (and +24h added to duration), so the user always
-gets the earliest option the following day.
+Normal feed updates prebuild today and tomorrow. Additional dates are generated
+under a file lock on first request:
 
-## Ranking
-
-Results are sorted by a weighted score:
-
-```
-score = arrivalSeconds
-      + (type == 'transfer' ? 15*60 : 0)   // 15-min transfer penalty
-      + day_offset * 86400                  // next-day pushed to the bottom
+```bash
+php scripts/build_planner_cache.php 2026-09-02 2026-09-03
 ```
 
-Ties break on shorter `duration`. The list is capped at **10** itineraries.
-The user-selected optimization (`time` / `transfers` / `walking`) is applied
-afterwards in the API — see [results-and-options.md](results-and-options.md).
+## Verification fixture
 
-## Itinerary shape
-
-Each itinerary has a `type` (`direct` | `transfer`), `departure_time`,
-`arrival_time`, `duration` (minutes), `stops_count`, and a `legs` array. A direct
-trip has a single `bus` leg; walking legs are added later by the API for
-address-based searches (see [address-geocoding.md](address-geocoding.md)).
-
-## Helper methods of note
-
-- `getLinesForStop($stopId, $afterTime, $limit)` — next departures per line at a
-  stop; backs the `/api/stop-lines` endpoint (see
-  [../stop-details/realtime-passages.md](../stop-details/realtime-passages.md)).
-- `findNearestStop($lat, $lon)` — Haversine nearest-stop lookup, used for geocoding.
-- `getCacheStats()` / `debugStop()` — diagnostics surfaced by `?debug=1`.
-</content>
+`ConnectionScanPlannerTest.php` exercises the real multimodal Mestre FS to
+Pellestrina itinerary, validates chronological legs, checks dates without active
+services and covers GTFS times beyond midnight.

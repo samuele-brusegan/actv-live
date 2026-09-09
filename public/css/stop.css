@@ -43,6 +43,12 @@
     border-radius: var(--radius-lg);
 }
 
+.passage-info { min-width: 0; }
+.passage-time-column { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; margin-left: 8px; }
+.passage-vehicle-info { display: flex; align-items: center; gap: 6px; margin-top: 5px; color: var(--color-primary-green); font-size: 12px; font-weight: 700; }
+.passage-vehicle-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary-green); box-shadow: 0 0 0 4px rgba(0,158,97,.14); flex: 0 0 auto; }
+.passage-map-link { border: 1px solid rgba(0,158,97,.32); border-radius: 999px; padding: 4px 9px; color: var(--color-primary-green); background: rgba(0,158,97,.08); font-size: 11px; font-weight: 800; line-height: 1; text-decoration: none; }
+
 .time-badge {
     font-family: var(--font-secondary);
     font-weight: 700;

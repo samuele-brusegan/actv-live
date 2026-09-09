@@ -50,6 +50,35 @@ body {
     position: relative; /* Ensure z-index works */
 }
 
+.service-switch {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+    align-items: center;
+}
+
+.service-switch-btn {
+    border: 1px solid var(--color-border-gray);
+    background: var(--color-white);
+    color: var(--color-text-dark);
+    padding: 8px 10px;
+    min-height: 42px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.service-switch-btn:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.service-switch-btn:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.service-switch-btn.active { background: var(--color-primary-green); border-color: var(--color-primary-green); color: #fff; font-weight: 700; }
+
+@media (max-width: 700px) {
+    #filters-bar { flex-wrap: wrap; }
+    .service-switch { width: 100%; }
+    .service-switch-btn { flex: 1; }
+    #filter-input { min-width: 0; }
+}
+
 #filter-input {
     flex: 1;
     padding: 10px 14px;
@@ -206,6 +235,31 @@ body {
     transition: background-color 0.3s;
 }
 
+.nd-toggle-btn {
+    width: auto;
+    min-width: 126px;
+    gap: 6px;
+    padding-inline: 10px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.nd-toggle-btn.active { background: var(--color-primary-green); border-color: var(--color-primary-green); color: #fff; }
+.nd-toggle-icon { font-size: 16px; font-weight: 700; line-height: 1; }
+
+.bus-icon.navigation {
+    position: relative;
+    overflow: visible;
+}
+
+.navigation-symbol {
+    position: absolute;
+    right: 1px;
+    bottom: 1px;
+    font-size: 10px;
+    line-height: 10px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .75);
+}
+
 /* Scheduled bus (gray, transparent) */
 .bus-icon.scheduled {
     background-color: #999 !important;
@@ -238,3 +292,4 @@ html[data-theme="dark"] .leaflet-control-attribution {
 html[data-theme="dark"] .leaflet-container {
     background: #0000;
 }
+.navigation-vehicle-icon { background: transparent; border: 0; font-size: 25px; line-height: 30px; text-align: center; filter: drop-shadow(0 1px 2px #fff); }
