@@ -80,6 +80,7 @@
                 <button class="trip-map-stops-header" type="button" onclick="toggleMapStops()" aria-expanded="true">
                     <span>Fermate della corsa</span><span class="trip-map-chevron">⌄</span>
                 </button>
+                <div class="trip-map-stops-legend"><span class="trip-map-legend-dot visited"></span> Già passata <span class="trip-map-legend-dot upcoming"></span> Da raggiungere</div>
                 <div id="trip-map-stops-list" class="trip-map-stops-list"></div>
             </section>
         </div>

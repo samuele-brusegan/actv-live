@@ -39,6 +39,8 @@ let tripMapUserMarker = null;
 let tripMapUserAccuracy = null;
 let tripMapGeoWatchId = null;
 let tripMapSelectedStopId = null;
+let tripMapStops = [];
+let tripMapProgress = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -502,6 +504,23 @@ function mapStopId(stop) {
     return String(stop?.stop_id ?? stop?.id ?? '');
 }
 
+function normalizeMapColor(value) {
+    let color = String(value ?? '').trim().replace(/^#/, '');
+    if (/^[0-9a-f]{3}$/i.test(color)) color = color.split('').map(char => char + char).join('');
+    return /^[0-9a-f]{6}$/i.test(color) ? `#${color.toUpperCase()}` : null;
+}
+
+function getContrastTextColor(background) {
+    const color = normalizeMapColor(background);
+    if (!color) return '#fff';
+    const channels = [1, 3, 5].map(index => parseInt(color.slice(index, index + 2), 16) / 255);
+    const linear = channels.map(channel => channel <= 0.03928
+        ? channel / 12.92
+        : ((channel + 0.055) / 1.055) ** 2.4);
+    const luminance = (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
+    return luminance > 0.179 ? '#111827' : '#fff';
+}
+
 function findMergedMapStop(stop) {
     const id = mapStopId(stop);
     return state.mergedStops.find(item => String(item.stop_id) === id)
@@ -524,6 +543,16 @@ function createMapStopPopup(stop, index) {
 
 function isSelectedMapStop(stop) {
     return tripMapSelectedStopId !== null && mapStopId(stop) === String(tripMapSelectedStopId);
+}
+
+function isVisitedMapStop(stop) {
+    if (!tripMapProgress || !tripMapGeometry.length) return false;
+    const position = findMapProgress({
+        lat: Number(stop?.lat ?? stop?.stop_lat),
+        lng: Number(stop?.lng ?? stop?.stop_lon)
+    });
+    if (!position) return false;
+    return position.index + position.ratio < tripMapProgress.index + tripMapProgress.ratio - 0.01;
 }
 
 function mapStopBearing(stops, index) {
@@ -586,8 +615,10 @@ function renderMapStops(stops) {
     list.innerHTML = stops.map((stop, index) => {
         const id = String(stop.stop_id || stop.id || '');
         const current = selectedIds.includes(id) || isSelectedMapStop(stop) ? ' current' : '';
+        const visited = isVisitedMapStop(stop) ? ' visited' : '';
         const name = escapeMapHtml(stop.name || stop.stop_name || '');
-        return `<div class="trip-map-stop${current}" data-stop-index="${index}" role="button" tabindex="0"><span class="trip-map-stop-marker"></span><span class="trip-map-stop-name">${name}</span><time>${escapeMapHtml(mapStopPassageLabel(stop))}</time></div>`;
+        const status = visited ? 'Già passata' : 'Da raggiungere';
+        return `<div class="trip-map-stop${current}${visited}" data-stop-index="${index}" role="button" tabindex="0" aria-label="${escapeMapHtml(name)} · ${status}"><span class="trip-map-stop-marker"></span><span class="trip-map-stop-name">${name}</span><time>${escapeMapHtml(mapStopPassageLabel(stop))}</time></div>`;
     }).join('');
 
     list.querySelectorAll('.trip-map-stop').forEach(item => {
@@ -622,6 +653,13 @@ async function loadTripMap() {
         }
         tripMapShape = Array.isArray(shapes) ? shapes.find(item => String(item.trip_id) === String(state.tripId)) || shapes[0] : null;
         if (!tripMapShape) throw new Error('Percorso non disponibile');
+        const lineBadge = document.getElementById('trip-map-line');
+        if (lineBadge) {
+            const routeColor = normalizeMapColor(tripMapShape.route_color);
+            lineBadge.style.backgroundColor = routeColor || '';
+            lineBadge.style.color = getContrastTextColor(routeColor);
+            lineBadge.style.borderColor = getContrastTextColor(routeColor);
+        }
         const geometry = Array.isArray(tripMapShape.shape) && tripMapShape.shape.length > 1 ? tripMapShape.shape : tripMapShape.path;
         const points = (geometry || []).map(point => [Number(point.lat), Number(point.lng)]).filter(point => point.every(Number.isFinite));
         if (points.length < 2) throw new Error('Traccia non disponibile');
@@ -633,6 +671,8 @@ async function loadTripMap() {
             paddingBottomRight: [40, 220]
         });
         const stops = Array.isArray(tripMapShape.path) ? tripMapShape.path : state.stopsGTFS;
+        tripMapStops = stops || [];
+        tripMapProgress = null;
         const selectedStop = state.stopsGTFS.find(stop =>
             String(state.currentStopId || '').split('-').includes(String(stop.stop_id))
         );
@@ -750,6 +790,7 @@ function findMapProgress(position) {
 function updateTripMapProgress(position) {
     const progress = findMapProgress(position);
     if (!progress || !tripMap) return;
+    tripMapProgress = { index: progress.index, ratio: progress.ratio };
     const passed = tripMapGeometry.slice(0, progress.index + 1);
     passed.push(progress.point);
     const remaining = [progress.point, ...tripMapGeometry.slice(progress.index + 1)];
@@ -757,6 +798,7 @@ function updateTripMapProgress(position) {
     if (tripMapCompletedRoute) tripMapCompletedRoute.setLatLngs(passed);
     else tripMapCompletedRoute = L.polyline(passed, { color: '#8b949e', weight: 7, opacity: 0.95 }).addTo(tripMap);
     if (tripMapRemainingRoute) tripMapRemainingRoute.setLatLngs(remaining);
+    renderMapStops(tripMapStops);
 }
 
 function startTripMapUserLocation() {
@@ -1151,7 +1193,9 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl = null) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         formatMinutesRemaining,
+        getContrastTextColor,
         mergeStops,
+        normalizeMapColor,
         normalizeStopName,
         selectMatchingTripTimingPoints,
         state

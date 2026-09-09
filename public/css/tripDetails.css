@@ -141,12 +141,20 @@ body.trip-map-open { overflow: hidden; }
 .trip-map-stops-header { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 50px; padding: 0 18px; border: 0; border-bottom: 1px solid var(--color-border-gray); background: var(--color-white); color: var(--color-text-dark); font: inherit; font-weight: 750; cursor: pointer; }
 .trip-map-chevron { font-size: 22px; transition: transform .2s; }
 .trip-map-stops.collapsed .trip-map-chevron { transform: rotate(180deg); }
-.trip-map-stops-list { max-height: calc(min(48vh, 430px) - 50px); padding: 0 18px 14px; overflow-y: auto; }
+.trip-map-stops-legend { display: flex; align-items: center; gap: 5px; min-height: 27px; padding: 3px 18px 0; color: var(--color-text-muted); font-size: 10px; font-weight: 650; }
+.trip-map-legend-dot { display: inline-block; width: 9px; height: 9px; margin-left: 7px; border-radius: 50%; }
+.trip-map-legend-dot:first-child { margin-left: 0; }
+.trip-map-legend-dot.visited { background: #8b949e; }
+.trip-map-legend-dot.upcoming { border: 2px solid #087f5b; background: #fff; }
+.trip-map-stops-list { max-height: calc(min(48vh, 430px) - 77px); padding: 0 18px 14px; overflow-y: auto; }
 .trip-map-stop { position: relative; display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; align-items: center; min-height: 42px; color: var(--color-text-dark); }
 .trip-map-stop:not(:last-child)::after { content: ''; position: absolute; left: 7px; top: 28px; bottom: -14px; width: 3px; background: #087f5b; }
 .trip-map-stop-marker { width: 15px; height: 15px; z-index: 1; border: 3px solid #087f5b; border-radius: 50%; background: #fff; }
 .trip-map-stop.current .trip-map-stop-marker { width: 18px; height: 18px; margin-left: -1px; border-color: #075bbb; background: #60a5fa; box-shadow: 0 0 0 4px rgba(7,91,187,.22); }
 .trip-map-stop.current .trip-map-stop-name { font-weight: 800; }
+.trip-map-stop.visited .trip-map-stop-marker { border-color: #8b949e; background: #8b949e; }
+.trip-map-stop.visited .trip-map-stop-name { color: var(--color-text-muted); text-decoration: line-through; text-decoration-color: rgba(139,148,158,.55); }
+.trip-map-stop.visited time { color: #8b949e; }
 .trip-map-stop time { max-width: 145px; color: var(--color-text-muted); font-size: 11px; text-align: right; }
 .trip-map-stop[role="button"] { cursor: pointer; border-radius: 10px; }
 .trip-map-stop[role="button"]:hover, .trip-map-stop[role="button"]:focus-visible { outline: 2px solid rgba(7,91,187,.28); background: rgba(7,91,187,.07); }

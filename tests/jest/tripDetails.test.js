@@ -8,7 +8,9 @@ window.history.pushState({}, 'Test', '?tripId=123');
 
 const {
     formatMinutesRemaining,
+    getContrastTextColor,
     mergeStops,
+    normalizeMapColor,
     normalizeStopName,
     selectMatchingTripTimingPoints,
     state
@@ -147,6 +149,19 @@ describe('mergeStops', () => {
 describe('normalizeStopName', () => {
     test('normalizza accenti e punteggiatura', () => {
         expect(normalizeStopName('  Università—Ca’ Foscari ')).toBe('universita ca foscari');
+    });
+});
+
+describe('trip map route colors', () => {
+    test('normalizza il colore route_color del database', () => {
+        expect(normalizeMapColor('#abc')).toBe('#AABBCC');
+        expect(normalizeMapColor('087f5b')).toBe('#087F5B');
+        expect(normalizeMapColor('invalid')).toBeNull();
+    });
+
+    test('sceglie il testo con contrasto migliore', () => {
+        expect(getContrastTextColor('#ffffff')).toBe('#111827');
+        expect(getContrastTextColor('#087f5b')).toBe('#fff');
     });
 });
 
