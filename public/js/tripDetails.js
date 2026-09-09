@@ -526,6 +526,59 @@ function isSelectedMapStop(stop) {
     return tripMapSelectedStopId !== null && mapStopId(stop) === String(tripMapSelectedStopId);
 }
 
+function mapStopBearing(stops, index) {
+    const current = stops[index];
+    const currentLat = Number(current?.lat ?? current?.stop_lat);
+    const currentLng = Number(current?.lng ?? current?.stop_lon);
+    if (!Number.isFinite(currentLat) || !Number.isFinite(currentLng)) return 0;
+
+    let target = null;
+    let forward = true;
+    for (let next = index + 1; next < stops.length; next++) {
+        const lat = Number(stops[next]?.lat ?? stops[next]?.stop_lat);
+        const lng = Number(stops[next]?.lng ?? stops[next]?.stop_lon);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            target = [lat, lng];
+            break;
+        }
+    }
+    if (!target) {
+        forward = false;
+        for (let previous = index - 1; previous >= 0; previous--) {
+            const lat = Number(stops[previous]?.lat ?? stops[previous]?.stop_lat);
+            const lng = Number(stops[previous]?.lng ?? stops[previous]?.stop_lon);
+            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                target = [lat, lng];
+                break;
+            }
+        }
+    }
+    if (!target) return 0;
+
+    const from = forward ? [currentLat, currentLng] : target;
+    const to = forward ? target : [currentLat, currentLng];
+    const latitude1 = from[0] * Math.PI / 180;
+    const latitude2 = to[0] * Math.PI / 180;
+    const deltaLongitude = (to[1] - from[1]) * Math.PI / 180;
+    const bearing = Math.atan2(
+        Math.sin(deltaLongitude) * Math.cos(latitude2),
+        Math.cos(latitude1) * Math.sin(latitude2)
+            - Math.sin(latitude1) * Math.cos(latitude2) * Math.cos(deltaLongitude)
+    ) * 180 / Math.PI;
+    return (bearing + 360) % 360;
+}
+
+function createMapStopIcon(selected, bearing) {
+    const className = selected ? ' trip-map-stop-icon-selected' : '';
+    const color = selected ? '#075bbb' : '#087f5b';
+    return L.divIcon({
+        className: 'trip-map-stop-icon',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+        html: `<span class="trip-map-stop-badge${className}" style="--stop-color:${color}"><svg viewBox="0 0 24 24" style="transform:rotate(${bearing}deg)" aria-hidden="true"><path d="M12 3 4.5 11h4.25v9h6.5v-9h4.25L12 3Z"/></svg></span>`
+    });
+}
+
 function renderMapStops(stops) {
     const list = document.getElementById('trip-map-stops-list');
     if (!list) return;
@@ -589,12 +642,9 @@ async function loadTripMap() {
             const lat = Number(stop.lat ?? stop.stop_lat), lng = Number(stop.lng ?? stop.stop_lon);
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
             const selected = isSelectedMapStop(stop);
-            const marker = L.circleMarker([lat, lng], {
-                radius: selected ? 9 : (index === 0 || index === stops.length - 1 ? 6 : 4),
-                color: selected ? '#075bbb' : '#087f5b',
-                weight: selected ? 4 : 2,
-                fillColor: selected ? '#60a5fa' : '#fff',
-                fillOpacity: 1
+            const marker = L.marker([lat, lng], {
+                icon: createMapStopIcon(selected, mapStopBearing(stops, index)),
+                zIndexOffset: selected ? 500 : 100
             }).addTo(tripMap).bindPopup(createMapStopPopup(stop, index));
             marker.on('click', () => marker.setPopupContent(createMapStopPopup(stop, index)));
             tripMapStopMarkers.set(index, marker);
