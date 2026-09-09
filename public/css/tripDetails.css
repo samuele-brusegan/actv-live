@@ -160,9 +160,9 @@ body.trip-map-open { overflow: hidden; }
 .trip-map-stop[role="button"]:hover, .trip-map-stop[role="button"]:focus-visible { outline: 2px solid rgba(7,91,187,.28); background: rgba(7,91,187,.07); }
 .trip-map-stop-icon { width: 30px !important; height: 30px !important; border: 0 !important; background: transparent !important; }
 .trip-map-stop-badge { display: grid; place-items: center; width: 26px; height: 26px; border: 3px solid #fff; border-radius: 50%; background: var(--stop-color); box-shadow: 0 2px 7px rgba(0,0,0,.36); }
-.trip-map-stop-badge svg { width: 17px; height: 17px; fill: #fff; transform-origin: 50% 50%; }
+.trip-map-stop-badge svg { width: 12px; height: 12px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transform-origin: 50% 50%; }
 .trip-map-stop-badge.trip-map-stop-icon-selected { width: 30px; height: 30px; box-shadow: 0 0 0 3px rgba(7,91,187,.25), 0 2px 8px rgba(0,0,0,.4); }
-.trip-map-stop-badge.trip-map-stop-icon-selected svg { width: 19px; height: 19px; }
+.trip-map-stop-badge.trip-map-stop-icon-selected svg { width: 13px; height: 13px; stroke-width: 1.8; }
 .trip-map-bus-icon { display: grid; place-items: center; width: 42px !important; height: 42px !important; border: 3px solid #fff; border-radius: 50%; background: #087f5b; box-shadow: 0 3px 10px rgba(0,0,0,.4); }
 .trip-map-bus-svg { width: 29px; height: 29px; fill: #fff; }
 .trip-map-bus-svg .trip-map-bus-window { fill: #087f5b; stroke: #fff; stroke-width: 1.5; }

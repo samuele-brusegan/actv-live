@@ -604,7 +604,7 @@ function createMapStopIcon(selected, bearing) {
         className: 'trip-map-stop-icon',
         iconSize: [30, 30],
         iconAnchor: [15, 15],
-        html: `<span class="trip-map-stop-badge${className}" style="--stop-color:${color}"><svg viewBox="0 0 24 24" style="transform:rotate(${bearing}deg)" aria-hidden="true"><path d="M12 3 4.5 11h4.25v9h6.5v-9h4.25L12 3Z"/></svg></span>`
+        html: `<span class="trip-map-stop-badge${className}" style="--stop-color:${color}"><svg viewBox="0 0 24 24" style="transform:rotate(${bearing}deg)" aria-hidden="true"><path d="M8 5l7 7-7 7"/></svg></span>`
     });
 }
 
