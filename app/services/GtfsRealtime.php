@@ -97,7 +97,9 @@ class GtfsRealtime
             $trip = self::fieldMessage($update, 1);
             $relationship = self::varintField($trip, 3);
             $delay = 0;
-            foreach (self::fieldMessages($update, 4) as $stopUpdate) {
+            foreach (self::fieldMessages($update, 4) as $stopUpdateField) {
+                if (($stopUpdateField['wire'] ?? null) !== 2 || !is_string($stopUpdateField['value'] ?? null)) continue;
+                $stopUpdate = $stopUpdateField['value'];
                 $arrival = self::fieldMessage($stopUpdate, 2);
                 $departure = self::fieldMessage($stopUpdate, 3);
                 $event = $arrival ?: $departure;
