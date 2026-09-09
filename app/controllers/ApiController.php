@@ -126,17 +126,24 @@ class ApiController {
 
     // Refactored from dbControll::api_gtfsIdentify
     function api_gtfsIdentify() {
-        $tableJoins = "
-            INNER JOIN trips ON routes.route_id = trips.route_id
-            INNER JOIN stop_times ON trips.trip_id = stop_times.trip_id
-            INNER JOIN stops ON stop_times.stop_id = stops.stop_id
-            INNER JOIN calendar ON trips.service_id = calendar.service_id
-            ";
-
-        // The view expects $db variable to be available
-        $db = $this->getDb($tableJoins);
-
-        require_once BASE_PATH . '/app/views/gtfsIdentify.php';
+        if (!isset($_GET['return'])) {
+            require BASE_PATH . '/app/views/gtfsIdentify.php';
+            return;
+        }
+        header('Content-Type: application/json');
+        header('Cache-Control: public, max-age=300, stale-while-revalidate=900');
+        require_once BASE_PATH . '/app/services/ResponseCache.php';
+        $keys = ['time', 'busTrack', 'busDirection', 'day', 'stop', 'lineId', 'stopId', 'limit'];
+        $arguments = [];
+        foreach ($keys as $key) $arguments[$key] = (string)($_GET[$key] ?? '');
+        $payload = ResponseCache::remember('gtfs-identify|' . hash('sha256', json_encode($arguments)), 300, function () {
+            ob_start();
+            require BASE_PATH . '/app/views/gtfsIdentify.php';
+            $json = (string)ob_get_clean();
+            $decoded = json_decode($json, true);
+            return is_array($decoded) ? $decoded : ['error' => 'Risposta GTFS non valida'];
+        });
+        echo json_encode($payload, JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     // Refactored from dbControll::gtfsTripBuilder
@@ -144,6 +151,7 @@ class ApiController {
         $tripId = $_GET['trip_id'] ?? '';
 
         header("Content-Type: application/json");
+        header('Cache-Control: public, max-age=3600, stale-while-revalidate=86400');
         if ($tripId === '') {
             header('HTTP/1.1 400 Bad Request');
             echo json_encode(['error' => 'Missing trip_id parameter']);
@@ -550,11 +558,14 @@ class ApiController {
 
     function navigationVehicles() {
         header('Content-Type: application/json');
+        header('Cache-Control: public, max-age=2, stale-while-revalidate=8');
         require_once BASE_PATH . '/app/services/GtfsRealtime.php';
+        require_once BASE_PATH . '/app/services/ResponseCache.php';
         // La mappa ha bisogno solo delle posizioni. Il feed tripUpdates è
         // separato e può impiegare fino al timeout del download: scaricarlo
         // qui raddoppiava il tempo di risposta dell'intera mappa.
-        $vehicles = GtfsRealtime::read('vehicles');
+        $vehicles = ResponseCache::remember('realtime-vehicles-navigation', 3, fn() => GtfsRealtime::read('vehicles'));
+        $vehicles = $this->filterRequestedVehicles($vehicles);
         $tripsFile = BASE_PATH . '/data/gtfs/cache/navigation/trips.json';
         $routesFile = BASE_PATH . '/data/gtfs/cache/navigation/routes.json';
         $trips = is_file($tripsFile) ? json_decode((string) file_get_contents($tripsFile), true) : [];
@@ -578,12 +589,36 @@ class ApiController {
 
     function realtimeVehicles() {
         header('Content-Type: application/json');
+        header('Cache-Control: public, max-age=2, stale-while-revalidate=8');
         $service = ($_GET['service'] ?? '') === 'automobilistico' ? 'automobilistico' : (($_GET['service'] ?? '') === 'navigation' ? 'navigation' : null);
         if ($service === null) { http_response_code(400); echo json_encode(['success'=>false,'error'=>'Servizio non valido']); return; }
         require_once BASE_PATH . '/app/services/GtfsRealtime.php';
-        $vehicles = GtfsRealtime::read('vehicles', $service);
-        if ($service === 'automobilistico') $vehicles = $this->guessBusRoutes($vehicles);
+        require_once BASE_PATH . '/app/services/ResponseCache.php';
+        $vehicles = ResponseCache::remember('realtime-vehicles-' . $service, 3, function () use ($service) {
+            $items = GtfsRealtime::read('vehicles', $service);
+            return $service === 'automobilistico' ? $this->guessBusRoutes($items) : $items;
+        });
+        $vehicles = $this->filterRequestedVehicles($vehicles);
         echo json_encode(['success'=>true, 'service'=>$service, 'vehicles'=>$vehicles], JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    private function requestedTripIds(): array {
+        $raw = (string)($_GET['tripIds'] ?? $_GET['tripId'] ?? '');
+        return array_slice(array_values(array_unique(array_filter(array_map('trim', explode(',', $raw))))), 0, 100);
+    }
+
+    private function filterRequestedVehicles(array $vehicles): array {
+        $trips = $this->requestedTripIds();
+        $routes = array_slice(array_values(array_unique(array_filter(array_map(
+            'trim', explode(',', (string)($_GET['routeIds'] ?? $_GET['routeId'] ?? ''))
+        )))), 0, 50);
+        if (!$trips && !$routes) return $vehicles;
+        $wantedTrips = array_fill_keys($trips, true);
+        $wantedRoutes = array_fill_keys($routes, true);
+        return array_values(array_filter($vehicles, static function ($vehicle) use ($wantedTrips, $wantedRoutes) {
+            return isset($wantedTrips[(string)($vehicle['trip_id'] ?? '')])
+                || isset($wantedRoutes[(string)($vehicle['route_id'] ?? '')]);
+        }));
     }
 
     private function guessBusRoutes(array $vehicles): array {
@@ -592,18 +627,28 @@ class ApiController {
         $index = is_file($base . '/stop_routes_index.json') ? json_decode((string)file_get_contents($base . '/stop_routes_index.json'), true) : [];
         $routes = is_file($base . '/routes.json') ? json_decode((string)file_get_contents($base . '/routes.json'), true) : [];
         if (!is_array($stops) || !is_array($index) || !is_array($routes)) return $vehicles;
+        // Griglia di circa 220 m: la ricerca usa solo la cella del mezzo e le
+        // otto adiacenti invece di scansionare tutte le fermate.
+        $grid = [];
+        foreach ($stops as $stopId => $stop) {
+            $lat = (float)($stop['lat'] ?? $stop['stop_lat'] ?? 0);
+            $lon = (float)($stop['lon'] ?? $stop['stop_lon'] ?? 0);
+            if (!$lat || !$lon) continue;
+            $grid[(int)floor($lat / .002) . ':' . (int)floor($lon / .003)][] = [(string)$stopId, $lat, $lon];
+        }
         foreach ($vehicles as &$vehicle) {
             if (($vehicle['route_short_name'] ?? '') !== '') continue;
             $lat = (float)($vehicle['vehicle_position']['lat'] ?? 0);
             $lon = (float)($vehicle['vehicle_position']['lon'] ?? 0);
             if (!$lat || !$lon) continue;
             $nearest = null; $distance = PHP_FLOAT_MAX;
-            foreach ($stops as $stopId => $stop) {
-                $stopLat = (float)($stop['lat'] ?? $stop['stop_lat'] ?? 0); $stopLon = (float)($stop['lon'] ?? $stop['stop_lon'] ?? 0);
-                if (!$stopLat || !$stopLon) continue;
-                $dLat = ($lat - $stopLat) * 111320; $dLon = ($lon - $stopLon) * 111320 * cos(deg2rad($lat));
-                $d = hypot($dLat, $dLon);
-                if ($d < $distance) { $distance = $d; $nearest = (string)$stopId; }
+            $cellLat = (int)floor($lat / .002); $cellLon = (int)floor($lon / .003);
+            for ($dy = -1; $dy <= 1; $dy++) for ($dx = -1; $dx <= 1; $dx++) {
+                foreach ($grid[($cellLat + $dy) . ':' . ($cellLon + $dx)] ?? [] as [$stopId, $stopLat, $stopLon]) {
+                    $dLat = ($lat - $stopLat) * 111320; $dLon = ($lon - $stopLon) * 111320 * cos(deg2rad($lat));
+                    $d = hypot($dLat, $dLon);
+                    if ($d < $distance) { $distance = $d; $nearest = $stopId; }
+                }
             }
             $candidate = $nearest !== null ? ($index[$nearest] ?? []) : [];
             if ($distance <= 180 && is_array($candidate) && count($candidate)) {
@@ -738,6 +783,7 @@ class ApiController {
         };
         header('Content-Type: application/json');
         if (($_GET['cache'] ?? '') === '1') {
+            header('Cache-Control: public, max-age=3600, stale-while-revalidate=86400');
             $emitJson($this->linesShapesFromCache());
             return;
         }
@@ -1340,8 +1386,20 @@ class ApiController {
     }
 
     function gtfsPassages() {
+        header('Content-Type: application/json');
+        header('Cache-Control: public, max-age=10, stale-while-revalidate=20');
         $db = $this->getDb();
-        require_once BASE_PATH . '/app/models/gtfsPassages.php';
+        require_once BASE_PATH . '/app/services/ResponseCache.php';
+        $stop = trim((string)($_GET['stop'] ?? ''));
+        $bucket = (int)floor(time() / 10);
+        $payload = ResponseCache::remember('gtfs-passages|' . $stop . '|' . $bucket, 12, function () use ($db) {
+            ob_start();
+            require BASE_PATH . '/app/models/gtfsPassages.php';
+            $json = (string)ob_get_clean();
+            $decoded = json_decode($json, true);
+            return is_array($decoded) ? $decoded : [];
+        });
+        echo json_encode($payload, JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     function stopLines() {

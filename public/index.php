@@ -11,6 +11,13 @@ require_once dirname(__DIR__) . '/app/bootstrap.php';
 
 session_start();
 
+// Le API pubbliche non modificano la sessione: rilasciane subito il lock per
+// permettere al browser di eseguire realmente più richieste in parallelo.
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if (str_starts_with($requestPath, '/api/') && !str_starts_with($requestPath, '/api/admin/')) {
+    session_write_close();
+}
+
 
 // Inizializza il router
 $router = new Router();

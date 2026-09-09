@@ -26,6 +26,10 @@ let firstIteration = {
     refresh: true,
     scroll: true
 };
+let tripMap = null;
+let tripMapVehicleMarker = null;
+let tripMapRefreshTimer = null;
+let tripMapShape = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -89,6 +93,9 @@ async function init() {
         if (loadingBox) loadingBox.innerHTML += '<br>Fermate caricate';
     }
     await initStopsJSON();
+    // I dati real-time sono appena stati caricati: evita una seconda chiamata
+    // identica (e le relative risoluzioni trip) nel primo refresh.
+    firstIteration.refresh = false;
 
     //set stopId from url
     state.currentStopId = sessionStorage.getItem('tripDetails_selectedStop');
@@ -398,12 +405,151 @@ function renderTimeline() {
     }
 }
 
-/** Naviga alla mappa delle linee */
-function openMap() {
-    const url = state.tripId
-        ? `/lines-map?tripId=${encodeURIComponent(state.tripId)}`
-        : `/lines-map?line=${encodeURIComponent(state.line)}`;
-    window.location.href = url;
+/** Apre la mappa della corsa senza perdere il dettaglio corrente. */
+async function openMap() {
+    const dialog = document.getElementById('trip-map-dialog');
+    if (!dialog || !state.tripId) return;
+    if (typeof L === 'undefined') {
+        errorPopup('Mappa non disponibile. Verifica la connessione e riprova.');
+        return;
+    }
+    dialog.hidden = false;
+    document.body.classList.add('trip-map-open');
+    const lineBadge = document.getElementById('trip-map-line');
+    const direction = document.getElementById('trip-map-direction');
+    if (lineBadge) lineBadge.textContent = state.line || '--';
+    if (direction) direction.textContent = state.destination?.replace(/\\/g, '') || 'Corsa ACTV';
+
+    if (!tripMap) {
+        tripMap = L.map('trip-map', { attributionControl: false }).setView([45.4384, 12.3359], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(tripMap);
+        await loadTripMap();
+    }
+    setTimeout(() => tripMap.invalidateSize(), 0);
+    await refreshTripVehicle();
+    clearInterval(tripMapRefreshTimer);
+    tripMapRefreshTimer = setInterval(refreshTripVehicle, 10000);
+}
+
+function closeMap() {
+    const dialog = document.getElementById('trip-map-dialog');
+    if (dialog) dialog.hidden = true;
+    document.body.classList.remove('trip-map-open');
+    clearInterval(tripMapRefreshTimer);
+    tripMapRefreshTimer = null;
+}
+
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !document.getElementById('trip-map-dialog')?.hidden) closeMap();
+});
+
+function toggleMapStops() {
+    const panel = document.getElementById('trip-map-stops');
+    const button = panel?.querySelector('.trip-map-stops-header');
+    if (!panel || !button) return;
+    const collapsed = panel.classList.toggle('collapsed');
+    button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+}
+
+function mapStopTime(stop) {
+    return String(stop.arrival_time || stop.departure_time || '').substring(0, 5) || '--:--';
+}
+
+function renderMapStops(stops) {
+    const list = document.getElementById('trip-map-stops-list');
+    if (!list) return;
+    const selectedIds = String(state.currentStopId || '').split('-');
+    list.innerHTML = stops.map((stop, index) => {
+        const id = String(stop.stop_id || stop.id || '');
+        const current = selectedIds.includes(id) ? ' current' : '';
+        const name = String(stop.name || stop.stop_name || '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+        return `<div class="trip-map-stop${current}"><span class="trip-map-stop-marker"></span><span class="trip-map-stop-name">${name}</span><time>${mapStopTime(stop)}</time></div>`;
+    }).join('');
+}
+
+async function loadTripMap() {
+    const status = document.getElementById('trip-map-status');
+    try {
+        const params = new URLSearchParams({ tripId: state.tripId, service: 'automobilistico', cache: '1' });
+        let response = await fetch(`/api/lines-shapes?${params.toString()}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        let shapes = await response.json();
+        if (!Array.isArray(shapes) || !shapes.length) {
+            params.delete('cache');
+            response = await fetch(`/api/lines-shapes?${params.toString()}`, { cache: 'no-store' });
+            shapes = response.ok ? await response.json() : [];
+        }
+        tripMapShape = Array.isArray(shapes) ? shapes.find(item => String(item.trip_id) === String(state.tripId)) || shapes[0] : null;
+        if (!tripMapShape) throw new Error('Percorso non disponibile');
+        const geometry = Array.isArray(tripMapShape.shape) && tripMapShape.shape.length > 1 ? tripMapShape.shape : tripMapShape.path;
+        const points = (geometry || []).map(point => [Number(point.lat), Number(point.lng)]).filter(point => point.every(Number.isFinite));
+        if (points.length < 2) throw new Error('Traccia non disponibile');
+        const route = L.polyline(points, { color: '#087f5b', weight: 7, opacity: 0.9 }).addTo(tripMap);
+        tripMap.fitBounds(route.getBounds(), {
+            paddingTopLeft: [40, 125],
+            paddingBottomRight: [40, 220]
+        });
+        const stops = Array.isArray(tripMapShape.path) ? tripMapShape.path : state.stopsGTFS;
+        renderMapStops(stops || []);
+        (stops || []).forEach((stop, index) => {
+            const lat = Number(stop.lat ?? stop.stop_lat), lng = Number(stop.lng ?? stop.stop_lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            L.circleMarker([lat, lng], { radius: index === 0 || index === stops.length - 1 ? 6 : 4, color: '#087f5b', weight: 2, fillColor: '#fff', fillOpacity: 1 })
+                .addTo(tripMap).bindPopup(`<strong>${index + 1}. ${String(stop.name || stop.stop_name || '')}</strong><br>${mapStopTime(stop)}`);
+        });
+        if (status) status.textContent = 'Ricerca posizione del mezzo...';
+    } catch (error) {
+        if (status) status.textContent = error.message;
+    }
+}
+
+async function refreshTripVehicle() {
+    if (!tripMap || !state.tripId) return;
+    const status = document.getElementById('trip-map-status');
+    try {
+        const params = new URLSearchParams({ service: 'automobilistico', tripId: state.tripId });
+        if (tripMapShape?.route_id) params.set('routeId', tripMapShape.route_id);
+        const response = await fetch(`/api/realtime/vehicles?${params.toString()}`);
+        if (!response.ok) throw new Error('Posizione non disponibile');
+        const payload = await response.json();
+        const vehicles = Array.isArray(payload) ? payload : payload.vehicles || [];
+        const exactVehicle = vehicles.find(item => String(item.trip_id || '') === String(state.tripId));
+        const routeVehicles = vehicles.filter(item =>
+            tripMapShape?.route_id && String(item.route_id || '') === String(tripMapShape.route_id)
+        );
+        const selectedIds = String(state.currentStopId || '').split('-');
+        const selectedStop = (tripMapShape?.path || []).find(stop => selectedIds.includes(String(stop.stop_id || stop.id || '')));
+        const referenceLat = Number(selectedStop?.lat ?? selectedStop?.stop_lat);
+        const referenceLng = Number(selectedStop?.lng ?? selectedStop?.stop_lon);
+        const distanceSquared = item => {
+            const lat = Number(item?.vehicle_position?.lat), lng = Number(item?.vehicle_position?.lon);
+            return Number.isFinite(referenceLat) && Number.isFinite(referenceLng) && Number.isFinite(lat) && Number.isFinite(lng)
+                ? (lat - referenceLat) ** 2 + (lng - referenceLng) ** 2
+                : Number.MAX_VALUE;
+        };
+        const fallbackVehicle = routeVehicles.slice().sort((a, b) => distanceSquared(a) - distanceSquared(b))[0];
+        const vehicle = exactVehicle || fallbackVehicle;
+        const lat = Number(vehicle?.vehicle_position?.lat), lng = Number(vehicle?.vehicle_position?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            if (tripMapVehicleMarker) {
+                tripMap.removeLayer(tripMapVehicleMarker);
+                tripMapVehicleMarker = null;
+            }
+            if (status) status.innerHTML = '<span class="trip-map-live-dot offline"></span>Nessun mezzo attivo rilevato su questa corsa';
+            return;
+        }
+        if (!tripMapVehicleMarker) {
+            const icon = L.divIcon({ className: 'trip-map-bus-icon', html: '🚌', iconSize: [38, 38], iconAnchor: [19, 19] });
+            tripMapVehicleMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(tripMap).bindPopup(`<strong>Linea ${state.line || ''}</strong><br>Posizione rilevata in tempo reale`);
+        } else {
+            tripMapVehicleMarker.setLatLng([lat, lng]);
+        }
+        if (status) status.innerHTML = `<span class="trip-map-live-dot"></span>${exactVehicle ? 'Posizione live' : 'Mezzo della linea'} · ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+    } catch (error) {
+        if (status) status.textContent = error.message;
+    }
 }
 
 function errorPopup(message) {

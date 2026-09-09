@@ -6,8 +6,10 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Dettaglio Corsa - ACTV</title>
         <?php require COMMON_HTML_HEAD; ?>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
         <link rel="stylesheet" href="/css/structure/structure-tripDetails.css">
         <link rel="stylesheet" href="/css/tripDetails.css">
+        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
         <script type="text/javascript" src="/js/tripDetails.js"></script>
         <script type="module" src="https://cdn.jsdelivr.net/npm/ldrs/dist/auto/hatch.js"></script>
     </head>
@@ -60,8 +62,26 @@
             </div>
         </div>
 
-        <button class="map-fab" onclick="openMap()" title="Vedi sulla mappa">
+        <button class="map-fab" onclick="openMap()" title="Vedi sulla mappa" aria-controls="trip-map-dialog">
             <?= getIcon('bus', 24) ?>
         </button>
+
+        <div id="trip-map-dialog" class="trip-map-dialog" hidden aria-label="Mappa della corsa">
+            <div id="trip-map"></div>
+            <header class="trip-map-header">
+                <button class="trip-map-close" type="button" onclick="closeMap()" aria-label="Chiudi mappa">&larr;</button>
+                <div class="trip-map-heading">
+                    <span id="trip-map-line" class="trip-map-line-badge">--</span>
+                    <div><strong id="trip-map-title">Mappa corsa</strong><small id="trip-map-direction">Caricamento...</small></div>
+                </div>
+                <div id="trip-map-status" class="trip-map-status"><span class="trip-map-live-dot"></span>Caricamento percorso...</div>
+            </header>
+            <section id="trip-map-stops" class="trip-map-stops">
+                <button class="trip-map-stops-header" type="button" onclick="toggleMapStops()" aria-expanded="true">
+                    <span>Fermate della corsa</span><span class="trip-map-chevron">⌄</span>
+                </button>
+                <div id="trip-map-stops-list" class="trip-map-stops-list"></div>
+            </section>
+        </div>
     </body>
 </html>
