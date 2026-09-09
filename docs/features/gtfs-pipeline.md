@@ -42,6 +42,12 @@ A single monolithic `stop_times.json` would be huge. Instead `parseStopTimes()`:
 - builds a **reverse index** `cache/stop_routes_index.json` mapping
   `stop_id → [route_id, ...]`.
 
+During generation, `stop_times.txt` is streamed into temporary per-route JSONL
+buckets and each route is then converted independently. This avoids keeping the
+entire feed in PHP memory. The updater also logs the current parser method,
+progress every 50,000 rows, memory usage, the effective `memory_limit`, and
+precise CSV/JSON/write errors.
+
 This lets the planner load only the routes relevant to a query (see
 [route-finder/planning-algorithm.md](route-finder/planning-algorithm.md)).
 
@@ -92,6 +98,12 @@ Avvio CLI manuale:
 ```bash
 php scripts/update_gtfs.php --trigger=manual
 ```
+
+In caso di errore, lo stato in `data/gtfs-update/state.json` contiene `failure`
+con task corrente, file/riga, memoria e trace quando disponibili; `update.log`
+contiene gli stessi dettagli e i progressi del parser. Se PHP termina con un
+errore fatale, il workspace temporaneo viene conservato nel percorso indicato
+da `failure.workspace` per consentire l'ispezione.
 
 ### Dipendenze runtime
 

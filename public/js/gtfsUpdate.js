@@ -13,6 +13,15 @@
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'
     }[char]));
 
+    const formatBytes = value => {
+        const bytes = Number(value);
+        if (!Number.isFinite(bytes)) return '--';
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+        if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
+        return `${(bytes / 1073741824).toFixed(2)} GB`;
+    };
+
     async function request(url, options) {
         const response = await fetch(url, {
             credentials: 'same-origin',
@@ -96,8 +105,13 @@
             `<div class="gtfs-stat-value">${esc(value)}</div></div>`
         ).join('');
 
+        const failure = state.failure;
+        const failureSuffix = failure
+            ? ` [${failure.type || 'diagnostica'}${failure.file ? ` · ${failure.file}:${failure.line || '?'}` : ''}` +
+              `${failure.memory?.peak_bytes ? ` · picco ${formatBytes(failure.memory.peak_bytes)}` : ''}]`
+            : '';
         $('update-summary').textContent = state.error
-            ? `Errore: ${state.error}`
+            ? `Errore: ${state.error}${failureSuffix}`
             : `${status}${state.feed_url ? ' · ' + state.feed_url : ''}`;
         $('start-update').disabled = !!state.running;
         $('start-update').textContent = state.running ? 'Aggiornamento in corso' : 'Avvia aggiornamento';
@@ -106,9 +120,13 @@
             const total = Math.max(1, Number(task.total) || 1);
             const current = Math.min(total, Number(task.current) || 0);
             const percent = Math.round(current / total * 100);
+            const detail = task.detail
+                ? `<div class="gtfs-task-detail">${esc(task.detail)}</div>`
+                : '';
             return `<div class="gtfs-task ${esc(task.status)}">` +
                 `<div class="gtfs-task-head"><strong>${esc(task.name)}</strong>` +
                 `<span>${current}/${total}</span></div>` +
+                detail +
                 `<div class="gtfs-progress"><div style="width:${percent}%"></div></div>` +
                 `</div>`;
         }).join('') || '<div class="gtfs-muted">Nessuna esecuzione registrata.</div>';

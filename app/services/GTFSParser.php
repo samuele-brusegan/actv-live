@@ -95,12 +95,15 @@ class GTFSParser {
         if (!file_exists($file)) {
             throw new Exception("stops.txt not found");
         }
-        
+
         $stops = [];
-        $handle = fopen($file, 'r');
-        $headers = fgetcsv($handle, 0, ",", "\"", "\\");
-        
+        $handle = $this->openCsv($file);
+        $headers = $this->readCsvHeaders($handle, $file);
+
         while (($data = fgetcsv($handle, 0, ",", "\"", "\\")) !== FALSE) {
+            if (count($data) !== count($headers)) {
+                throw new RuntimeException($this->csvRowError($file, ftell($handle), $headers, $data));
+            }
             $stop = array_combine($headers, $data);
             $stops[$stop['stop_id']] = [
                 'id' => $stop['stop_id'],
@@ -114,10 +117,7 @@ class GTFSParser {
         
         fclose($handle);
         
-        file_put_contents(
-            $this->cacheDir . '/stops.json',
-            json_encode($stops, JSON_PRETTY_PRINT)
-        );
+        $this->writeJsonCache($this->cacheDir . '/stops.json', $stops, 'stops.json', JSON_PRETTY_PRINT);
         
         echo "Parsed " . count($stops) . " stops\n";
         return $stops;
@@ -133,12 +133,15 @@ class GTFSParser {
         if (!file_exists($file)) {
             throw new Exception("routes.txt not found");
         }
-        
+
         $routes = [];
-        $handle = fopen($file, 'r');
-        $headers = fgetcsv($handle, 0, ",", "\"", "\\");
-        
+        $handle = $this->openCsv($file);
+        $headers = $this->readCsvHeaders($handle, $file);
+
         while (($data = fgetcsv($handle, 0, ",", "\"", "\\")) !== FALSE) {
+            if (count($data) !== count($headers)) {
+                throw new RuntimeException($this->csvRowError($file, ftell($handle), $headers, $data));
+            }
             $route = array_combine($headers, $data);
             $routes[$route['route_id']] = [
                 'id' => $route['route_id'],
@@ -156,10 +159,7 @@ class GTFSParser {
         
         fclose($handle);
         
-        file_put_contents(
-            $this->cacheDir . '/routes.json',
-            json_encode($routes, JSON_PRETTY_PRINT)
-        );
+        $this->writeJsonCache($this->cacheDir . '/routes.json', $routes, 'routes.json', JSON_PRETTY_PRINT);
         
         echo "Parsed " . count($routes) . " routes\n";
         return $routes;
@@ -175,12 +175,15 @@ class GTFSParser {
         if (!file_exists($file)) {
             throw new Exception("trips.txt not found");
         }
-        
+
         $trips = [];
-        $handle = fopen($file, 'r');
-        $headers = fgetcsv($handle, 0, ",", "\"", "\\");
-        
+        $handle = $this->openCsv($file);
+        $headers = $this->readCsvHeaders($handle, $file);
+
         while (($data = fgetcsv($handle, 0, ",", "\"", "\\")) !== FALSE) {
+            if (count($data) !== count($headers)) {
+                throw new RuntimeException($this->csvRowError($file, ftell($handle), $headers, $data));
+            }
             $trip = array_combine($headers, $data);
             $trips[$trip['trip_id']] = [
                 'id' => $trip['trip_id'],
@@ -195,10 +198,7 @@ class GTFSParser {
         
         fclose($handle);
         
-        file_put_contents(
-            $this->cacheDir . '/trips.json',
-            json_encode($trips, JSON_PRETTY_PRINT)
-        );
+        $this->writeJsonCache($this->cacheDir . '/trips.json', $trips, 'trips.json', JSON_PRETTY_PRINT);
         
         echo "Parsed " . count($trips) . " trips\n";
         return $trips;
@@ -221,86 +221,157 @@ class GTFSParser {
         if (!file_exists($tripsFile)) {
             throw new Exception("trips.json not found. Parse trips first.");
         }
-        $trips = json_decode(file_get_contents($tripsFile), true);
+        try {
+            $trips = json_decode(
+                (string) file_get_contents($tripsFile),
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (JsonException $error) {
+            throw new RuntimeException(
+                'Impossibile leggere trips.json: ' . $error->getMessage() . ' (' . $tripsFile . ')',
+                0,
+                $error
+            );
+        }
+        if (!is_array($trips)) {
+            throw new RuntimeException('trips.json non contiene un oggetto valido: ' . $tripsFile);
+        }
+        $tripRoutes = [];
+        foreach ($trips as $tripId => $trip) {
+            if (!is_array($trip) || !isset($trip['route_id'])) continue;
+            $tripRoutes[(string) $tripId] = (string) $trip['route_id'];
+        }
+        unset($trips);
         
         // Prepare routes directory
         $routesDir = $this->cacheDir . '/routes';
-        if (!file_exists($routesDir)) {
-            mkdir($routesDir, 0777, true);
+        if (!is_dir($routesDir) && !mkdir($routesDir, 0777, true) && !is_dir($routesDir)) {
+            throw new RuntimeException('Impossibile creare la directory cache route: ' . $routesDir);
         }
-        
-        $routeStopTimes = [];
+
+        // Non accumulare tutte le 900k+ righe in un unico array PHP: su feed
+        // reali questo supera facilmente il limite di memoria del processo.
+        $bucketsDir = $this->cacheDir . '/.stop-times-' . getmypid() . '-' . bin2hex(random_bytes(3));
+        if (!mkdir($bucketsDir, 0777, true) && !is_dir($bucketsDir)) {
+            throw new RuntimeException('Impossibile creare la cache temporanea stop_times: ' . $bucketsDir);
+        }
+        $bucketHandles = [];
+        $bucketPaths = [];
+        $routeNames = [];
         $stopRoutes = [];
-        
-        $handle = fopen($file, 'r');
-        $headers = fgetcsv($handle, 0, ",", "\"", "\\");
-        
+
+        $handle = $this->openCsv($file);
+        $headers = $this->readCsvHeaders($handle, $file);
         $count = 0;
-        while (($data = fgetcsv($handle, 0, ",", "\"", "\\")) !== FALSE) {
-            $stopTime = array_combine($headers, $data);
-            $tripId = $stopTime['trip_id'];
-            $stopId = $stopTime['stop_id'];
-            
-            if (!isset($trips[$tripId])) {
-                continue; // Skip if trip not found (shouldn't happen)
+        try {
+            while (($data = fgetcsv($handle, 0, ",", "\"", "\\")) !== FALSE) {
+                if (count($data) !== count($headers)) {
+                    throw new RuntimeException($this->csvRowError($file, ftell($handle), $headers, $data));
+                }
+                $stopTime = array_combine($headers, $data);
+                $tripId = (string) ($stopTime['trip_id'] ?? '');
+                $stopId = (string) ($stopTime['stop_id'] ?? '');
+
+                if (!isset($tripRoutes[$tripId])) {
+                    continue;
+                }
+
+                $routeId = $tripRoutes[$tripId];
+                $safeRouteId = preg_replace('/[^a-zA-Z0-9_-]/', '_', $routeId);
+                if (isset($routeNames[$safeRouteId]) && $routeNames[$safeRouteId] !== $routeId) {
+                    throw new RuntimeException(
+                        "Gli ID route '$routeId' e '{$routeNames[$safeRouteId]}' producono lo stesso file cache '$safeRouteId'."
+                    );
+                }
+                $routeNames[$safeRouteId] = $routeId;
+                if (!isset($bucketHandles[$routeId])) {
+                    $bucketPaths[$routeId] = $bucketsDir . '/route_' . $safeRouteId . '.jsonl';
+                    $bucketHandles[$routeId] = fopen($bucketPaths[$routeId], 'ab');
+                    if (!$bucketHandles[$routeId]) {
+                        throw new RuntimeException('Impossibile aprire il bucket temporaneo: ' . $bucketPaths[$routeId]);
+                    }
+                }
+
+                $bucketRow = json_encode([
+                    $tripId,
+                    $stopId,
+                    (string) ($stopTime['arrival_time'] ?? ''),
+                    (string) ($stopTime['departure_time'] ?? ''),
+                    (int) ($stopTime['stop_sequence'] ?? 0),
+                ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
+                if (fwrite($bucketHandles[$routeId], $bucketRow) !== strlen($bucketRow)) {
+                    throw new RuntimeException('Scrittura bucket stop_times fallita: ' . $bucketPaths[$routeId]);
+                }
+
+                if (!isset($stopRoutes[$stopId])) $stopRoutes[$stopId] = [];
+                if (!in_array($routeId, $stopRoutes[$stopId], true)) $stopRoutes[$stopId][] = $routeId;
+
+                $count++;
+                if ($count % 50000 === 0) {
+                    $this->debug("stop_times letti=$count route=" . count($bucketPaths));
+                }
             }
-            
-            $routeId = $trips[$tripId]['route_id'];
-            
-            // Add to route schedule
-            if (!isset($routeStopTimes[$routeId])) {
-                $routeStopTimes[$routeId] = [];
+
+            fclose($handle);
+            $handle = null;
+            foreach ($bucketHandles as $bucketHandle) fclose($bucketHandle);
+            $bucketHandles = [];
+
+            echo "Saving per-route schedules...\n";
+            foreach ($bucketPaths as $routeId => $bucketPath) {
+                $tripTimes = [];
+                $bucket = fopen($bucketPath, 'rb');
+                if (!$bucket) throw new RuntimeException('Impossibile leggere il bucket stop_times: ' . $bucketPath);
+                while (($line = fgets($bucket)) !== false) {
+                    try {
+                        $row = json_decode(trim($line), true, 512, JSON_THROW_ON_ERROR);
+                    } catch (JsonException $error) {
+                        throw new RuntimeException('JSON non valido nel bucket stop_times: ' . $bucketPath, 0, $error);
+                    }
+                    if (!is_array($row) || count($row) !== 5) {
+                        throw new RuntimeException('Record non valido nel bucket stop_times: ' . $bucketPath);
+                    }
+                    [$tripId, $stopId, $arrivalTime, $departureTime, $stopSequence] = $row;
+                    $tripTimes[$tripId][] = [
+                        'stop_id' => $stopId,
+                        'arrival_time' => $arrivalTime,
+                        'departure_time' => $departureTime,
+                        'stop_sequence' => (int) $stopSequence,
+                    ];
+                }
+                fclose($bucket);
+
+                foreach ($tripTimes as &$times) {
+                    usort($times, fn($a, $b) => $a['stop_sequence'] <=> $b['stop_sequence']);
+                }
+                unset($times);
+
+                $safeRouteId = preg_replace('/[^a-zA-Z0-9_-]/', '_', $routeId);
+                $this->writeJsonCache(
+                    $routesDir . '/route_' . $safeRouteId . '.json',
+                    $tripTimes,
+                    'route_' . $safeRouteId . '.json'
+                );
+                unset($tripTimes);
             }
-            if (!isset($routeStopTimes[$routeId][$tripId])) {
-                $routeStopTimes[$routeId][$tripId] = [];
-            }
-            
-            $routeStopTimes[$routeId][$tripId][] = [
-                'stop_id' => $stopId,
-                'arrival_time' => $stopTime['arrival_time'],
-                'departure_time' => $stopTime['departure_time'],
-                'stop_sequence' => intval($stopTime['stop_sequence'])
-            ];
-            
-            // Add to index
-            if (!isset($stopRoutes[$stopId])) {
-                $stopRoutes[$stopId] = [];
-            }
-            if (!in_array($routeId, $stopRoutes[$stopId])) {
-                $stopRoutes[$stopId][] = $routeId;
-            }
-            
-            $count++;
-            if ($count % 50000 == 0) {
-                echo "Processed $count stop times...\n";
-            }
-        }
-        
-        fclose($handle);
-        
-        echo "Saving per-route schedules...\n";
-        foreach ($routeStopTimes as $routeId => $tripTimes) {
-            // Sort each trip by sequence
-            foreach ($tripTimes as &$times) {
-                usort($times, function($a, $b) {
-                    return $a['stop_sequence'] - $b['stop_sequence'];
-                });
-            }
-            
-            $safeRouteId = preg_replace('/[^a-zA-Z0-9_-]/', '_', $routeId);
-            file_put_contents(
-                $routesDir . '/route_' . $safeRouteId . '.json',
-                json_encode($tripTimes) // Minified for space
+
+            echo "Saving stop-routes index...\n";
+            $this->writeJsonCache(
+                $this->cacheDir . '/stop_routes_index.json',
+                $stopRoutes,
+                'stop_routes_index.json',
+                JSON_PRETTY_PRINT
             );
+            echo "Parsed $count stop times. Created schedules for " . count($bucketPaths) . " routes.\n";
+        } finally {
+            if (is_resource($handle)) fclose($handle);
+            foreach ($bucketHandles as $bucketHandle) {
+                if (is_resource($bucketHandle)) fclose($bucketHandle);
+            }
+            $this->removeDirectory($bucketsDir);
         }
-        
-        echo "Saving stop-routes index...\n";
-        file_put_contents(
-            $this->cacheDir . '/stop_routes_index.json',
-            json_encode($stopRoutes, JSON_PRETTY_PRINT)
-        );
-        
-        echo "Parsed $count stop times. Created schedules for " . count($routeStopTimes) . " routes.\n";
     }
     
     /**
@@ -355,12 +426,12 @@ class GTFSParser {
             foreach ($points as &$point) unset($point['sequence']);
         }
         unset($points, $point);
-        file_put_contents($this->cacheDir . '/shapes.json', json_encode($shapes));
+        $this->writeJsonCache($this->cacheDir . '/shapes.json', $shapes, 'shapes.json');
         $shapesDir = $this->cacheDir . '/shapes';
         if (!is_dir($shapesDir)) mkdir($shapesDir, 0777, true);
         foreach ($shapes as $shapeId => $points) {
             $safeId = preg_replace('/[^a-zA-Z0-9_-]/', '_', (string) $shapeId);
-            file_put_contents($shapesDir . '/shape_' . $safeId . '.json', json_encode($points));
+            $this->writeJsonCache($shapesDir . '/shape_' . $safeId . '.json', $points, 'shape_' . $safeId . '.json');
         }
         return $shapes;
     }
@@ -420,4 +491,73 @@ class GTFSParser {
     }
 
     public function getProfile(): string { return $this->profile; }
+
+    private function openCsv(string $file)
+    {
+        $handle = fopen($file, 'rb');
+        if (!$handle) throw new RuntimeException('Impossibile aprire il CSV GTFS: ' . $file);
+        return $handle;
+    }
+
+    private function readCsvHeaders($handle, string $file): array
+    {
+        $headers = fgetcsv($handle, 0, ',', '"', '\\');
+        if (!is_array($headers) || !$headers) {
+            throw new RuntimeException('Header CSV GTFS non valido: ' . $file);
+        }
+        $headers[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $headers[0]);
+        return $headers;
+    }
+
+    private function csvRowError(string $file, int $offset, array $headers, array $data): string
+    {
+        return sprintf(
+            'Riga CSV GTFS non valida in %s (offset byte %d: attese %d colonne, trovate %d).',
+            $file,
+            $offset,
+            count($headers),
+            count($data)
+        );
+    }
+
+    private function writeJsonCache(string $path, mixed $data, string $label, int $flags = 0): int
+    {
+        try {
+            $json = json_encode($data, $flags | JSON_THROW_ON_ERROR);
+        } catch (JsonException $error) {
+            throw new RuntimeException(
+                "Creazione $label fallita: {$error->getMessage()} (" . $path . ')',
+                0,
+                $error
+            );
+        }
+        $bytes = file_put_contents($path, $json);
+        if ($bytes === false) {
+            $lastError = error_get_last();
+            throw new RuntimeException(
+                "Scrittura $label fallita (" . $path . ')' .
+                ($lastError ? ': ' . $lastError['message'] : '.')
+            );
+        }
+        return $bytes;
+    }
+
+    private function debug(string $message): void
+    {
+        echo sprintf(
+            "[GTFSParser] %s | memory=%s peak=%s limit=%s\n",
+            $message,
+            $this->formatBytes(memory_get_usage(true)),
+            $this->formatBytes(memory_get_peak_usage(true)),
+            (string) ini_get('memory_limit')
+        );
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes < 1024) return $bytes . ' B';
+        if ($bytes < 1048576) return round($bytes / 1024, 1) . ' KB';
+        if ($bytes < 1073741824) return round($bytes / 1048576, 1) . ' MB';
+        return round($bytes / 1073741824, 2) . ' GB';
+    }
 }

@@ -191,6 +191,9 @@ class GtfsUpdateManager
             'feed_url' => null,
             'feed_last_modified' => null,
             'error' => null,
+            'failure' => null,
+            'current_task' => null,
+            'workspace' => null,
             'tasks' => [],
             'stats' => [],
         ], $this->readJson($this->stateFile));
@@ -198,6 +201,13 @@ class GtfsUpdateManager
         if (!$state['running'] && $state['status'] === 'running') {
             $state['status'] = 'failed';
             $state['error'] = $state['error'] ?: 'Il processo non è più attivo.';
+            $state['failure'] ??= [
+                'type' => 'PROCESS_EXITED',
+                'message' => $state['error'],
+                'task' => $state['current_task'] ?? null,
+                'memory' => null,
+                'workspace' => $state['workspace'] ?? null,
+            ];
         }
         return $state;
     }
@@ -338,12 +348,32 @@ class GtfsUpdateManager
             'feed_url' => null,
             'feed_last_modified' => null,
             'error' => null,
+            'failure' => null,
+            'workspace' => $workspace,
             'tasks' => $tasks,
             'stats' => [],
         ];
         $this->writeJson($this->stateFile, $state);
         $pdo = null;
         $staging = [];
+        $shutdownHandled = false;
+        register_shutdown_function(function () use (&$state, &$shutdownHandled, $workspace): void {
+            if ($shutdownHandled) return;
+            $lastError = error_get_last();
+            if (!$lastError || !in_array($lastError['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) return;
+
+            $state['status'] = 'failed';
+            $state['error'] = 'Errore fatale durante l\'aggiornamento GTFS: ' . $lastError['message'];
+            $state['failure'] = $this->failureDetails($state, $lastError);
+            $state['finished_at'] = date(DATE_ATOM);
+            foreach ($state['tasks'] as &$task) {
+                if ($task['status'] === 'running') $task['status'] = 'failed';
+            }
+            unset($task);
+            $state['workspace'] = $workspace;
+            $this->writeState($state);
+            $this->appendDiagnostic('FATAL ' . json_encode($state['failure'], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
+        });
 
         try {
             $feed = $this->selectFeed();
@@ -362,12 +392,16 @@ class GtfsUpdateManager
             $this->setTask($state, 'cache', 'running');
             require_once BASE_PATH . '/app/services/GTFSParser.php';
             $parser = new GTFSParser($extractDir, $cacheDir);
+            $this->setTaskDetail($state, 'cache', 'parseStops()');
             $parser->parseStops();
             $this->advanceTask($state, 'cache');
+            $this->setTaskDetail($state, 'cache', 'parseRoutes()');
             $parser->parseRoutes();
             $this->advanceTask($state, 'cache');
+            $this->setTaskDetail($state, 'cache', 'parseTrips()');
             $parser->parseTrips();
             $this->advanceTask($state, 'cache');
+            $this->setTaskDetail($state, 'cache', 'parseStopTimes() - lettura e suddivisione per route');
             $parser->parseStopTimes();
             $this->setTask($state, 'cache', 'completed', 4);
 
@@ -429,20 +463,24 @@ class GtfsUpdateManager
             $this->writeState($state);
             if ($pdo instanceof PDO) $this->dropStagingTables($pdo, $staging);
             $this->removeTree($workspace);
+            $shutdownHandled = true;
             flock($lock, LOCK_UN);
             fclose($lock);
             return 0;
         } catch (Throwable $e) {
             $state['status'] = 'failed';
             $state['error'] = $e->getMessage();
+            $state['failure'] = $this->failureDetails($state, $e);
             $state['finished_at'] = date(DATE_ATOM);
             foreach ($state['tasks'] as &$task) {
                 if ($task['status'] === 'running') $task['status'] = 'failed';
             }
             unset($task);
+            $this->appendDiagnostic('FAIL ' . json_encode($state['failure'], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
             $this->writeState($state);
             if ($pdo instanceof PDO) $this->dropStagingTables($pdo, $staging);
             $this->removeTree($workspace);
+            $shutdownHandled = true;
             flock($lock, LOCK_UN);
             fclose($lock);
             return 1;
@@ -726,6 +764,12 @@ class GtfsUpdateManager
             if ($task['id'] !== $id) continue;
             $task['status'] = $status;
             if ($current !== null) $task['current'] = $current;
+            if ($status !== 'running') $task['detail'] = null;
+            $state['current_task'] = [
+                'id' => $id,
+                'name' => $task['name'],
+                'detail' => $task['detail'] ?? null,
+            ];
         }
         unset($task);
         $this->writeState($state);
@@ -737,6 +781,22 @@ class GtfsUpdateManager
             if ($task['id'] === $id) $task['current']++;
         }
         unset($task);
+        $this->writeState($state);
+    }
+
+    private function setTaskDetail(array &$state, string $id, string $detail): void
+    {
+        foreach ($state['tasks'] as &$task) {
+            if ($task['id'] !== $id) continue;
+            $task['detail'] = $detail;
+            $state['current_task'] = [
+                'id' => $id,
+                'name' => $task['name'],
+                'detail' => $detail,
+            ];
+        }
+        unset($task);
+        $this->appendDiagnostic("task=$id detail=$detail");
         $this->writeState($state);
     }
 
@@ -773,8 +833,47 @@ class GtfsUpdateManager
     private function writeJson(string $file, array $data): void
     {
         $temp = $file . '.tmp-' . getmypid();
-        file_put_contents($temp, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
-        rename($temp, $file);
+        try {
+            $json = json_encode(
+                $data,
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR
+            );
+        } catch (JsonException $error) {
+            throw new RuntimeException('Scrittura stato GTFS fallita: ' . $error->getMessage(), 0, $error);
+        }
+        if (file_put_contents($temp, $json, LOCK_EX) === false || !rename($temp, $file)) {
+            @unlink($temp);
+            throw new RuntimeException('Impossibile scrivere lo stato GTFS: ' . $file);
+        }
+    }
+
+    private function failureDetails(array $state, Throwable|array $error): array
+    {
+        $isThrowable = $error instanceof Throwable;
+        $current = $state['current_task'] ?? null;
+        return [
+            'type' => $isThrowable ? get_class($error) : 'PHP_FATAL',
+            'message' => $isThrowable ? $error->getMessage() : (string) ($error['message'] ?? 'Errore PHP sconosciuto'),
+            'file' => $isThrowable ? $error->getFile() : ($error['file'] ?? null),
+            'line' => $isThrowable ? $error->getLine() : ($error['line'] ?? null),
+            'task' => $current,
+            'memory' => [
+                'current_bytes' => memory_get_usage(true),
+                'peak_bytes' => memory_get_peak_usage(true),
+                'limit' => ini_get('memory_limit'),
+            ],
+            'workspace' => $state['workspace'] ?? null,
+            'trace' => $isThrowable ? array_slice($error->getTrace(), 0, 8) : null,
+        ];
+    }
+
+    private function appendDiagnostic(string $message): void
+    {
+        @file_put_contents(
+            $this->logFile,
+            '[' . date(DATE_ATOM) . '] ' . $message . PHP_EOL,
+            FILE_APPEND | LOCK_EX
+        );
     }
 
     private function removeTree(string $path): void

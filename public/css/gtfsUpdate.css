@@ -111,6 +111,13 @@
     margin-bottom: 6px;
 }
 
+.gtfs-task-detail {
+    margin: -2px 0 6px;
+    color: var(--text-secondary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.78rem;
+}
+
 .gtfs-progress {
     height: 10px;
     overflow: hidden;
