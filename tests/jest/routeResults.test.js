@@ -94,7 +94,8 @@ describe('getLineBadgeDetails', () => {
 
     test('linea Cammina ritorna icona pedone', () => {
         const result = getLineBadgeDetails('Cammina');
-        expect(result.name).toBe('🚶');
+        expect(result.name).toContain('<svg');
+        expect(result.name).toContain('walking-icon');
         expect(result.class).toBe('badge-walking');
     });
 
@@ -195,9 +196,9 @@ describe('getWalkingMinutes', () => {
 describe('findBestValues', () => {
     test('trova i valori migliori tra percorsi', () => {
         const routes = [
-            { duration: 30, stops_count: 8, legs: [{ type: 'transit', stops_count: 8 }] },
-            { duration: 25, stops_count: 5, legs: [{ type: 'walking', duration: 3 }, { type: 'transit', stops_count: 5 }] },
-            { duration: 35, stops_count: 10, legs: [{ type: 'transit', stops_count: 4 }, { type: 'transit', stops_count: 6 }] }
+            { duration: 30, stops_count: 8, legs: [{ type: 'transit', departure_time: '08:00:00', arrival_time: '08:30:00', stops_count: 8 }] },
+            { duration: 25, stops_count: 5, legs: [{ type: 'walking', duration: 3 }, { type: 'transit', departure_time: '08:05:00', arrival_time: '08:30:00', stops_count: 5 }] },
+            { duration: 35, stops_count: 10, legs: [{ type: 'transit', departure_time: '08:00:00', arrival_time: '08:15:00', stops_count: 4 }, { type: 'transit', departure_time: '08:20:00', arrival_time: '08:35:00', stops_count: 6 }] }
         ];
         const best = findBestValues(routes);
         expect(best.duration).toBe(25);

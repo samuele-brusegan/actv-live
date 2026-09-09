@@ -6,7 +6,13 @@
 // Usiamo history.pushState per cambiare l'URL in jsdom
 window.history.pushState({}, 'Test', '?tripId=123');
 
-const { formatMinutesRemaining, mergeStops, normalizeStopName, state } = require('../../public/js/tripDetails');
+const {
+    formatMinutesRemaining,
+    mergeStops,
+    normalizeStopName,
+    selectMatchingTripTimingPoints,
+    state
+} = require('../../public/js/tripDetails');
 
 describe('formatMinutesRemaining', () => {
     test('ritorna la stringa originale se non contiene ":"', () => {
@@ -141,5 +147,31 @@ describe('mergeStops', () => {
 describe('normalizeStopName', () => {
     test('normalizza accenti e punteggiatura', () => {
         expect(normalizeStopName('  Università—Ca’ Foscari ')).toBe('universita ca foscari');
+    });
+});
+
+describe('selectMatchingTripTimingPoints', () => {
+    test('usa soltanto la corsa con trip ID esatto', () => {
+        const wrongTrip = [{ stop: 'Fermata sbagliata', time: '21:15' }];
+        const exactTrip = [{ stop: 'Fermata corretta', time: '21:16' }];
+
+        expect(selectMatchingTripTimingPoints([
+            { calculatedTripId: 'AUT_ACTV_99_11111', timingPoints: wrongTrip },
+            { calculatedTripId: 'AUT_ACTV_99_57155', timingPoints: exactTrip }
+        ], 'AUT_ACTV_99_57155')).toBe(exactTrip);
+    });
+
+    test('non usa il primo candidato quando l ID non coincide', () => {
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const candidate = [{ stop: 'Fermata di un altra corsa', time: '21:15' }];
+
+        expect(selectMatchingTripTimingPoints([
+            { calculatedTripId: 'AUT_ACTV_99_11111', line: '5E_EN', timingPoints: candidate }
+        ], 'AUT_ACTV_99_57155')).toEqual([]);
+        expect(warn).toHaveBeenCalledWith('No matching trip found for tripId', expect.objectContaining({
+            requestedTripId: 'AUT_ACTV_99_57155'
+        }));
+
+        warn.mockRestore();
     });
 });

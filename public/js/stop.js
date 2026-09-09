@@ -881,9 +881,13 @@ async function init() {
         return;
     }
 
-    // Imposta info intestazione
-    document.getElementById('station-name').innerText = stationName || `Fermata ${stationId}`;
-    document.getElementById('station-id').innerText = stationId;
+    // Imposta info intestazione. Alcuni consumer/test caricano il modulo senza
+    // il markup completo della pagina: l'assenza di un elemento non deve
+    // interrompere il caricamento delle funzioni della fermata.
+    const stationNameEl = document.getElementById('station-name');
+    const stationIdEl = document.getElementById('station-id');
+    if (stationNameEl) stationNameEl.innerText = stationName || `Fermata ${stationId}`;
+    if (stationIdEl) stationIdEl.innerText = stationId;
 
     updateFavoriteButton();
     updateNotifyButton();

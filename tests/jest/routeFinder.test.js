@@ -66,23 +66,25 @@ describe('swapStations', () => {
 });
 
 describe('searchRoutes', () => {
-    test('mostra alert se origin è mancante', () => {
+    test('mostra dialog se origin è mancante', () => {
         searchState.origin = null;
         searchState.destination = { id: '200', name: 'Stop B' };
 
-        const alertMock = jest.spyOn(window, 'alert').mockImplementation(() => { });
+        const alertMock = jest.fn();
+        window.actvAlert = alertMock;
         searchRoutes();
-        expect(alertMock).toHaveBeenCalledWith('Inserisci sia la partenza che la destinazione.');
-        alertMock.mockRestore();
+        expect(alertMock).toHaveBeenCalledWith('Inserisci sia la partenza che la destinazione.', 'Percorso incompleto');
+        delete window.actvAlert;
     });
 
-    test('mostra alert se destination è mancante', () => {
+    test('mostra dialog se destination è mancante', () => {
         searchState.origin = { id: '100', name: 'Stop A' };
         searchState.destination = null;
 
-        const alertMock = jest.spyOn(window, 'alert').mockImplementation(() => { });
+        const alertMock = jest.fn();
+        window.actvAlert = alertMock;
         searchRoutes();
-        expect(alertMock).toHaveBeenCalledWith('Inserisci sia la partenza che la destinazione.');
-        alertMock.mockRestore();
+        expect(alertMock).toHaveBeenCalledWith('Inserisci sia la partenza che la destinazione.', 'Percorso incompleto');
+        delete window.actvAlert;
     });
 });

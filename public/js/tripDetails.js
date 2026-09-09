@@ -268,6 +268,23 @@ async function refreshData() {
 
         state.mergedStops = mergeStops();
 
+        const unmatchedRealtimeStops = state.mergedStops
+            .filter(stop => stop.hasRealTime && !stop.hasGTFS)
+            .map(stop => ({ stop: stop.stop, time: stop.arrival_time }));
+        if (unmatchedRealtimeStops.length) {
+            console.warn('Realtime stops without GTFS match', {
+                tripId: state.tripId,
+                line: state.line,
+                destination: state.destination,
+                currentStopId: state.currentStopId,
+                gtfsStopCount: state.stopsGTFS.length,
+                realtimeStopCount: state.stopsJSON.length,
+                gtfsLastStop: state.stopsGTFS[state.stopsGTFS.length - 1]?.stop_name ?? null,
+                realtimeLastStop: state.stopsJSON[state.stopsJSON.length - 1]?.stop ?? null,
+                stops: unmatchedRealtimeStops
+            });
+        }
+
         // Try to get real time for previous stops
         getPreviousStopsRealTime();
 
@@ -341,26 +358,23 @@ async function fetchRealTimeInfo(currentStopId, line, today) {
             return tripLine === line;
         });
         const matchPromises = plausibleTrips.map(async trip => {
-            const stop = trip.timingPoints[trip.timingPoints.length - 1];
+            const timingPoints = Array.isArray(trip.timingPoints) ? trip.timingPoints : [];
+            const stop = timingPoints[timingPoints.length - 1];
+            if (!stop) return { ...trip, calculatedTripId: null };
+
             const tid = await fetchTripId(
                 trip.line.split('_')[0],
                 trip.destination,
                 today,
                 stop.time,
                 stop.stop,
-                trip.lineId,
-                currentStopId // Pass data_url as stopId
+                trip.lineId
             );
             return { ...trip, calculatedTripId: tid };
         });
 
         const results = await Promise.all(matchPromises);
-        const interestingTrip = results.find(t => t.calculatedTripId == state.tripId);
-        if (interestingTrip) return interestingTrip.timingPoints;
-
-        console.warn("No matching trip found for tripId Using loose matching", state.tripId);
-
-        return results[0] ? results[0].timingPoints : [];
+        return selectMatchingTripTimingPoints(results, state.tripId);
 
     } catch (e) {
         console.error("fetchRealTimeInfo:", e);
@@ -503,6 +517,34 @@ async function loadTripMap() {
     } catch (error) {
         if (status) status.textContent = error.message;
     }
+}
+
+/**
+ * Seleziona i passaggi realtime solo quando l'identificazione GTFS è esatta.
+ *
+ * Il vecchio fallback restituiva results[0] quando nessun ID coincideva. In
+ * questo modo una corsa plausibile, ma diversa, veniva fusa con il GTFS della
+ * corsa richiesta e produceva fermate "senza GTFS". Un dato realtime assente è
+ * preferibile a una timeline attribuita alla corsa sbagliata.
+ */
+function selectMatchingTripTimingPoints(results, requestedTripId) {
+    const requested = String(requestedTripId ?? '');
+    const exact = results.find(trip => String(trip.calculatedTripId ?? '') === requested);
+    if (exact) return Array.isArray(exact.timingPoints) ? exact.timingPoints : [];
+
+    console.warn('No matching trip found for tripId', {
+        requestedTripId,
+        candidates: results.map(trip => ({
+            tripId: trip.calculatedTripId ?? null,
+            line: trip.line ?? null,
+            destination: trip.destination ?? null,
+            timingPoints: Array.isArray(trip.timingPoints) ? trip.timingPoints.length : 0,
+            lastStop: Array.isArray(trip.timingPoints) && trip.timingPoints.length
+                ? trip.timingPoints[trip.timingPoints.length - 1].stop
+                : null
+        }))
+    });
+    return [];
 }
 
 async function refreshTripVehicle() {
@@ -824,8 +866,6 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl = null) {
     }
 
     if (!stop.hasGTFS) {
-        console.warn("Stop without GTFS:", stop);
-        console.error("Ergo: tripID sbagliato", state);
         return;
     }
 
@@ -862,5 +902,11 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl = null) {
 
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { formatMinutesRemaining, mergeStops, normalizeStopName, state };
+    module.exports = {
+        formatMinutesRemaining,
+        mergeStops,
+        normalizeStopName,
+        selectMatchingTripTimingPoints,
+        state
+    };
 }
