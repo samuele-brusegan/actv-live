@@ -31,6 +31,14 @@ let tripMap = null;
 let tripMapVehicleMarker = null;
 let tripMapRefreshTimer = null;
 let tripMapShape = null;
+let tripMapGeometry = [];
+let tripMapRemainingRoute = null;
+let tripMapCompletedRoute = null;
+let tripMapStopMarkers = new Map();
+let tripMapUserMarker = null;
+let tripMapUserAccuracy = null;
+let tripMapGeoWatchId = null;
+let tripMapSelectedStopId = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -449,6 +457,7 @@ async function openMap() {
         }).addTo(tripMap);
         await loadTripMap();
     }
+    startTripMapUserLocation();
     setTimeout(() => tripMap.invalidateSize(), 0);
     await refreshTripVehicle();
     clearInterval(tripMapRefreshTimer);
@@ -461,6 +470,10 @@ function closeMap() {
     document.body.classList.remove('trip-map-open');
     clearInterval(tripMapRefreshTimer);
     tripMapRefreshTimer = null;
+    if (tripMapGeoWatchId !== null && navigator.geolocation?.clearWatch) {
+        navigator.geolocation.clearWatch(tripMapGeoWatchId);
+        tripMapGeoWatchId = null;
+    }
 }
 
 document.addEventListener('keydown', event => {
@@ -479,27 +492,78 @@ function mapStopTime(stop) {
     return String(stop.arrival_time || stop.departure_time || '').substring(0, 5) || '--:--';
 }
 
+function escapeMapHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char]));
+}
+
+function mapStopId(stop) {
+    return String(stop?.stop_id ?? stop?.id ?? '');
+}
+
+function findMergedMapStop(stop) {
+    const id = mapStopId(stop);
+    return state.mergedStops.find(item => String(item.stop_id) === id)
+        || state.mergedStops.find(item => normalizeStopName(item.stop_name) === normalizeStopName(stop?.name || stop?.stop_name));
+}
+
+function mapStopPassageLabel(stop) {
+    const merged = findMergedMapStop(stop);
+    const time = String(merged?.arrival_time || merged?.departure_time || stop?.arrival_time || stop?.departure_time || '');
+    if (time === 'departure') return 'Il bus è in partenza';
+    if (!time.includes(':')) return 'Orario non disponibile';
+    const remaining = formatMinutesRemaining(time);
+    return merged?.hasRealTime ? `Passaggio realtime: tra ${remaining}` : `Passaggio previsto: tra ${remaining}`;
+}
+
+function createMapStopPopup(stop, index) {
+    const name = stop?.name || stop?.stop_name || 'Fermata';
+    return `<strong>${index + 1}. ${escapeMapHtml(name)}</strong><br><span>${escapeMapHtml(mapStopPassageLabel(stop))}</span>`;
+}
+
+function isSelectedMapStop(stop) {
+    return tripMapSelectedStopId !== null && mapStopId(stop) === String(tripMapSelectedStopId);
+}
+
 function renderMapStops(stops) {
     const list = document.getElementById('trip-map-stops-list');
     if (!list) return;
     const selectedIds = String(state.currentStopId || '').split('-');
     list.innerHTML = stops.map((stop, index) => {
         const id = String(stop.stop_id || stop.id || '');
-        const current = selectedIds.includes(id) ? ' current' : '';
-        const name = String(stop.name || stop.stop_name || '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-        return `<div class="trip-map-stop${current}"><span class="trip-map-stop-marker"></span><span class="trip-map-stop-name">${name}</span><time>${mapStopTime(stop)}</time></div>`;
+        const current = selectedIds.includes(id) || isSelectedMapStop(stop) ? ' current' : '';
+        const name = escapeMapHtml(stop.name || stop.stop_name || '');
+        return `<div class="trip-map-stop${current}" data-stop-index="${index}" role="button" tabindex="0"><span class="trip-map-stop-marker"></span><span class="trip-map-stop-name">${name}</span><time>${escapeMapHtml(mapStopPassageLabel(stop))}</time></div>`;
     }).join('');
+
+    list.querySelectorAll('.trip-map-stop').forEach(item => {
+        const index = Number(item.dataset.stopIndex);
+        const marker = tripMapStopMarkers.get(index);
+        if (!marker) return;
+        const open = () => marker.openPopup();
+        item.addEventListener('click', open);
+        item.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                open();
+            }
+        });
+    });
 }
 
 async function loadTripMap() {
     const status = document.getElementById('trip-map-status');
     try {
-        const params = new URLSearchParams({ tripId: state.tripId, service: 'automobilistico', cache: '1' });
+        // Prima chiediamo la geometria DB: per una corsa filtrata contiene la
+        // shape_refined snapped alla strada. La cache JSON resta il fallback
+        // per installazioni senza DB o durante un aggiornamento.
+        const params = new URLSearchParams({ tripId: state.tripId, service: 'automobilistico' });
         let response = await fetch(`/api/lines-shapes?${params.toString()}`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         let shapes = await response.json();
         if (!Array.isArray(shapes) || !shapes.length) {
-            params.delete('cache');
+            params.set('cache', '1');
             response = await fetch(`/api/lines-shapes?${params.toString()}`, { cache: 'no-store' });
             shapes = response.ok ? await response.json() : [];
         }
@@ -508,19 +572,34 @@ async function loadTripMap() {
         const geometry = Array.isArray(tripMapShape.shape) && tripMapShape.shape.length > 1 ? tripMapShape.shape : tripMapShape.path;
         const points = (geometry || []).map(point => [Number(point.lat), Number(point.lng)]).filter(point => point.every(Number.isFinite));
         if (points.length < 2) throw new Error('Traccia non disponibile');
-        const route = L.polyline(points, { color: '#087f5b', weight: 7, opacity: 0.9 }).addTo(tripMap);
-        tripMap.fitBounds(route.getBounds(), {
+        tripMapGeometry = points;
+        tripMapRemainingRoute = L.polyline(points, { color: '#087f5b', weight: 7, opacity: 0.9 }).addTo(tripMap);
+        tripMapCompletedRoute = null;
+        tripMap.fitBounds(tripMapRemainingRoute.getBounds(), {
             paddingTopLeft: [40, 125],
             paddingBottomRight: [40, 220]
         });
         const stops = Array.isArray(tripMapShape.path) ? tripMapShape.path : state.stopsGTFS;
-        renderMapStops(stops || []);
+        const selectedStop = state.stopsGTFS.find(stop =>
+            String(state.currentStopId || '').split('-').includes(String(stop.stop_id))
+        );
+        tripMapSelectedStopId = selectedStop?.stop_id ?? null;
+        tripMapStopMarkers.clear();
         (stops || []).forEach((stop, index) => {
             const lat = Number(stop.lat ?? stop.stop_lat), lng = Number(stop.lng ?? stop.stop_lon);
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-            L.circleMarker([lat, lng], { radius: index === 0 || index === stops.length - 1 ? 6 : 4, color: '#087f5b', weight: 2, fillColor: '#fff', fillOpacity: 1 })
-                .addTo(tripMap).bindPopup(`<strong>${index + 1}. ${String(stop.name || stop.stop_name || '')}</strong><br>${mapStopTime(stop)}`);
+            const selected = isSelectedMapStop(stop);
+            const marker = L.circleMarker([lat, lng], {
+                radius: selected ? 9 : (index === 0 || index === stops.length - 1 ? 6 : 4),
+                color: selected ? '#075bbb' : '#087f5b',
+                weight: selected ? 4 : 2,
+                fillColor: selected ? '#60a5fa' : '#fff',
+                fillOpacity: 1
+            }).addTo(tripMap).bindPopup(createMapStopPopup(stop, index));
+            marker.on('click', () => marker.setPopupContent(createMapStopPopup(stop, index)));
+            tripMapStopMarkers.set(index, marker);
         });
+        renderMapStops(stops || []);
         if (status) status.textContent = 'Ricerca posizione del mezzo...';
     } catch (error) {
         if (status) status.textContent = error.message;
@@ -580,6 +659,90 @@ function selectMatchingTripTimingPoints(results, requestedTripId, context = null
     return [];
 }
 
+function busMarkerSvg() {
+    return `<svg class="trip-map-bus-svg" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <path d="M12 7h24c4.4 0 8 3.6 8 8v18a4 4 0 0 1-4 4h-2v4h-5v-4H15v4h-5v-4H8a4 4 0 0 1-4-4V15c0-4.4 3.6-8 8-8Z"/>
+        <path class="trip-map-bus-window" d="M9 14h30v11H9z"/>
+        <circle cx="14" cy="32" r="3"/><circle cx="34" cy="32" r="3"/>
+        <path class="trip-map-bus-light" d="M7 18h3M38 18h3"/>
+    </svg>`;
+}
+
+function projectMapPointToSegment(point, start, end) {
+    const scaleX = 111320 * Math.cos((point[0] * Math.PI) / 180);
+    const scaleY = 111320;
+    const ax = start[1] * scaleX, ay = start[0] * scaleY;
+    const bx = end[1] * scaleX, by = end[0] * scaleY;
+    const px = point[1] * scaleX, py = point[0] * scaleY;
+    const dx = bx - ax, dy = by - ay;
+    const lengthSquared = dx * dx + dy * dy;
+    const ratio = lengthSquared ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSquared)) : 0;
+    const projected = [start[0] + (end[0] - start[0]) * ratio, start[1] + (end[1] - start[1]) * ratio];
+    return {
+        ratio,
+        point: projected,
+        distanceSquared: ((projected[0] - point[0]) * scaleY) ** 2 + ((projected[1] - point[1]) * scaleX) ** 2
+    };
+}
+
+function findMapProgress(position) {
+    if (!tripMapGeometry.length || !position) return null;
+    const point = [Number(position.lat), Number(position.lng)];
+    if (!point.every(Number.isFinite)) return null;
+    let best = null;
+    for (let index = 0; index < tripMapGeometry.length - 1; index++) {
+        const candidate = projectMapPointToSegment(point, tripMapGeometry[index], tripMapGeometry[index + 1]);
+        if (!best || candidate.distanceSquared < best.distanceSquared) best = { ...candidate, index };
+    }
+    return best;
+}
+
+function updateTripMapProgress(position) {
+    const progress = findMapProgress(position);
+    if (!progress || !tripMap) return;
+    const passed = tripMapGeometry.slice(0, progress.index + 1);
+    passed.push(progress.point);
+    const remaining = [progress.point, ...tripMapGeometry.slice(progress.index + 1)];
+
+    if (tripMapCompletedRoute) tripMapCompletedRoute.setLatLngs(passed);
+    else tripMapCompletedRoute = L.polyline(passed, { color: '#8b949e', weight: 7, opacity: 0.95 }).addTo(tripMap);
+    if (tripMapRemainingRoute) tripMapRemainingRoute.setLatLngs(remaining);
+}
+
+function startTripMapUserLocation() {
+    if (!tripMap || typeof navigator === 'undefined' || !navigator.geolocation || tripMapGeoWatchId !== null) return;
+
+    const update = position => {
+        const lat = Number(position.coords.latitude), lng = Number(position.coords.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        if (!tripMapUserMarker) {
+            tripMapUserMarker = L.circleMarker([lat, lng], {
+                radius: 8, color: '#fff', weight: 3, fillColor: '#1769e0', fillOpacity: 1, pane: 'markerPane'
+            }).addTo(tripMap).bindPopup('La tua posizione');
+        } else {
+            tripMapUserMarker.setLatLng([lat, lng]);
+        }
+        const accuracy = Number(position.coords.accuracy);
+        if (Number.isFinite(accuracy) && typeof L.circle === 'function') {
+            if (!tripMapUserAccuracy) {
+                tripMapUserAccuracy = L.circle([lat, lng], {
+                    radius: accuracy, color: '#1769e0', weight: 1, fillColor: '#1769e0', fillOpacity: 0.12, interactive: false
+                }).addTo(tripMap);
+            } else {
+                tripMapUserAccuracy.setLatLng([lat, lng]).setRadius(accuracy);
+            }
+        }
+    };
+    const fail = error => console.info('Posizione utente non disponibile sulla mappa', error?.message || error);
+    if (typeof navigator.geolocation.watchPosition === 'function') {
+        tripMapGeoWatchId = navigator.geolocation.watchPosition(update, fail, {
+            enableHighAccuracy: true, maximumAge: 15000, timeout: 10000
+        });
+    } else {
+        navigator.geolocation.getCurrentPosition(update, fail, { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 });
+    }
+}
+
 async function refreshTripVehicle() {
     if (!tripMap || !state.tripId) return;
     const status = document.getElementById('trip-map-status');
@@ -615,8 +778,9 @@ async function refreshTripVehicle() {
             if (status) status.innerHTML = '<span class="trip-map-live-dot offline"></span>Nessun mezzo attivo rilevato su questa corsa';
             return;
         }
+        updateTripMapProgress({ lat, lng });
         if (!tripMapVehicleMarker) {
-            const icon = L.divIcon({ className: 'trip-map-bus-icon', html: '🚌', iconSize: [38, 38], iconAnchor: [19, 19] });
+            const icon = L.divIcon({ className: 'trip-map-bus-icon', html: busMarkerSvg(), iconSize: [42, 42], iconAnchor: [21, 21] });
             tripMapVehicleMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(tripMap).bindPopup(`<strong>Linea ${state.line || ''}</strong><br>Posizione rilevata in tempo reale`);
         } else {
             tripMapVehicleMarker.setLatLng([lat, lng]);
