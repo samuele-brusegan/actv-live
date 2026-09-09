@@ -20,7 +20,8 @@ let state = {
     today: null,         // Giorno della settimana (es. "monday")
     stopsGTFS: [],       // Lista fermate da GTFS (statico)
     stopsJSON: [],       // Lista fermate da Real-Time
-    mergedStops: []      // Lista fermate merge
+    mergedStops: [],     // Lista fermate merge
+    tripContext: null    // Contesto originale usato per identificare la corsa
 };
 let firstIteration = {
     refresh: true,
@@ -53,13 +54,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function init() {
     const dow = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
     state.today = dow[new Date().getDay()];
+    const urlParams = new URLSearchParams(window.location.search);
 
     // Recupero info contestuali dalla sessione (usati per identificare univocamente la corsa)
-    const trackName = sessionStorage.getItem('busTrack');
-    const lastStop = sessionStorage.getItem('lastStop');
-    const timedStop = sessionStorage.getItem('timedStop');
-    const realTime = sessionStorage.getItem('realTime');
-    const lineId = sessionStorage.getItem('lineId');
+    const contextValue = (urlKey, storageKey) =>
+        urlParams.get(urlKey) || sessionStorage.getItem(storageKey) || null;
+    const trackName = contextValue('contextLine', 'busTrack');
+    const lastStop = contextValue('contextDestination', 'lastStop');
+    const timedStop = contextValue('contextStop', 'timedStop');
+    const realTime = contextValue('contextTime', 'realTime');
+    const lineId = contextValue('contextLineId', 'lineId');
+    state.tripContext = { stop: timedStop, time: realTime, destination: lastStop, lineId };
 
     let initUnpackTripId = async () => {
 
@@ -85,8 +90,8 @@ async function init() {
     await Promise.all([initUnpackTripId(), initStopsGTFS()]);
 
     let initStopsJSON = async () => {
-        state.currentStopId = sessionStorage.getItem('tripDetails_selectedStop');
-        state.stopsJSON = await fetchRealTimeInfo(state.currentStopId, state.line, state.today);
+        state.currentStopId = urlParams.get('stopId') || sessionStorage.getItem('tripDetails_selectedStop');
+        state.stopsJSON = await fetchRealTimeInfo(state.currentStopId, state.line, state.today, state.tripContext);
 
 
         let loadingBox = document.querySelector('.loading-state');
@@ -98,7 +103,7 @@ async function init() {
     firstIteration.refresh = false;
 
     //set stopId from url
-    state.currentStopId = sessionStorage.getItem('tripDetails_selectedStop');
+    state.currentStopId = urlParams.get('stopId') || sessionStorage.getItem('tripDetails_selectedStop');
 
     // Destination e last stop non matchano lancio un warn in console
     if (state.destination != lastStop) {
@@ -343,7 +348,7 @@ async function fetchGTFSStops(tripId) {
 }
 
 /** Recupera informazioni real-time per la fermata selezionata */
-async function fetchRealTimeInfo(currentStopId, line, today) {
+async function fetchRealTimeInfo(currentStopId, line, today, context = null) {
     try {
         let url = `https://oraritemporeale.actv.it/aut/backend/passages/${currentStopId}-web-aut`;
         const response = await fetch(url, {
@@ -374,7 +379,10 @@ async function fetchRealTimeInfo(currentStopId, line, today) {
         });
 
         const results = await Promise.all(matchPromises);
-        return selectMatchingTripTimingPoints(results, state.tripId);
+        return selectMatchingTripTimingPoints(results, state.tripId, {
+            ...context,
+            expectedDestination: state.destination
+        });
 
     } catch (e) {
         console.error("fetchRealTimeInfo:", e);
@@ -527,13 +535,38 @@ async function loadTripMap() {
  * corsa richiesta e produceva fermate "senza GTFS". Un dato realtime assente è
  * preferibile a una timeline attribuita alla corsa sbagliata.
  */
-function selectMatchingTripTimingPoints(results, requestedTripId) {
+function selectMatchingTripTimingPoints(results, requestedTripId, context = null) {
     const requested = String(requestedTripId ?? '');
     const exact = results.find(trip => String(trip.calculatedTripId ?? '') === requested);
     if (exact) return Array.isArray(exact.timingPoints) ? exact.timingPoints : [];
 
+    const contextStop = normalizeStopName(context?.stop);
+    const contextTime = String(context?.time ?? '').slice(0, 5);
+    const expectedDestination = normalizeStopName(context?.expectedDestination);
+    if (contextStop && contextTime) {
+        const contextMatches = results.filter(trip => {
+            const destinationMatches = !expectedDestination
+                || normalizeStopName(trip.destination) === expectedDestination;
+            return destinationMatches && Array.isArray(trip.timingPoints)
+                && trip.timingPoints.some(point =>
+                    normalizeStopName(point.stop) === contextStop
+                    && String(point.time ?? '').slice(0, 5) === contextTime
+                );
+        });
+        if (contextMatches.length === 1) {
+            console.info('Realtime trip selected from original context', {
+                requestedTripId,
+                matchedDestination: contextMatches[0].destination,
+                contextStop: context.stop,
+                contextTime: context.time
+            });
+            return contextMatches[0].timingPoints;
+        }
+    }
+
     console.warn('No matching trip found for tripId', {
         requestedTripId,
+        context,
         candidates: results.map(trip => ({
             tripId: trip.calculatedTripId ?? null,
             line: trip.line ?? null,

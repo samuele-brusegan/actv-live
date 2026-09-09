@@ -161,6 +161,28 @@ describe('selectMatchingTripTimingPoints', () => {
         ], 'AUT_ACTV_99_57155')).toBe(exactTrip);
     });
 
+    test('usa il contesto originale quando il resolver restituisce un ID diverso', () => {
+        const contextTrip = [{ stop: 'IST.GRITTI', time: '21:29' }];
+        const otherTrip = [{ stop: 'IST.GRITTI', time: '21:30' }];
+
+        expect(selectMatchingTripTimingPoints([
+            {
+                calculatedTripId: 'AUT_ACTV_99_other',
+                destination: 'MESTRE CENTRO B3',
+                timingPoints: contextTrip
+            },
+            {
+                calculatedTripId: 'AUT_ACTV_99_11111',
+                destination: 'MESTRE CENTRO B3',
+                timingPoints: otherTrip
+            }
+        ], 'AUT_ACTV_99_57155', {
+            stop: 'IST.GRITTI',
+            time: '21:29',
+            expectedDestination: 'MESTRE CENTRO B3'
+        })).toBe(contextTrip);
+    });
+
     test('non usa il primo candidato quando l ID non coincide', () => {
         const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
         const candidate = [{ stop: 'Fermata di un altra corsa', time: '21:15' }];

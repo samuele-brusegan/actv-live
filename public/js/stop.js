@@ -596,11 +596,12 @@ function createPassageCard(p) {
         const tripId = await fetchTripId(lineName, destination, day, timingPoint.time, timingPoint.stop, lineId);
 
         const params = new URLSearchParams({
-            /* line: `${lineName}_${lineTag}`,
-            dest: destination,
+            tripId: tripId,
             stopId: stationId,
-            time: timeStr */
-            tripId: tripId
+            contextStop: timingPoint.stop,
+            contextTime: timingPoint.time,
+            contextDestination: destination,
+            contextLineId: lineId
         });
 
         window.location.href = `/trip-details?${params.toString()}`;
