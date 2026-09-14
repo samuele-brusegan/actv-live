@@ -95,6 +95,12 @@
     z-index: 100;
 }
 
+@media (max-width: 759px) {
+    .map-fab {
+        bottom: calc(84px + env(safe-area-inset-bottom));
+    }
+}
+
 .loading-state {
     padding: 40px;
 }
