@@ -21,6 +21,7 @@ $router->add('/widget'                  , 'Controller', 'widget');
 $router->add('/delay-stats'             , 'Controller', 'delayStats');
 $router->add('/routes'                  , 'Controller', 'routes');
 $router->add('/line-schedule'           , 'Controller', 'lineSchedule');
+$router->add('/trip-finder'             , 'Controller', 'tripFinder');
 $router->add('/delete-cookie'           , 'Controller', 'deleteCookie');
 $router->add('/feedback'                , 'Controller', 'feedback');
 
@@ -49,6 +50,7 @@ $router->add('/api/log-js-error'        , 'ApiController', 'logJsError');
 $router->add('/api/line-variants'       , 'ApiController', 'lineVariants');
 $router->add('/api/line-catalog'        , 'ApiController', 'lineCatalog');
 $router->add('/api/line-schedule'       , 'ApiController', 'lineSchedule');
+$router->add('/api/line-trips'          , 'ApiController', 'lineTrips');
 $router->add('/api/stop-upcoming'       , 'ApiController', 'stopUpcoming');
 $router->add('/api/delete-cookie'       , 'ApiController', 'deleteCookie');
 $router->add('/api/feedback'            , 'ApiController', 'feedback');

@@ -95,6 +95,9 @@
                 <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/line-schedule'">
                     Orari delle linee
                 </button>
+                <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/trip-finder'">
+                    Cerca una corsa
+                </button>
                 <a class="btn rounded-pill px-4 py-2 home-action-btn feedback-home-btn" href="/feedback">
                     ✎ Invia feedback
                 </a>

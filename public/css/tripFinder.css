@@ -1,0 +1,239 @@
+.trip-finder-content {
+    width: min(100% - 32px, 720px);
+    margin: -18px auto 0;
+    padding: 24px 0 32px;
+    position: relative;
+    z-index: 4;
+}
+
+.finder-card {
+    margin-bottom: 16px;
+    padding: clamp(18px, 4vw, 28px);
+    border: 1px solid var(--actv-border);
+    border-radius: var(--actv-radius);
+    background: var(--actv-surface);
+    box-shadow: var(--actv-shadow);
+}
+
+.finder-card-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.finder-card h2 {
+    margin: 3px 0 0;
+    color: var(--actv-ink);
+    font-size: clamp(20px, 4vw, 26px);
+    letter-spacing: -.025em;
+}
+
+.eyebrow {
+    margin: 0;
+    color: var(--actv-muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.trip-count {
+    flex: 0 0 auto;
+    padding: 6px 9px;
+    border-radius: 999px;
+    background: var(--actv-surface-2);
+    color: var(--actv-muted);
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.finder-field label {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--actv-ink);
+    font-weight: 750;
+}
+
+.finder-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(150px, .75fr);
+    gap: 16px;
+}
+
+.finder-grid .finder-field + .finder-field { margin-top: 0; }
+.finder-field + .finder-field { margin-top: 18px; }
+.finder-field .form-select { width: 100%; }
+.finder-field .form-select:disabled { opacity: .62; cursor: not-allowed; }
+
+.field-help {
+    display: block;
+    margin-top: 7px;
+    color: var(--actv-muted);
+    font-size: 13px;
+}
+
+.direction-arrow {
+    width: 34px;
+    height: 34px;
+    margin: 12px auto -1px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--actv-border);
+    border-radius: 50%;
+    color: var(--actv-blue);
+    font-weight: 800;
+}
+
+.finder-status {
+    min-height: 22px;
+    margin-top: 17px;
+    color: var(--actv-muted);
+    font-size: 14px;
+}
+
+.finder-status.is-error { color: #b42318; }
+.finder-status.is-loading { color: var(--actv-blue); }
+
+.trips-card { margin-bottom: 0; }
+.trips-card .finder-card-heading { align-items: center; }
+
+.trips-navigation {
+    display: grid;
+    gap: 12px;
+    margin: 20px 0 0;
+    padding: 18px 0 0;
+    border-top: 1px solid var(--actv-border);
+}
+
+.pagination-row,
+.jump-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.pagination-row { justify-content: space-between; }
+.pagination-button,
+.jump-button {
+    min-height: 38px;
+    padding: 6px 12px;
+    border: 1px solid var(--actv-border);
+    border-radius: 10px;
+    background: var(--actv-surface);
+    color: var(--actv-ink);
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.pagination-button { width: 42px; padding: 0; font-size: 24px; line-height: 1; }
+.pagination-button:disabled { cursor: not-allowed; opacity: .45; }
+.page-label { min-width: 150px; color: var(--actv-ink); font-size: 14px; font-weight: 750; text-align: center; }
+.jump-row { justify-content: center; flex-wrap: wrap; color: var(--actv-muted); font-size: 13px; }
+.jump-control { display: grid; gap: 6px; }
+.jump-control label { color: var(--actv-muted); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.jump-input-group { display: flex; gap: 6px; }
+.jump-input { width: 82px; min-height: 40px; padding: 6px 9px; border: 1px solid var(--actv-border); border-radius: 10px; background: var(--actv-surface); color: var(--actv-ink); }
+.time-input { width: 116px; }
+.jump-button { color: var(--actv-blue); }
+.jump-or { align-self: end; padding: 0 4px 11px; color: var(--actv-muted); font-size: 12px; }
+
+.trips-list {
+    display: grid;
+    gap: 10px;
+}
+
+.trip-option {
+    width: 100%;
+    padding: 13px 14px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 13px;
+    border: 1px solid var(--actv-border);
+    border-radius: 13px;
+    background: var(--actv-surface);
+    color: var(--actv-ink);
+    text-align: left;
+    cursor: pointer;
+}
+
+.trip-option:hover,
+.trip-option:focus-visible,
+.trip-option.is-selected {
+    border-color: var(--actv-blue);
+    background: color-mix(in srgb, var(--actv-blue) 8%, var(--actv-surface));
+}
+
+.trip-option.is-selected { box-shadow: 0 0 0 3px color-mix(in srgb, var(--actv-blue) 16%, transparent); }
+
+.trip-option.is-in-motion {
+    border-color: var(--actv-green);
+    background: color-mix(in srgb, var(--actv-green) 9%, var(--actv-surface));
+}
+
+.trip-option.is-in-motion.is-selected { box-shadow: 0 0 0 3px color-mix(in srgb, var(--actv-green) 18%, transparent); }
+
+.trip-time {
+    min-width: 86px;
+    color: var(--actv-blue);
+    font-size: 17px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.trip-headsign {
+    overflow: hidden;
+    color: var(--actv-ink);
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trip-id {
+    display: block;
+    margin-top: 3px;
+    overflow: hidden;
+    color: var(--actv-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trip-live-label {
+    display: block;
+    margin-top: 3px;
+    color: var(--actv-green-dark);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.empty-state {
+    margin: 0;
+    padding: 18px 0 8px;
+    color: var(--actv-muted);
+    font-size: 14px;
+}
+
+.open-trip-button {
+    width: 100%;
+    margin-top: 18px;
+    min-height: 50px;
+}
+
+.open-trip-button:disabled { cursor: not-allowed; opacity: .52; }
+
+@media (max-width: 480px) {
+    .finder-grid { grid-template-columns: 1fr; gap: 18px; }
+    .finder-grid .finder-field + .finder-field { margin-top: 0; }
+    .trip-option { grid-template-columns: 1fr; gap: 3px; }
+    .trip-time { min-width: 0; }
+    .jump-row { display: grid; grid-template-columns: 1fr; gap: 9px; }
+    .jump-control,
+    .jump-input-group,
+    .jump-input { width: 100%; }
+    .jump-input-group { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+    .jump-or { justify-self: center; align-self: auto; padding: 0; }
+}

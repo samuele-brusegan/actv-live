@@ -1645,6 +1645,107 @@ class ApiController {
     }
 
     /**
+     * API /api/line-trips
+     * Restituisce le corse attive per una linea e una coppia di fermate.
+     * Le fermate sono identificate dai rispettivi stop_id GTFS: il controllo
+     * sulla sequenza impedisce di proporre corse nella direzione sbagliata.
+     */
+    function lineTrips() {
+        header('Content-Type: application/json');
+
+        $service = $this->lineService();
+        if ($service !== 'automobilistico') {
+            echo json_encode(['success' => false, 'error' => 'Questo selettore supporta il servizio automobilistico']);
+            return;
+        }
+
+        $line = trim((string)($_GET['line'] ?? ''));
+        $origin = trim((string)($_GET['origin'] ?? ''));
+        $destination = trim((string)($_GET['destination'] ?? ''));
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['date'] ?? '')
+            ? str_replace('-', '', $_GET['date'])
+            : date('Ymd');
+        $day = $this->dayColumn($_GET['day'] ?? strtolower(date('l')));
+
+        if ($line === '' || $origin === '' || $destination === '') {
+            echo json_encode(['success' => false, 'error' => 'Parametri line/origin/destination mancanti']);
+            return;
+        }
+        if ($origin === $destination) {
+            echo json_encode(['success' => false, 'error' => 'Partenza e destinazione devono essere diverse']);
+            return;
+        }
+        if ($day === null) {
+            echo json_encode(['success' => false, 'error' => 'Giorno non valido']);
+            return;
+        }
+
+        try {
+            $db = $this->getDb();
+            $routeIds = $this->routeIdsForShortName($db, $line);
+            if (empty($routeIds)) {
+                echo json_encode(['success' => false, 'error' => 'Linea non trovata']);
+                return;
+            }
+
+            $routePh = implode(',', array_fill(0, count($routeIds), '?'));
+            $sql = "SELECT DISTINCT
+                        t.trip_id,
+                        t.trip_headsign AS headsign,
+                        t.shape_id,
+                        origin_st.departure_time AS departure_time,
+                        destination_st.arrival_time AS arrival_time
+                    FROM trips t
+                    JOIN stop_times origin_st ON origin_st.trip_id = t.trip_id
+                    JOIN stop_times destination_st ON destination_st.trip_id = t.trip_id
+                    WHERE t.route_id IN ($routePh)
+                      AND origin_st.stop_id = ?
+                      AND destination_st.stop_id = ?
+                      AND origin_st.stop_sequence < destination_st.stop_sequence
+                      AND (
+                          t.service_id IN (
+                              SELECT c.service_id FROM calendar c
+                              WHERE c.{$day} = 1 AND c.start_date <= ? AND c.end_date >= ?
+                          )
+                          OR t.service_id IN (
+                              SELECT cd.service_id FROM calendar_dates cd
+                              WHERE cd.date = ? AND cd.exception_type = 1
+                          )
+                      )
+                      AND t.service_id NOT IN (
+                          SELECT cd.service_id FROM calendar_dates cd
+                          WHERE cd.date = ? AND cd.exception_type = 2
+                      )
+                    ORDER BY origin_st.departure_time ASC, t.trip_id ASC";
+            $rows = $db->query($sql, array_merge($routeIds, [$origin, $destination, $date, $date, $date, $date]));
+
+            $trips = array_map(static function ($row) {
+                return [
+                    'trip_id' => $row['trip_id'],
+                    'headsign' => $row['headsign'] ?? '',
+                    'shape_id' => $row['shape_id'] ?? null,
+                    'departure_time' => substr((string)($row['departure_time'] ?? ''), 0, 5),
+                    'arrival_time' => substr((string)($row['arrival_time'] ?? ''), 0, 5),
+                ];
+            }, $rows);
+
+            echo json_encode([
+                'success' => true,
+                'service' => $service,
+                'line' => $line,
+                'origin' => $origin,
+                'destination' => $destination,
+                'date' => substr($date, 0, 4) . '-' . substr($date, 4, 2) . '-' . substr($date, 6, 2),
+                'trips' => $trips,
+            ], JSON_INVALID_UTF8_SUBSTITUTE);
+        } catch (Throwable $e) {
+            Logger::log('EXCEPTION', 'lineTrips: ' . $e->getMessage(), __FILE__, __LINE__, $e->getTraceAsString());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Impossibile caricare le corse della tratta']);
+        }
+    }
+
+    /**
      * API /api/line-schedule
      * Per le varianti indicate (param: trips = trip_id rappresentativi) ritorna,
      * per ogni fermata, TUTTI gli orari del giorno (param: day) della linea
