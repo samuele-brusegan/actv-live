@@ -1,83 +1,73 @@
-# Sezione Amministrazione
-Questo documento descrive l'architettura e l'implementazione pratica della sezione di amministrazione dell'applicazione ACTV Live.
+# Area amministrativa
 
-## 1. Accesso Nascosto
-L'accesso alla sezione admin è protetto da un meccanismo nascosto per evitare l'esposizione diretta dell'interfaccia di gestione a utenti occasionali.
+L’area amministrativa di ACTV Live è una superficie protetta da sessione per
+monitorare l’applicazione, leggere i log, aggiornare i dati GTFS e ispezionare i
+feed GTFS-RT.
 
-- **Meccanismo**: L'utente deve cliccare 5 volte rapidamente (entro un intervallo di 500ms tra i click) sulla sezione del footer (#footer-licence).
-- **Implementazione**: Il codice JavaScript in `home.php`gestisce il conteggio dei click e rivela un'icona nascosta nell'header (#admin-secret-link) che punta alla Time Machine.
+## Pagine disponibili
 
-```js
-// Estratto da home.php
-let footerClicks = 0;
-let lastClickTime = 0;
-document.getElementById('footer-licence').addEventListener('click', (e) => {
-    const currentTime = new Date().getTime();
-    if (currentTime - lastClickTime < 500) {
-        footerClicks++;
-    } else {
-        footerClicks = 1;
-    }
-    lastClickTime = currentTime;
-    if (footerClicks >= 5) {
-        const adminLink = document.getElementById('admin-secret-link');
-        adminLink.classList.remove('d-none');
-        alert("Admin access unlocked!");
-    }
-});
-```
+| Pagina | Scopo |
+|---|---|
+| `/admin/login` | Login con password e token CSRF |
+| `/admin/dashboard` | Metriche operative della flotta e tabella dettagli |
+| `/admin/logs` | Ultimi 100 log PHP, eccezioni e JavaScript |
+| `/admin/feedback` | Feedback ricevuti, filtrabili per categoria e stato |
+| `/admin/gtfs-update` | Stato, avvio e pianificazione dell’importazione GTFS |
+| `/admin/gtfs-rt-inspector` | Ispezione raw e decodifica locale dei feed GTFS-RT |
+| `/admin/logout` | Chiusura della sessione admin |
 
-## 2. Gestione Eccezioni e Bug (Logs)
-Il sistema implementa un logger centralizzato che registra sia gli errori lato server (PHP) che quelli lato client (JavaScript).
+Le pagine sono registrate in [`public/routes.php`](../public/routes.php) e
+richiedono `AdminAuth::requireAuth()`, tranne login e logout.
 
-### Architettura Server-side
-- **Service**: `Logger.php` gestisce l'inserimento nel database (tabella `logs`).
-- **Integrazione**: In `bootstrap.php`, vengono impostati gli handler globali:
-    - `set_error_handler`: Cattura i warning e gli errori PHP standard.
-    - `set_exception_handler`: Cattura le eccezioni PHP non gestite.
-### Log Client-side (JavaScript)
-Le eccezioni JavaScript vengono inviate al server tramite una chiamata fetch all'endpoint:
+## Autenticazione e CSRF
 
-- Rotta: `/api/log-js-error`
-- Controller: `ApiController::logJsError()`
+`app/services/AdminAuth.php` legge `ADMIN_PASSWORD` dal file `.env`.
+All’accesso riuscito:
 
-### Visualizzazione Admin
-L'interfaccia in `logs.php` permette di visualizzare gli ultimi 100 log, con filtri per tipo (EXCEPTION, PHP_ERROR, JS_ERROR).
+1. verifica il token CSRF del form;
+2. confronta la password con `hash_equals()`;
+3. rigenera l’identificatore di sessione;
+4. imposta `$_SESSION['is_admin']` e reindirizza alla dashboard.
 
-## 3. Time Machine
-La Time Machine permette di registrare i passaggi in tempo reale per determinate fermate e "riprodurli" in un momento successivo per simulazione o debug.
+Le API amministrative richiedono il cookie di sessione. Le richieste `POST`
+(`/api/admin/gtfs-update/config` e `/api/admin/gtfs-update/start`) devono
+includere anche il token CSRF nel body JSON o nel form.
 
-### Database Schema
-- `tm_sessions`: Memorizza i metadati della sessione (nome, orario di inizio/fine, lista fermate, stato).
-- `tm_data`: Memorizza il payload JSON grezzo ricevuto dall'API ACTV per ogni fermata durante la registrazione.
+## Logging
 
-### Processo di Registrazione
-Esistono due modi per gestire la registrazione dei dati:
+`app/services/Logger.php` registra nella tabella `logs`:
 
-1.  **Metodo API Heartbeat (Consigliato)**: Uno speciale endpoint `/api/tm/heartbeat` che, se richiamato, esegue un ciclo di registrazione. Questo metodo è "disaccoppiato" dall'host e permette di innescare la registrazione dall'esterno.
-2.  **Script Locale**: Lo script PHP `record_tm.php` può essere eseguito via cron job direttamente sul server.
+- `PHP_ERROR` per warning ed errori PHP;
+- `EXCEPTION` per eccezioni non gestite;
+- `JS_ERROR` per errori inviati dal frontend tramite `/api/log-js-error`.
 
-### Setup della Registrazione (Heartbeat)
-Per configurare la registrazione senza accesso SSH o cron di sistema:
+La pagina `/admin/logs` supporta `?type=PHP_ERROR`, `?type=EXCEPTION` e
+`?type=JS_ERROR`, e mostra messaggio, file, riga, contesto e stack trace quando
+disponibili.
 
-1.  **Configurazione .env**: Aggiungi una chiave di sicurezza al tuo file `.env`:
-    ```ini
-    TM_HEARTBEAT_TOKEN=una_stringa_segreta_e_casuale
-    ```
-2.  **Servizio Esterno**: Utilizza un servizio di "Cron-job" esterno (come [Cron-job.org](https://cron-job.org/)) o un sistema di monitoraggio (UptimeRobot).
-3.  **Configurazione URL**: Imposta il servizio per richiamare ogni minuto il seguente URL:
-    ```
-    https://tuo-dominio.test/api/tm/heartbeat?token=IL_TUO_TOKEN_SEGRETO
-    ```
-4.  **Verifica**: L'endpoint restituirà un JSON con il riepilogo delle operazioni effettuate.
+## Aggiornamento GTFS
 
-### Setup Alternativo (Cron di Sistema)
-Se hai accesso SSH, puoi aggiungere questa riga al crontab (`crontab -e`):
-```cron
-* * * * * /usr/bin/php /percorso/assoluto/scripts/record_tm.php >> /percorso/assoluto/tm_cron.log 2>&1
-```
+La pagina `/admin/gtfs-update` usa le API:
 
-### Riproduzione (Playback)
-Quando la Time Machine è attiva nel client, le richieste di dati per le fermate vengono deviate a:
-- **Endpoint**: `/api/tm/simulated-data?stopId=ID&time=YYYY-MM-DD HH:MM:SS`
-- **Logica**: Il database cerca il dato registrato più vicino temporalmente (tramite `ORDER BY ABS(TIMESTAMPDIFF(...))`) per simulare fedelmente il passaggio dei bus in quel momento.
+- `GET /api/admin/gtfs-update/status`;
+- `POST /api/admin/gtfs-update/config`;
+- `POST /api/admin/gtfs-update/start`.
+
+Il processo è gestito da `app/services/GtfsUpdateManager.php`, usa un lock per
+impedire esecuzioni concorrenti e pubblica cache e tabelle solo dopo la
+validazione. La pianificazione settimanale aggiorna il crontab dell’utente che
+esegue PHP-FPM e usa UTC+00.
+
+## GTFS-RT Inspector
+
+`/admin/gtfs-rt-inspector` richiama
+`GET /api/admin/gtfs-rt-inspector?service=automobilistico|navigation&kind=vehicles|updates`.
+Mostra payload protobuf in Base64, anteprima esadecimale e record decodificati
+dal decoder locale `app/services/GtfsRealtime.php`.
+
+## Nota sulla vecchia Time Machine
+
+Le tabelle `tm_sessions` e `tm_data` create dallo script storico
+`scripts/setup_db.php` sono mantenute per compatibilità dello schema, ma le
+vecchie rotte `/api/tm/*`, gli heartbeat e il playback non sono registrati nel
+router corrente. Non devono essere considerati funzionalità attive.

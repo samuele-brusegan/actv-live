@@ -38,4 +38,3 @@ page.
 - Constant-time comparisons (`hash_equals`) for both password and CSRF.
 - Session id regenerated on successful login.
 - CLI context skips `session_start()` (`ensureSession` guard).
-</content>

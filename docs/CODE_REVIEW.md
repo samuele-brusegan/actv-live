@@ -1,9 +1,11 @@
 # Code Review — actv-live
 
-Report dei problemi individuati durante la review della codebase.
+Report storico dei problemi individuati durante una review della codebase.
 Stato: `[ ]` da fare · `[~]` in corso · `[x]` risolto
 
-> Nota: la suite di test (217 Jest + 15 Pest) passa, ma **non** copre i bug critici #1, #2, #3.
+> Nota: i conteggi dei test riportati qui appartengono allo snapshot della review
+> e non sono un indicatore aggiornato della suite corrente. Verificare sempre
+> `npm test` e `vendor/bin/pest` prima di usare questo report come stato attuale.
 
 ---
 

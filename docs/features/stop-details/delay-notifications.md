@@ -24,7 +24,7 @@ is disabled.
 ## Scope & limitations
 
 - These are **local** notifications driven by client-side polling — not true server
-  push. Real push is listed as a TODO in the project README.
+  push. La versione corrente non include un backend per subscription Web Push.
 - Monitoring only runs while the app (or its Service Worker) is active in the browser.
 
 ## Related
@@ -32,4 +32,3 @@ is disabled.
 - The same `/sw.js` registration is used by [offline support](../../frontend.md)
   (`public/js/offline.js`).
 - Recorded delays also feed the [delay statistics](../delay-stats.md) page.
-</content>

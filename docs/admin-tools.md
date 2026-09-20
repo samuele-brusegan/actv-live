@@ -1,53 +1,57 @@
-# Admin Tools & Logging
+# Strumenti amministrativi e diagnostica
 
-Questa sezione descrive gli strumenti a disposizione per il debug e la gestione avanzata dell'applicazione.
+Questa pagina riassume gli strumenti operativi presenti nell’area admin. Per
+il dettaglio dell’autenticazione vedere [features/admin/authentication.md](features/admin/authentication.md).
 
-## 1. Sistema di Logging Centralizzato
+## Logging centralizzato
 
-Qualsiasi anomalia viene catturata dal service `app/services/Logger.php`.
+`app/services/Logger.php` intercetta errori PHP ed eccezioni dal bootstrap e
+riceve gli errori JavaScript dal frontend tramite `POST /api/log-js-error`.
+Gli eventi sono memorizzati nella tabella `logs` e sono consultabili in
+`/admin/logs`, con filtro per tipo e limite agli ultimi 100 record.
 
-### Tipi di Log
-1.  **PHP_ERROR**: Errori standard di PHP (Warning, Notice).
-2.  **EXCEPTION**: Eccezioni non catturate (`try-catch` globale).
-3.  **JS_ERROR**: Errori JavaScript che avvengono nel browser dell'utente, inviati tramite l'endpoint `/api/log-js-error`.
+I dati utili per la diagnosi sono:
 
-### Visualizzazione
-I log sono consultabili alla rotta `/admin/logs` (richiede accesso admin). Ogni log include:
-- Messaggio di errore.
-- File e riga.
-- Stack trace (per eccezioni).
-- **Context**: Un dump JSON che include lo User Agent dell'utente, l'URL visitato e eventuali parametri POST.
+- tipo e messaggio;
+- file e riga, quando disponibili;
+- stack trace per le eccezioni;
+- contesto JSON, inclusi URL e dati client quando forniti dal logger.
 
----
+## Dashboard operativa
 
-## 2. Time Machine (Registrazione & Playback)
+`/admin/dashboard` carica dal frontend i dati della flotta e mostra bus attivi,
+ritardo medio, ritardo massimo, copertura GPS e distribuzione per linea. La
+dashboard usa le API realtime e non rappresenta un archivio storico server-side.
 
-La Time Machine risolve il problema del "tempo reale non testabile di notte". Permette di registrare il traffico di un pomeriggio e riprodurlo la sera.
+## Aggiornamento dati
 
-### Registrazione (Heartbeat)
-La registrazione avviene tramite "Heartbeat". Un servizio esterno (es. Cron-job.org) deve chiamare ogni minuto:
-`https://tuo-dominio.it/api/tm/heartbeat?token=IL_TUO_TOKEN`
+`/admin/gtfs-update` è il pannello per l’importazione atomica dei feed GTFS.
+Visualizza stato, task, statistiche, timestamp della cache e coda del log.
+L’esecuzione manuale o pianificata è descritta in
+[Pipeline GTFS](features/gtfs-pipeline.md).
 
-**Dettagli Tecnici**:
-1. Il sistema controlla in `tm_sessions` se ci sono sessioni in stato `RECORDING`.
-2. Per ogni fermata configurata nella sessione, chiama l'API ufficiale ACTV.
-3. Salva l'intero JSON ricevuto nella tabella `tm_data`.
+## Ispezione GTFS-RT
 
-### Riproduzione (Playback)
-Quando un utente attiva la Time Machine:
-1. Imposta una data e ora "simulata".
-2. Il frontend aggiunge un header o parametro alle richieste API.
-3. Il backend, invece di chiamare ACTV, esegue questa query:
-   ```sql
-   SELECT data_json FROM tm_data 
-   WHERE stop_id = ? 
-   ORDER BY ABS(TIMESTAMPDIFF(SECOND, fetched_at, ?)) LIMIT 1
-   ```
-4. Viene restituito il dato registrato più vicino al momento richiesto.
+`/admin/gtfs-rt-inspector` consente di scegliere il servizio
+(`automobilistico` o `navigation`) e il feed (`vehicles` o `updates`).
+Il pannello mostra il payload binario Base64, un’anteprima esadecimale e il
+risultato del decoder protobuf locale.
 
----
+## Diagnostica performance
 
-## 3. Accesso Segreto
-L'interfaccia admin non è linkata pubblicamente.
-- **Attivazione**: 5 click rapidi sul footer della home page.
-- **Logica**: Una volta sbloccato, appare l'icona dell'ingranaggio nell'header.
+Per una singola richiesta si possono abilitare gli header diagnostici con:
+
+```ini
+ACTV_PERF_DIAGNOSTICS=1
+```
+
+e aggiungendo `?perf=1` all’URL. Il server restituisce `Server-Timing: app` e
+`X-ACTV-Perf`. La modalità è pensata per diagnosi temporanee e non dovrebbe
+essere lasciata esposta senza necessità.
+
+## Funzionalità storiche non attive
+
+Le precedenti istruzioni relative a `/api/tm/heartbeat`,
+`/api/tm/simulated-data` e `record_tm.php` non sono applicabili alla versione
+corrente: queste rotte e questo script non esistono in `public/routes.php` e non
+vanno usati per configurare l’installazione.

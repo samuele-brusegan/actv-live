@@ -1,15 +1,21 @@
-# Frontend & UI System
+# Frontend e UI
 
-Il frontend di ACTV Live è progettato per essere leggero, veloce e ottimizzato per mobile (PWA).
+Il frontend di ACTV Live è JavaScript vanilla, ottimizzato per mobile e
+distribuito senza una fase di build. Le pagine PHP includono gli asset comuni e
+caricano il modulo della feature in uso.
 
-## Design System (`style.css`)
+## Design system (`style.css` e `app-shell.css`)
 
-L'intero aspetto visiva è basato su variabili CSS (`:root`) per permettere una facile manutenzione e il supporto al **Tema Scuro**.
+L’aspetto visivo usa variabili CSS (`:root`) per colori, spaziature, tipografia,
+ombre e raggi dei bordi. `app-shell.css` aggiunge le variabili della shell
+responsiva e della navigazione inferiore.
 
 ### Variabili Principali
 - `--color-primary-green`: #009E61 (Colore brand ACTV).
 - `--color-primary-blue`: #0152BB (Colore secondario).
-- `--radius-lg`: 15px (Smussamento angoli per le card).
+- `--color-primary-green`: `#009E61`.
+- `--color-primary-blue`: `#0152BB`.
+- `--radius-lg`: `15px` (smussamento angoli per le card).
 
 Il tema scuro viene attivato aggiungendo `data-theme="dark"` all'elemento `html`.
 
@@ -19,10 +25,14 @@ Il tema scuro viene attivato aggiungendo `data-theme="dark"` all'elemento `html`
 
 L'applicazione non usa framework pesanti (come React o Vue), ma moduli Vanilla JS organizzati per responsabilità:
 
-- **`js/theme.js`**: Gestisce il toggle tra tema light e dark e salva la preferenza nel `localStorage`.
-- **`js/time-machine.js`**: Gestisce lo stato globale della riproduzione simulata. Quando attivo, intercetta tutte le chiamate API dirette al server reale.
-- **`js/cookie-notice.js`**: Gestisce l'informativa sui cookie.
-- **`js/liveBusMap.js`**: Logica di visualizzazione geografica (vedi [Live Tracker](live-tracker.md)).
+- **`js/theme.js`**: alterna tema chiaro/scuro e salva la preferenza in `localStorage`.
+- **`js/offline.js`**: registra `/sw.js`, gestisce l’indicatore online/offline e
+  invia i comandi di precaricamento o pulizia cache.
+- **`js/cookie-notice.js`** e **`js/ui-feedback.js`**: componenti globali della
+  shell.
+- **`js/liveBusMap.js`**: mappa realtime e caricamento progressivo di mezzi e shape.
+- **`js/tripFinder.js`**: selezione linea, capolinea, corsa e stato in
+  `sessionStorage`.
 
 ---
 
@@ -34,11 +44,16 @@ Le mappe utilizzano Leaflet.js caricato via CDN per ridurre il peso del pacchett
 
 ---
 
-## Progressive Web App (PWA)
+## Progressive Web App (PWA) e offline
 
-I file necessari sono in `/public/pwa/`:
-- **`site.webmanifest`**: Definisce icone, colori e nome dell'app per l'installazione su home screen.
-- **`service-worker.js`**: (Se implementato) gestisce il caching offline delle risorse statiche.
+I file necessari sono in `/public/pwa/` e `/public/sw.js`:
+- **`pwa/site.webmanifest`**: definisce icone, colori e nome dell’app;
+- **`sw.js`**: service worker che gestisce cache statiche e comandi offline;
+- **`offline.js`**: registra il service worker e controlla lo stato di rete.
+
+Il precaricamento GTFS è disponibile tramite `precacheGtfsData()` e deve essere
+richiesto dal client; non implica che ogni endpoint dinamico sia utilizzabile
+offline.
 
 ---
 

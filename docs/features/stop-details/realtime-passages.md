@@ -34,12 +34,11 @@ When the real-time feed has no data, the app uses the GTFS schedule:
   [`app/models/gtfsPassages.php`](../../../app/models/gtfsPassages.php), which queries
   scheduled passages from the MySQL GTFS tables.
 
-> Note: the project README lists a TODO to add a format adapter so
-> `/api/gtfs-passages` output matches the real-time shape exactly.
+> Limitation: `/api/gtfs-passages` è un fallback legacy e il suo formato non è
+> completamente identico al payload realtime della sorgente ACTV.
 
 ## Delay recording
 
 As passages are rendered with their delays, observations are appended to the local
 `delay_history` store — see [delay-notifications.md](delay-notifications.md) and the
 [delay statistics](../delay-stats.md) feature.
-</content>

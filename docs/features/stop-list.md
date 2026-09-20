@@ -27,4 +27,3 @@ passed to the view as `$stations`.
 The view exposes tabs to switch between the plain list and a zone-based grouping.
 Each entry is rendered with the shared `StopCard` / `StopListItem` components so the
 look matches the home page.
-</content>

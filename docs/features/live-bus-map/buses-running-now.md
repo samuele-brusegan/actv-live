@@ -46,5 +46,5 @@ time, with wrap-around handling for the 24h clock. For each kept trip:
 ```
 
 Each returned `trip_id` is then expanded into a positioned marker via
-[position-and-shape.md](position-and-shape.md).
-</content>
+[position-and-shape.md](position-and-shape.md) when the scheduled fallback is
+used. The primary current-position path is `/api/realtime/vehicles`.

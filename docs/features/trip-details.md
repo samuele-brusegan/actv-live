@@ -31,4 +31,3 @@ be found.
 
 - `gtfs-stop-translater` (`/api/gtfs-stop-translater`) returns the same trip stops
   ordered by `arrival_time` — used when translating raw GTFS times.
-</content>

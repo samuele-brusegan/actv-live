@@ -3,22 +3,29 @@
 Questa pagina descrive il contenuto GTFS effettivamente importato nel database
 MySQL/MariaDB di ACTV Live.
 
-I tipi, i conteggi e gli esempi sono stati verificati sul database configurato
-il **10 giugno 2026**. Il feed caricato copre il periodo dal **5 giugno 2026**
-al **9 agosto 2026**. I conteggi cambiano a ogni aggiornamento.
+I tipi, i conteggi e gli esempi riportati sono riferimenti indicativi di uno
+snapshot del database, verificato il **10 giugno 2026**. Anche l'intervallo di
+validità del feed riportato negli esempi è indicativo: feed, conteggi, calendario,
+eccezioni e shape possono cambiare a ogni aggiornamento GTFS. Per lo stato reale
+consultare `feed_info.txt`, i file GTFS presenti in `data/gtfs/` e il pannello
+`/admin/gtfs-update`.
 
 ## Panoramica
 
 | Tabella | Righe rilevate | Origine | Contenuto |
 |---|---:|---|---|
-| `routes` | 97 | `routes.txt` | Linee e varianti commerciali |
-| `trips` | 30.183 | `trips.txt` | Singole corse programmate |
-| `stops` | 2.250 | `stops.txt` + ACTV real-time | Fermate e coordinate |
-| `stop_times` | 693.658 | `stop_times.txt` | Orari di ogni corsa a ogni fermata |
-| `calendar` | 3 | `calendar.txt` | Regole settimanali dei servizi |
-| `calendar_dates` | 52 | `calendar_dates.txt` | Eccezioni per date specifiche |
-| `shapes` | 702.240 | `shapes.txt` | Punti geografici dei percorsi |
-| `shapes_refined` | 702.240 | derivata da `shapes` | Shape nel formato usato dalle API |
+| `routes` | circa 97* | `routes.txt` | Linee e varianti commerciali |
+| `trips` | circa 30.183* | `trips.txt` | Singole corse programmate |
+| `stops` | circa 2.250* | `stops.txt` + ACTV real-time | Fermate e coordinate |
+| `stop_times` | circa 693.658* | `stop_times.txt` | Orari di ogni corsa a ogni fermata |
+| `calendar` | circa 3* | `calendar.txt` | Regole settimanali dei servizi |
+| `calendar_dates` | circa 52* | `calendar_dates.txt` | Eccezioni per date specifiche |
+| `shapes` | circa 702.240* | `shapes.txt` | Punti geografici dei percorsi |
+| `shapes_refined` | circa 702.240* | derivata da `shapes` | Shape nel formato usato dalle API |
+
+\* Valori indicativi dello snapshot documentato, non invarianti del database
+runtime. Il numero effettivo dipende dall'ultimo feed importato e dalle eventuali
+elaborazioni locali.
 
 Il feed contiene anche `agency.txt` e `feed_info.txt`, ma la pipeline corrente
 non li importa nel database. Le informazioni dell'operatore restano comunque
@@ -259,8 +266,9 @@ Esempio:
 }
 ```
 
-Questa riga indica un servizio feriale, attivo dal 5 giugno al 9 agosto 2026,
-salvo eccezioni in `calendar_dates`.
+Questa riga è un esempio indicativo di servizio feriale. Le date effettive di
+validità devono essere lette dal `calendar.txt` e dalle eccezioni in
+`calendar_dates` del feed corrente.
 
 ## `calendar_dates`
 
@@ -450,7 +458,8 @@ shapes
 
 ### `agency.txt`
 
-Il feed corrente dichiara:
+Il feed può contenere metadati come i seguenti (esempio di uno snapshot; il
+valore corrente va verificato nel file scaricato):
 
 ```json
 {
@@ -466,16 +475,10 @@ Il feed corrente dichiara:
 
 ### `feed_info.txt`
 
-```json
-{
-  "feed_id": "0",
-  "feed_publisher_name": "ACTV S.p.a",
-  "feed_publisher_url": "http://www.actv.it/",
-  "feed_lang": "IT",
-  "feed_start_date": "20260605",
-  "feed_end_date": "20260809"
-}
-```
+Il file può contenere `feed_id`, editore, lingua e intervallo di validità del
+feed. Le date non sono riportate qui come valori fissi perché cambiano a ogni
+pubblicazione ACTV e sono determinanti per capire se una data di servizio è
+coperta.
 
 Questi dati sono disponibili nell'archivio estratto, ma non hanno una tabella
 runtime dedicata.
@@ -483,7 +486,9 @@ runtime dedicata.
 
 Il parser supporta due profili indipendenti:
 
-- `php scripts/parse_gtfs.php` mantiene la cache automobilistica storica;
+- `php scripts/parse_gtfs.php` aggiorna manualmente la cache automobilistica;
+- `php scripts/update_gtfs.php` esegue il flusso completo con import DB e
+  pubblicazione atomica;
 - `php scripts/parse_gtfs.php --navigation` oppure `php scripts/update_navigation.php`
   scarica il feed Navigazione in `data/gtfs/cache/navigation/`.
 

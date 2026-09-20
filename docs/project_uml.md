@@ -66,6 +66,18 @@ classDiagram
         -calculateGeoDistance(float lat1, float lon1, float lat2, float lon2) float
     }
 
+    class ConnectionCacheBuilder {
+        -string plannerDir
+        +ensure(string date) string
+        -build(string date, string path) void
+    }
+
+    class ConnectionScanPlanner {
+        -ConnectionCacheBuilder cacheBuilder
+        +plan(string originId, string destinationId, string date, string time) array
+        +planAlternatives(string originId, string destinationId, string date, string time) array
+    }
+
     class GTFSParser {
         -string gtfsUrl
         -string dataDir
@@ -88,7 +100,9 @@ classDiagram
     Router ..> ApiController : instanzia
     Controller ..> databaseConnector : usa
     ApiController ..> databaseConnector : usa
-    ApiController ..> RoutePlanner : instanzia
+    ApiController ..> RoutePlanner : compatibilita e geocoding
+    ApiController ..> ConnectionScanPlanner : planner di produzione
+    ConnectionScanPlanner ..> ConnectionCacheBuilder : cache per data
     ApiController ..> Logger : usa
     RoutePlanner ..> GTFSParser : dipende dalla cache generata da
 ```
@@ -99,6 +113,11 @@ classDiagram
 - **Controller**: Gestisce le viste principali dell'applicazione e le operazioni amministrative.
 - **ApiController**: Fornisce endpoint per le funzionalità dinamiche (GTFS, pianificazione percorsi, posizioni bus).
 - **databaseConnector**: Implementa il pattern Singleton per gestire la connessione al database tramite PDO.
-- **RoutePlanner**: Logica di ricerca percorsi (diretti e con cambi) basata su dati GTFS pre-elaborati.
+- **ConnectionScanPlanner**: Planner di produzione date-aware per connessioni bus,
+  navigazione e cammini.
+- **ConnectionCacheBuilder**: Costruisce e pubblica la cache ordinata delle
+  connessioni per ogni data di servizio.
+- **RoutePlanner**: Planner compatibile e servizio di supporto per cache legacy,
+  API esistenti e ricerca della fermata più vicina.
 - **GTFSParser**: Utility per scaricare e convertire i file GTFS in cache JSON ottimizzate.
 - **Logger**: Utility statica per la registrazione di log ed errori.

@@ -18,13 +18,14 @@ docs/features/
 ├── stop-list.md               Browsable catalog of all stops
 ├── lines-map.md               Geographic view of route paths
 ├── trip-details.md            Stop-by-stop view of a single trip
+├── trip-finder.md             Line, capolinea e corsa programmata
 ├── delay-stats.md             Historical delay analytics (local data)
 ├── shareable-widget.md        Embeddable stop widget (iframe)
 ├── gtfs-pipeline.md           GTFS download / parse / JSON cache pipeline
 │
 ├── route-finder/              ▸ LARGE — journey planner
 │   ├── README.md              Overview & multi-page flow
-│   ├── planning-algorithm.md  Direct + 1-transfer search, next-day fallback
+│   ├── planning-algorithm.md  Connection Scan, transfers, next-day fallback
 │   ├── address-geocoding.md   Coordinates → nearest stop + walking legs
 │   └── results-and-options.md Optimization, comparison, return trip
 │
@@ -55,10 +56,11 @@ docs/features/
 | [Stop list](stop-list.md) | small | `/stopList` | `app/views/stopList.php` |
 | [Lines map](lines-map.md) | small | `/lines-map` | `app/views/linesMap.php`, `public/js/linesMap.js` |
 | [Trip details](trip-details.md) | small | `/trip-details` | `app/views/tripDetails.php`, `public/js/tripDetails.js` |
+| [Trip Finder](trip-finder.md) | small | `/trip-finder` | `app/views/tripFinder.php`, `public/js/tripFinder.js` |
 | [Delay statistics](delay-stats.md) | small | `/delay-stats` | `app/views/delayStats.php`, `public/js/delayHistory.js` |
 | [Shareable widget](shareable-widget.md) | small | `/widget` | `app/views/widget.php`, `public/js/widget.js` |
-| [GTFS pipeline](gtfs-pipeline.md) | small | (CLI) | `app/services/GTFSParser.php`, `scripts/parse_gtfs.php` |
-| [Route finder](route-finder/README.md) | large | `/route-finder`, `/station-selector`, `/route-results`, `/route-details` | `app/services/RoutePlanner.php` |
+| [GTFS pipeline](gtfs-pipeline.md) | small | (CLI), `/admin/gtfs-update` | `app/services/GtfsUpdateManager.php`, `scripts/update_gtfs.php` |
+| [Route finder](route-finder/README.md) | large | `/route-finder`, `/station-selector`, `/route-results`, `/route-details` | `app/services/ConnectionScanPlanner.php`, `app/services/ConnectionCacheBuilder.php` |
 | [Stop details](stop-details/README.md) | large | `/aut/stops/stop` | `app/views/stop.php`, `public/js/stop.js` |
 | [Live bus map](live-bus-map/README.md) | large | `/live-map` | `app/views/liveBusMap.php`, `public/js/liveBusMap.js` |
 | [Admin](admin/README.md) | large | `/admin/*` | `app/services/AdminAuth.php`, `app/services/Logger.php` |
@@ -67,4 +69,3 @@ All routes are declared in [`public/routes.php`](../../public/routes.php) and di
 by [`app/Router.php`](../../app/Router.php). Page actions live in
 [`app/controllers/Controller.php`](../../app/controllers/Controller.php); JSON endpoints
 in [`app/controllers/ApiController.php`](../../app/controllers/ApiController.php).
-</content>

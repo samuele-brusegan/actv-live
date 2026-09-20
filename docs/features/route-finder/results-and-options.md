@@ -13,8 +13,8 @@ already-ranked routes:
 
 | `optimize` | Sort behaviour (`planRoute()`) |
 |------------|--------------------------------|
-| `time` (default) | Keep the planner's weighted score (earliest arrival, transfer penalty, next-day last) |
-| `transfers` | Direct rides first, then by shorter duration |
+| `time` (default) | Keep the alternatives ordered by arrival time as returned by `ConnectionScanPlanner` |
+| `transfers` | Fewer transit legs first, then by shorter duration |
 | `walking` | Least total walking distance (sum of walking-leg `distance`), then duration |
 
 The response echoes the applied criterion: `{ "optimize": "...", "routes": [...] }`.
@@ -41,4 +41,3 @@ When enabled, the outbound and return legs are planned independently (a second
 `/api/plan-route` call with origin/destination swapped and the return time), so each
 direction is optimized on its own. The time-picker modal tracks which time it is
 editing via `timeModalTarget` (`'departure'` | `'return'`).
-</content>

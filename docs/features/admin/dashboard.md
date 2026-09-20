@@ -28,5 +28,6 @@ and GPS/positioning coverage, then renders them as summary cards/charts.
 ## Notes
 
 The admin area is intentionally minimal (no user accounts, single shared password —
-see [authentication.md](authentication.md)).
-</content>
+see [authentication.md](authentication.md)). Feedback moderation is available at
+`/admin/feedback`; GTFS operations are linked from the dashboard but run in the
+separate update panel.

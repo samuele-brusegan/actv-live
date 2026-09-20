@@ -1,48 +1,89 @@
-# ACTV Live - Documentazione Tecnica
+# Documentazione tecnica di ACTV Live
 
-Benvenuto nella documentazione tecnica di **ACTV Live**. Questo manuale è progettato per permettere a uno sviluppatore di comprendere, mantenere e ricostruire l'intero sistema da zero.
+Questa directory raccoglie la documentazione per sviluppo, manutenzione e
+deploy di ACTV Live. Il codice resta la fonte di verità per le rotte e per i
+contratti API: le rotte registrate sono in [`public/routes.php`](../public/routes.php),
+mentre le implementazioni sono nei controller e nei service sotto `app/`.
 
-## Indice della Documentazione
+## Indice
 
-1.  **[Architettura del Sistema](architecture.md)**: Struttura del progetto, ciclo di vita della richiesta e pattern MVC.
-2.  **[Database & Modelli](database.md)**: Schema delle tabelle MySQL e gestione della persistenza.
-3.  **[API Reference](api.md)**: Elenco completo degli endpoint, parametri e formati di risposta.
-4.  **[Database GTFS](gtfs-format.md)**: Tabelle, campi, relazioni e contenuti di esempio.
-5.  **[GTFS & Route Planning](GTFS.md)**: Come vengono elaborati i dati statici e come funziona l'algoritmo di ricerca percorsi.
-6.  **[Frontend & UI](frontend.md)**: Design system, moduli JavaScript e integrazione con Leaflet.
-7.  **[Admin Tools & Logging](admin-tools.md)**: Gestione degli errori, logs centralizzati e la Time Machine.
-8.  **[Live Bus Tracking](live-tracker.md)**: Logica di interpolazione delle posizioni e caricamento asincrono sulla mappa.
-9.  **[Documentazione per Feature](features/README.md)**: Documentazione ad albero, una pagina per feature (le feature più grandi sono cartelle con un README e file dedicati ai sotto-problemi).
+### Fondamenta
 
-## Stack Tecnologico
+- [Architettura](architecture.md) — bootstrap, router e flusso delle richieste.
+- [Frontend](frontend.md) — CSS, JavaScript, PWA e componenti condivisi.
+- [Database e modelli](database.md) — persistenza applicativa e relazioni.
+- [Schema GTFS](gtfs-format.md) — tabelle importate e campi applicativi.
+- [Formato JSON ACTV](actv-json-format.md) — payload utilizzati dalle sorgenti ACTV.
+- [API](api.md) — endpoint pubblici e amministrativi.
 
--   **Backend**: PHP 8.x (Custom MVC).
--   **Database**: MySQL / MariaDB (per logs e dati persistenti), JSON Cache (per dati GTFS ad alte prestazioni).
--   **Frontend**: Vanilla JavaScript (ES6+), CSS3 (Custom Design System), Bootstrap 5 (Utility).
--   **Mappe**: Leaflet.js.
--   **Dati**: GTFS (General Transit Feed Specification).
+### Dati e pianificazione
 
-## Requisiti di Installazione
+- [Pipeline GTFS](features/gtfs-pipeline.md) — download, cache, import atomico e cron.
+- [GTFS e route planning](GTFS.md) — cache del planner e algoritmi di ricerca.
+- [Route Finder](features/route-finder/README.md) — flusso di pianificazione multimodale.
+- [Trip Finder](features/trip-finder.md) — selezione di linea, capolinea, corsa e dettagli.
 
-1.  **Server Web**: Apache con `mod_rewrite` abilitato (vedi `.htaccess`).
-2.  **PHP**: Versione >= 8.4, con estensioni `curl` e `pdo_mysql`.
-3.  **Estrazione GTFS**: Estensione PHP `zip` (`ZipArchive`) oppure comando di sistema `unzip`.
-4.  **Pianificazione GTFS**: Comando `crontab` disponibile e servizio cron attivo.
-5.  **Database**: MySQL o MariaDB con il dump fornito.
-6.  **Configurazione**: Rinominare `.env.example` (se presente) in `.env` e configurare le credenziali DB.
+### Esperienza utente
 
-Su Debian/Ubuntu le dipendenze PHP e GTFS possono essere installate con:
+- [Home](features/home.md)
+- [Elenco fermate](features/stop-list.md)
+- [Dettaglio fermata](features/stop-details/README.md)
+- [Mappa delle linee](features/lines-map.md)
+- [Mappa realtime](features/live-bus-map/README.md)
+- [Dettaglio corsa](features/trip-details.md)
+- [Statistiche ritardi](features/delay-stats.md)
+- [Widget incorporabile](features/shareable-widget.md)
+
+### Amministrazione e diagnosi
+
+- [Strumenti admin e logging](admin-tools.md)
+- [Autenticazione admin](features/admin/authentication.md)
+- [Dashboard e log](features/admin/dashboard.md)
+- [Diagnostica performance](performance-diagnostics.md)
+- [Code review storica](CODE_REVIEW.md)
+
+## Stack
+
+| Area | Tecnologia |
+|---|---|
+| Backend | PHP 8.4+, MVC leggero senza framework |
+| Routing | Router custom in `app/Router.php` |
+| Frontend | JavaScript vanilla, CSS, Bootstrap/Leaflet via asset condivisi |
+| Dati statici | Feed GTFS automobilistico e navigazione |
+| Dati realtime | Feed GTFS-RT ACTV per vehicle positions e trip updates |
+| Persistenza | MySQL/MariaDB e cache JSON locale |
+| Test | Pest per PHP, Jest + jsdom per JavaScript |
+| Automazione | GitHub Actions su push e pull request |
+
+## Avvio rapido per sviluppatori
+
+Dalla radice del repository:
 
 ```bash
-sudo apt install cron php8.4-cli php8.4-curl php8.4-mysql php8.4-zip unzip
+cp .env.example .env
+composer install
+npm ci
+vendor/bin/pest --no-coverage
+npm test
 ```
 
-## Avvio Rapido
-
-Per rigenerare i dati GTFS (necessario al primo avvio o dopo un aggiornamento dei feed ACTV):
+Per i prerequisiti di database, il document root e gli aggiornamenti GTFS vedere
+il [README principale](../README.md). Per usare il server PHP integrato dietro
+un reverse proxy HTTPS:
 
 ```bash
-php scripts/parse_gtfs.php
+php -S 127.0.0.1:8080 -t public public/index.php
 ```
 
-Questo comando scaricherà il file ZIP ufficiale di ACTV, estrarrà i dati e genererà la cache JSON ottimizzata per il `RoutePlanner`.
+Il server integrato non fornisce TLS; usato direttamente, l’entry point
+reindirizza a HTTPS. Per il comportamento completo usare Apache o un reverse
+proxy TLS davanti all’upstream PHP.
+
+## Regole di manutenzione della documentazione
+
+- aggiornare `docs/api.md` quando si aggiunge o modifica un endpoint;
+- aggiornare la pagina della feature quando cambia un flusso visibile all’utente;
+- distinguere dati statici GTFS, dati realtime e fallback locali;
+- non documentare endpoint non presenti in `public/routes.php` come se fossero attivi;
+- indicare sempre quando un dato è locale al browser (`localStorage` o
+  `sessionStorage`) e non sincronizzato lato server.

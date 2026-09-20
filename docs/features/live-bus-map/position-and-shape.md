@@ -34,7 +34,7 @@ reference time. Time helpers come from [`public/js/utils.js`](../../../public/js
 
 ## Shape data
 
-The `shapes_refined` table is produced/cleaned by `scripts/refine_shapes.php` (see the
+The `shapes_refined` table is produced by the GTFS update pipeline (see the
 [GTFS pipeline](../gtfs-pipeline.md)); `dist_traveled` enables proportional placement
-along the polyline.
-</content>
+along the polyline. `/api/lines-shapes` can also serve detailed geometry from the
+cache when the DB-backed response is unavailable.

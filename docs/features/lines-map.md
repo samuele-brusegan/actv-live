@@ -38,4 +38,3 @@ The endpoint raises its memory limit to 256M and time limit to 120s because the
 > The `path` is built from **stop coordinates**, not from the detailed GTFS
 > `shapes` geometry. For the smoothed shape geometry used by the live map, see
 > [live-bus-map/position-and-shape.md](live-bus-map/position-and-shape.md).
-</content>

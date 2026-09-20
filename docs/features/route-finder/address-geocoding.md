@@ -38,4 +38,3 @@ splices walking legs around the transit itinerary:
 
 Walking legs use `type: "walking"` with `route_short_name: "Cammina"`, `stops_count: 0`,
 plus `distance`, `duration` and from/to names.
-</content>

@@ -37,4 +37,3 @@ a throwing logger would cascade into an infinite/again-failing error loop.
 
 `Logger` lazily creates a `databaseConnector` singleton using the `ENV` DB
 credentials, shared across all log writes for the request.
-</content>

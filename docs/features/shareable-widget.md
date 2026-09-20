@@ -26,6 +26,5 @@ URL with `URLSearchParams` (base defaults to `window.location.origin`). The UI o
 ## Notes / known limitations
 
 - The widget renders passages the same way as the stop page.
-- Cross-origin embedding may require a CORS proxy for the upstream ACTV data — this
-  is noted as a TODO in the project README.
-</content>
+- Cross-origin embedding may require una configurazione CORS o un proxy per la
+  sorgente ACTV quando il widget viene incorporato su un dominio terzo.

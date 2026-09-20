@@ -17,4 +17,3 @@ Users can bookmark stops; favourites are stored locally and surfaced on the
 
 Favourites are per-device/per-browser (no server-side account). The favourites list
 is also what the [delay notifications](delay-notifications.md) feature can monitor.
-</content>

@@ -5,12 +5,15 @@ without blocking the UI.
 
 ## Concurrent, progressive loading
 
-1. Fetch the active trips from [`/api/gtfs-bnr`](buses-running-now.md).
-2. For each trip, fetch [`/api/bus-position`](position-and-shape.md) — but cap
-   concurrency at `MAX_CONCURRENT = 6` parallel requests.
-3. Each marker appears on the map **as soon as its data arrives** (progressive
-   rendering) rather than waiting for the whole batch.
-4. A counter / "last update" indicator reflects loading progress.
+1. Fetch the vehicle positions from `/api/realtime/vehicles?service=automobilistico`.
+2. Fetch waterbus positions from `/api/navigation/vehicles` when the navigation
+   layer is enabled.
+3. Use `/api/gtfs-bnr` and `/api/bus-position` for scheduled bus fallback and
+   static trip geometry.
+4. Load `/api/lines-shapes` on demand for the selected trip or line.
+5. Each independent resource is rendered as soon as it arrives instead of
+   waiting for all requests to complete.
+6. A counter / "last update" indicator reflects loading progress.
 
 Each line is drawn with a stable colour picked from the `BUS_COLORS` palette.
 
@@ -28,6 +31,6 @@ The filter input (`#filter-input`, with a clear button) narrows the visible mark
 - `tripId`,
 - `routeId`.
 
-Buses that cannot be positioned (e.g. missing shape) can be listed in a side panel
-rather than dropped silently.
-</content>
+Buses that cannot be positioned or whose route is only heuristic remain marked as
+such instead of being presented as an exact realtime association. When a shape is
+missing, the map can fall back to the ordered stop path.

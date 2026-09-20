@@ -1,7 +1,8 @@
 # Database & Modelli
 
-Il sistema utilizza MySQL (o MariaDB) per i dati GTFS, i log e le registrazioni
-Time Machine. Lo schema dettagliato delle tabelle di trasporto, con tipi ed
+Il sistema utilizza MySQL (o MariaDB) per i dati GTFS, i log e il feedback. Lo
+script di setup conserva inoltre alcune tabelle legacy della vecchia Time Machine.
+Lo schema dettagliato delle tabelle di trasporto, con tipi ed
 esempi reali, è in [Database GTFS](gtfs-format.md).
 
 ## Connettore Database (`app/models/databaseConnector.php`)
@@ -31,11 +32,10 @@ Memorizza errori e warning catturati dal sistema.
 -   `type`: `PHP_ERROR`, `JS_ERROR`, `EXCEPTION`.
 -   `context`: Campo JSON per dati aggiuntivi (es. User Agent, parametri richiesta).
 
-### 3. Time Machine
--   **`tm_sessions`**: Sessioni di registrazione configurate.
-    -   `stops`: JSON con la lista degli ID fermata da monitorare.
--   **`tm_data`**: Dati grezzi registrati.
-    -   `data_json`: Il payload JSON ricevuto dall'API ACTV (longtext).
+### 3. Tabelle legacy
+
+`tm_sessions` e `tm_data` sono create da `scripts/setup_db.php` per compatibilità
+con installazioni storiche, ma non sono usate dalle rotte registrate correnti.
 
 ---
 
@@ -47,7 +47,6 @@ erDiagram
     trips ||--o{ stop_times : "has schedule"
     stops ||--o{ stop_times : "is part of"
     calendar ||--o{ trips : "defines service days"
-    tm_sessions ||--o{ tm_data : "records data for"
 ```
 
 ## Esempio di Query Tipica

@@ -24,4 +24,3 @@ need right now and provides navigation to every other feature.
 including the view. No server-side data is fetched for the home page itself — all
 dynamic content (favourites, nearby stops) is built on the client and hydrated from
 `/api/stops` when needed.
-</content>

@@ -26,4 +26,3 @@ such as average/worst delay broken down **by line, by stop, and by time-of-day b
 
 - Data is per-device and per-browser (not shared, not synced).
 - Statistics are only as complete as the pages the user has visited.
-</content>

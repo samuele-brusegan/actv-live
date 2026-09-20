@@ -2,14 +2,15 @@
 
 The journey planner. The user picks an origin and a destination (a stop, or an
 address/coordinate), a date/time, and an optimization criterion; the app returns
-ranked itineraries supporting **direct** rides and **single-transfer** connections,
-with a **next-day fallback** when nothing is found today.
+ranked multimodal itineraries made of transit and walking legs. The search can
+combine bus and water services and also scans the next service day when nothing
+is found in the requested day.
 
 This is a **large feature** spanning several pages and one core service. The
 sub-problems are documented separately:
 
-- [planning-algorithm.md](planning-algorithm.md) — how `RoutePlanner` finds and
-  ranks itineraries (direct + 1 transfer, next-day fallback, scoring).
+- [planning-algorithm.md](planning-algorithm.md) — how `ConnectionScanPlanner`
+  scans date-specific connections, handles transfers and generates alternatives.
 - [address-geocoding.md](address-geocoding.md) — turning `lat,lon` input into the
   nearest stop and injecting walking legs.
 - [results-and-options.md](results-and-options.md) — optimization modes, route
@@ -30,12 +31,15 @@ all logic is client-side JS calling the planning API.
 
 ## Core service & API
 
-- **Service:** [`app/services/RoutePlanner.php`](../../../app/services/RoutePlanner.php)
+- **Production planner:** [`app/services/ConnectionScanPlanner.php`](../../../app/services/ConnectionScanPlanner.php)
+- **Cache builder:** [`app/services/ConnectionCacheBuilder.php`](../../../app/services/ConnectionCacheBuilder.php)
+- **Compatibility and geocoding helper:** [`app/services/RoutePlanner.php`](../../../app/services/RoutePlanner.php)
 - **API:** `GET /api/plan-route` → `ApiController::planRoute()`
 
 `planRoute()` is the single backend entry point. It resolves origin/destination
-(stop id or address), calls `RoutePlanner::findRoutesMulti()`, post-processes walking
-legs, applies the optimization sort, and returns:
+(stop id or address), uses `RoutePlanner` to resolve coordinates to the nearest
+stop when needed, then calls `ConnectionScanPlanner::planAlternatives()`. It
+post-processes walking legs, applies the selected optimization sort, and returns:
 
 ```json
 { "success": true, "optimize": "time", "routes": [ /* itineraries */ ] }
@@ -46,8 +50,8 @@ stats and per-stop debug info instead of routes.
 
 ## Data source
 
-The planner reads **only the JSON cache** in `data/gtfs/cache/` (never the DB),
-produced by the [GTFS pipeline](../gtfs-pipeline.md):
-`stops.json`, `routes.json`, `stop_routes_index.json`, and per-route
-`routes/route_<id>.json` schedules.
-</content>
+The production planner reads metadata from the JSON caches in
+`data/gtfs/cache/` and `data/gtfs/cache/navigation/`, then scans date-specific
+connection caches under `data/gtfs/cache/planner/`. The connection cache combines
+bus and water services and is generated from the static GTFS feeds; the normal
+planning request does not query MySQL for its transit connections.

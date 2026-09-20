@@ -27,8 +27,13 @@ curl 'https://example.test/api/stop-lines?stop=1234&time=14:30'
 | Metodo | Endpoint | Descrizione |
 |---|---|---|
 | `GET` | `/api/stops` | Tutte le fermate |
+| `GET` | `/api/navigation/stops` | Fermate del servizio di navigazione |
+| `GET` | `/api/navigation/lines` | Linee del servizio di navigazione |
+| `GET` | `/api/navigation/passages` | Passaggi previsti a una fermata acquea |
+| `GET` | `/api/navigation/vehicles` | Posizioni realtime dei mezzi acquei |
 | `GET` | `/api/plan-route` | Pianificazione di un percorso |
 | `GET` | `/api/stop-lines` | Linee disponibili a una fermata |
+| `GET` | `/api/line-colors` | Colori GTFS delle linee |
 | `GET` | `/api/lines-shapes` | Percorsi geografici di linee e corse |
 | `GET` | `/api/trip-stops` | Fermate di una linea |
 | `GET` | `/api/bus-position` | Fermate e shape di una corsa |
@@ -36,7 +41,9 @@ curl 'https://example.test/api/stop-lines?stop=1234&time=14:30'
 | `GET` | `/api/line-variants` | Varianti di percorso di una linea |
 | `GET` | `/api/line-schedule` | Orario giornaliero di una o più varianti |
 | `GET` | `/api/line-catalog` | Catalogo linee filtrato per servizio e data |
+| `GET` | `/api/line-trips` | Corse tra una partenza e una destinazione |
 | `GET` | `/api/stop-upcoming` | Passaggi previsti nella prossima ora |
+| `GET` | `/api/realtime/vehicles` | Posizioni realtime per servizio |
 | `GET` | `/api/gtfs-identify` | Ricerca del `trip_id` GTFS |
 | `GET` | `/api/gtfs-resolve` | Metadati di un `trip_id` |
 | `GET` | `/api/gtfs-builder` | Fermate complete di un `trip_id` |
@@ -44,10 +51,12 @@ curl 'https://example.test/api/stop-lines?stop=1234&time=14:30'
 | `GET` | `/api/gtfs-stops` | Elenco fermate GTFS legacy |
 | `GET` | `/api/gtfs-passages` | Passaggi GTFS previsti per fermata ACTV |
 | `POST` | `/api/feedback` | Invio feedback pubblico |
+| `GET`/`POST` | `/api/delete-cookie` | Rimozione cookie server-side |
 | `POST` | `/api/log-js-error` | Registrazione di un errore frontend |
 | `GET` | `/api/admin/gtfs-update/status` | Stato aggiornamento GTFS |
 | `POST` | `/api/admin/gtfs-update/config` | Configurazione aggiornamento GTFS |
 | `POST` | `/api/admin/gtfs-update/start` | Avvio aggiornamento GTFS |
+| `GET` | `/api/admin/gtfs-rt-inspector` | Ispezione di un feed GTFS-RT |
 
 ## Fermate e linee
 
@@ -108,6 +117,33 @@ Seleziona una corsa rappresentativa di una linea e ne restituisce le fermate.
 
 Errori: `400` se manca `line`; `404` se la linea o una corsa non esistono.
 
+### `GET /api/navigation/stops`
+
+Restituisce le fermate del profilo `navigation` dalla cache GTFS dedicata. La
+risposta è un array di oggetti con `stop_id`, `stop_name`, `stop_lat`,
+`stop_lon`, `service: "navigation"` e `mode: "water"`.
+
+### `GET /api/navigation/lines`
+
+Restituisce le linee presenti in `data/gtfs/cache/navigation/routes.json`.
+Non richiede parametri.
+
+### `GET /api/navigation/passages`
+
+Restituisce i passaggi previsti per una fermata acquea tramite il planner di
+navigazione.
+
+| Parametro | Obbligatorio | Descrizione |
+|---|---:|---|
+| `stop_id` o `stop` | sì | Identificatore della fermata |
+| `time` | no | Orario `HH:MM` o `HH:MM:SS`; default: ora server |
+
+### `GET /api/line-colors`
+
+Restituisce una mappa di colori GTFS indicizzata come `bus|LINEA` o
+`navigation|LINEA`. Ogni voce contiene `route_color` e `route_text_color` in
+formato esadecimale normalizzato.
+
 ## Pianificazione
 
 ### `GET /api/plan-route`
@@ -150,6 +186,46 @@ Quando un estremo è espresso come coordinate, la risposta può includere una
 tratta con `type: "walking"` verso o dalla fermata più vicina.
 
 ## Corse e posizione
+
+### `GET /api/realtime/vehicles`
+
+Legge le Vehicle Positions GTFS-RT e arricchisce i record con linea, direzione
+e colore quando i dati statici o il database lo consentono.
+
+| Parametro | Obbligatorio | Descrizione |
+|---|---:|---|
+| `service` | sì | `automobilistico` oppure `navigation` |
+| `tripId` / `tripIds` | no | Filtra per uno o più `trip_id` separati da virgola |
+| `routeId` / `routeIds` | no | Filtra per uno o più `route_id` separati da virgola |
+
+Risposta:
+
+```json
+{
+  "success": true,
+  "service": "automobilistico",
+  "vehicles": [
+    {
+      "trip_id": "AUT_ACTV_5E_123",
+      "route_id": "10",
+      "route_short_name": "5E",
+      "trip_headsign": "Venezia",
+      "vehicle_position": {"lat": 45.49, "lon": 12.24}
+    }
+  ]
+}
+```
+
+Il campo `route_guess` indica una linea stimata dalla vicinanza del veicolo a
+una fermata quando il feed non fornisce un’associazione sufficiente; non è una
+corrispondenza GTFS certa.
+
+### `GET /api/navigation/vehicles`
+
+Endpoint storico compatibile per le sole posizioni di navigazione. Supporta gli
+stessi filtri `tripId`/`tripIds` e `routeId`/`routeIds` e restituisce direttamente
+un array di veicoli, non l’involucro `{success, service, vehicles}` di
+`/api/realtime/vehicles`.
 
 ### `GET /api/gtfs-bnr`
 
@@ -320,6 +396,24 @@ La posizione di ogni elemento in `times` corrisponde alla stessa posizione
 nell'array `stops`. Un valore `null` indica che quella corsa non serve la
 fermata.
 
+### `GET /api/line-trips`
+
+Restituisce le corse automobilistiche che collegano una partenza e una
+destinazione nella sequenza corretta. Il controllo del calendario considera sia
+`calendar` sia le eccezioni `calendar_dates`.
+
+| Parametro | Obbligatorio | Descrizione |
+|---|---:|---|
+| `line` | sì | `route_short_name` |
+| `origin` | sì | `stop_id` della prima fermata |
+| `destination` | sì | `stop_id` dell’ultima fermata |
+| `date` | no | Data `YYYY-MM-DD`; default: data server |
+| `day` | no | Giorno in inglese; default: giorno server |
+
+L’endpoint è usato dal [Trip Finder](features/trip-finder.md). Il risultato è
+ordinato per `departure_time` e include `trip_id`, `headsign`,
+`departure_time` e `arrival_time`.
+
 ### `GET /api/stop-upcoming`
 
 Restituisce tutti i passaggi previsti nei 60 minuti successivi.
@@ -476,6 +570,16 @@ curl -X POST 'https://example.test/api/log-js-error' \
 Risposta valida: `{"success":true}`. Un body JSON non valido produce HTTP
 `400`.
 
+## Utility cookie
+
+### `GET|POST /api/delete-cookie`
+
+Senza `name` tenta di rimuovere i cookie PHP ricevuti nella richiesta; con
+`name` limita l’operazione al cookie indicato. La risposta include l’elenco dei
+cookie rimossi e un’istruzione JavaScript per quelli accessibili solo dal client.
+È una utility legacy: non sostituisce la cancellazione di `localStorage` o
+`sessionStorage`.
+
 ## API amministrative
 
 Le API amministrative richiedono:
@@ -552,6 +656,20 @@ Risposta:
   "message": "Aggiornamento avviato."
 }
 ```
+
+### `GET /api/admin/gtfs-rt-inspector`
+
+Richiede una sessione admin autenticata. Scarica e decodifica un feed GTFS-RT
+tramite `GtfsRealtime::inspect()`.
+
+| Parametro | Obbligatorio | Valori |
+|---|---:|---|
+| `service` | no | `automobilistico` (default) oppure `navigation` |
+| `kind` | no | `vehicles` (default) oppure `updates` |
+
+La risposta contiene `success` e `data`, che include il payload raw e i record
+decodificati. Un servizio o tipo non valido produce `422`; un errore del feed
+produce `502`.
 
 ## Endpoint non API
 

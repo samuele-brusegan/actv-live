@@ -16,26 +16,33 @@ Il parser scarica i feed ufficiali ACTV e li trasforma in una cache JSON ottimiz
 
 ---
 
-## Logica di Ricerca Percorsi (`RoutePlanner.php`)
+## Logica di Ricerca Percorsi
 
-Il `RoutePlanner` implementa un algoritmo di ricerca percorsi personalizzato.
+Il percorso normale `/api/plan-route` usa `ConnectionScanPlanner` e la cache
+date-specifica generata da `ConnectionCacheBuilder`. Il planner combina le reti
+automobilistica e di navigazione in una sequenza ordinata di connessioni tra
+fermate consecutive.
 
-### 1. Connessioni Dirette
-Cerca nel `stop_routes_index.json` se l'origine e la destinazione condividono una linea. In caso affermativo, cerca i trip che passano per entrambe le fermate nell'ordine corretto e dopo l'orario richiesto.
+Per ogni fermata raggiungibile conserva il primo arrivo noto e il momento dal
+quale è possibile prendere un altro mezzo. Un'etichetta associata al `trip_id`
+permette di rimanere sullo stesso mezzo senza trattare ogni fermata come un nuovo
+cambio. Sono supportati cambi multipli tra bus, navigazione e percorsi a piedi;
+non esiste il vecchio limite concettuale di “un solo cambio” nella ricerca
+principale.
 
-### 2. Cambi (1 Transfer)
-Se non c'è una connessione diretta:
-1.  Prende tutte le linee che passano per l'origine.
-2.  Prende tutte le linee che passano per la destinazione.
-3.  Cerca una fermata intermedia dove queste linee si incrociano.
-4.  Calcola il tempo totale includendo un margine di 2 minuti per il cambio.
+Le fermate con lo stesso nome e compatibili per distanza possono essere raggruppate.
+Bus e navigazione entro 300 metri vengono collegati da un tratto a piedi, con una
+durata minima di trasferimento. La scansione considera la data richiesta e, se
+necessario, il giorno di servizio successivo, preservando gli orari GTFS oltre
+`24:00:00`.
 
-### 3. Ricerca nel Giorno Successivo
-Se dopo le 23:00 non ci sono più corse, il sistema riprova automaticamente la ricerca partendo dalle 00:00 del giorno dopo, marcando i risultati con un `day_offset`.
+`RoutePlanner` resta disponibile per compatibilità, per alcune API basate sulla
+cache JSON e per la risoluzione della fermata più vicina a coordinate geografiche;
+non è il planner usato per le richieste normali di `/api/plan-route`.
 
 ---
 
-## Struttura della Cache JSON
+## Struttura della Cache JSON di compatibilità
 
 -   **`stops.json`**: `{ "stop_id": { "name", "lat", "lon" } }`
 -   **`stop_routes_index.json`**: `{ "stop_id": ["route_id1", "route_id2"] }`
@@ -49,6 +56,10 @@ Se dopo le 23:00 non ci sono più corse, il sistema riprova automaticamente la r
     }
     ```
 
+Questa cache è utilizzata da `RoutePlanner` per le API compatibili e per alcune
+ricerche di supporto; il planner di produzione usa invece
+`data/gtfs/cache/planner/*.connections.tsv`.
+
 ---
 
 ## Funzioni Particolari
@@ -56,5 +67,10 @@ Se dopo le 23:00 non ci sono più corse, il sistema riprova automaticamente la r
 ### `calculateGeoDistance` (Haversine)
 Utilizzata per trovare la fermata più vicina partendo da coordinate GPS. Implementa la formula matematica per calcolare la distanza su una sfera (Terra).
 
-### `Weighted Scoring`
-I risultati non sono ordinati solo per orario di arrivo, ma penalizzati se prevedono un cambio (+15 minuti virtuali) o se sono nel giorno successivo (+24 ore virtuali). Questo assicura che un viaggio diretto alle 14:10 sia preferito a un viaggio con cambio che arriva alle 14:05.
+### Ordinamento delle alternative
+
+`ConnectionScanPlanner::planAlternatives()` esegue ricerche a partire dall'orario
+richiesto e da due orari successivi ravvicinati, elimina i duplicati e restituisce
+le alternative ordinate per arrivo. L'API può poi riordinare le alternative con
+`optimize=transfers` oppure `optimize=walking`; non applica un weighted scoring
+con una penalità fissa per i cambi.

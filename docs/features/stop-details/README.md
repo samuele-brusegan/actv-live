@@ -26,4 +26,3 @@ is a thin include of `stop.php`; all data is fetched client-side.
 
 - Observed delays feed the [delay statistics](../delay-stats.md) page.
 - The [shareable widget](../shareable-widget.md) reuses the same passage rendering.
-</content>

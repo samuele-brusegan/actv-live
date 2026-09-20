@@ -2,23 +2,30 @@
 
 The offline pipeline that turns the official ACTV GTFS feed into the data structures
 the app reads at runtime. This underpins the [route finder](route-finder/README.md)
-(JSON cache) and most GTFS APIs (MySQL tables).
+(metadata and date-specific connection caches) and the GTFS APIs (MySQL tables and
+legacy JSON caches).
 
 - **Service:** `app/services/GTFSParser.php`
-- **CLI entry:** `scripts/parse_gtfs.php`
+- **CLI entry principale:** `scripts/update_gtfs.php`
+- **Parser/cache locale:** `scripts/parse_gtfs.php`
 - **DB setup / helpers:** `scripts/setup_db.php`, `scripts/refine_shapes.php`,
   `scripts/update_stops_dataurl.php`, plus diagnostics
   (`check_db.php`, `check_refined.php`, `inspect_data.php`, `verify_shapes.php`,
   `test_planner.php`)
 
-## Hybrid storage model
+## Runtime storage model
 
-The app uses GTFS data in **two** forms:
+The app uses GTFS data in **three** related forms:
 
-1. **JSON cache** (`data/gtfs/cache/`) — produced by `GTFSParser`, optimized for the
-   `RoutePlanner` so route planning never hits the database.
-2. **MySQL tables** (`stops`, `routes`, `trips`, `stop_times`, `calendar`,
-   `shapes_refined`) — used by the DB-backed APIs (live map, trip details, gtfs-*).
+1. **Metadata and compatibility JSON** (`data/gtfs/cache/`) — produced by
+   `GTFSParser` and used by the production planner to resolve stops/routes, by
+   compatibility helpers, and by some APIs.
+2. **Date-specific connection cache** (`data/gtfs/cache/planner/`) — ordered TSV
+   connections built by `ConnectionCacheBuilder` for the production
+   `ConnectionScanPlanner`; it combines bus and navigation services.
+3. **MySQL tables** (`stops`, `routes`, `trips`, `stop_times`, `calendar`,
+   `shapes_refined`) — used by DB-backed APIs such as live map, trip details and
+   the `gtfs-*` endpoints.
 
 ## `GTFSParser` flow (`parseAll()`)
 
@@ -30,7 +37,10 @@ The app uses GTFS data in **two** forms:
 | Parse trips | `parseTrips()` | `cache/trips.json` (`id, route_id, service_id, headsign`) |
 | Parse stop_times | `parseStopTimes()` | per-route files + reverse index |
 
-Feed URL: `http://actv.avmspa.it/sites/default/files/attachments/opendata/automobilistico/actv_aut.zip`
+Feed predefinito: `https://actv.avmspa.it/sites/default/files/attachments/opendata/automobilistico/actv_aut.zip`.
+Il runner può ricevere più URL tramite `GTFS_URLS` e sceglie quello con header
+`Last-Modified` più recente; `GTFS_URL` singolare è mantenuto come fallback di
+compatibilità.
 
 ### Why stop_times is split per route
 
@@ -48,18 +58,21 @@ entire feed in PHP memory. The updater also logs the current parser method,
 progress every 50,000 rows, memory usage, the effective `memory_limit`, and
 precise CSV/JSON/write errors.
 
-This lets the planner load only the routes relevant to a query (see
-[route-finder/planning-algorithm.md](route-finder/planning-algorithm.md)).
+These files remain available to compatibility helpers and DB-backed APIs. The
+production route finder uses the date-specific connection cache described in
+[route-finder/planning-algorithm.md](route-finder/planning-algorithm.md).
 
 ## Refreshing the data
 
 ```bash
-php scripts/parse_gtfs.php
+php scripts/update_gtfs.php --trigger=manual
 ```
 
 `GTFSParser::isCacheValid($maxAge = 86400)` checks the age of `stops.json` so callers
 can decide whether a refresh is needed (default freshness window: 24h). `parseStops`
-raises the PHP memory limit to 1024M.
+raises the PHP memory limit to 1024M. L’aggiornamento completo usa invece
+`GtfsUpdateManager`, che scarica il feed, costruisce una cache temporanea, importa
+le tabelle di staging e pubblica tutto solo dopo la validazione.
 
 ## Aggiornamento completo e pianificato
 
@@ -90,7 +103,7 @@ Il comando `crontab` deve essere installato e l'utente PHP deve poter gestire il
 proprio crontab. Il salvataggio dal pannello restituisce un errore e ripristina la
 configurazione precedente se la sincronizzazione fallisce.
 
-La pianificazione usa il fuso UTC+00. I secondi vengono applicati tramite un
+La pianificazione usa `CRON_TZ=UTC` e quindi il fuso UTC+00. I secondi vengono applicati tramite un
 ritardo `sleep` dopo l'avvio del job da parte di cron, che ha precisione al minuto.
 
 Avvio CLI manuale:
