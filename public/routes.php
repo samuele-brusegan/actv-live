@@ -20,6 +20,7 @@ $router->add('/trip-details'            , 'Controller', 'tripDetails');
 $router->add('/widget'                  , 'Controller', 'widget');
 $router->add('/delay-stats'             , 'Controller', 'delayStats');
 $router->add('/routes'                  , 'Controller', 'routes');
+$router->add('/route'                   , 'Controller', 'routes');
 $router->add('/line-schedule'           , 'Controller', 'lineSchedule');
 $router->add('/trip-finder'             , 'Controller', 'tripFinder');
 $router->add('/delete-cookie'           , 'Controller', 'deleteCookie');

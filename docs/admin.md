@@ -14,6 +14,7 @@ feed GTFS-RT.
 | `/admin/feedback` | Feedback ricevuti, filtrabili per categoria e stato |
 | `/admin/gtfs-update` | Stato, avvio e pianificazione dell’importazione GTFS |
 | `/admin/gtfs-rt-inspector` | Ispezione raw e decodifica locale dei feed GTFS-RT |
+| `/route` | Elenco tecnico delle rotte registrate, accessibile solo agli amministratori |
 | `/admin/logout` | Chiusura della sessione admin |
 
 Le pagine sono registrate in [`public/routes.php`](../public/routes.php) e

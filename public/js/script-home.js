@@ -272,9 +272,27 @@ function renderJourneyResume() {
     section.classList.add('is-visible');
 }
 
+function setupLicenseShortcut() {
+    const license = document.getElementById('footer-licence');
+    if (!license) return;
+
+    let clicks = 0;
+    let resetTimer = null;
+    license.addEventListener('click', () => {
+        clicks += 1;
+        clearTimeout(resetTimer);
+        resetTimer = setTimeout(() => { clicks = 0; }, 1500);
+
+        if (clicks === 7) {
+            window.location.assign('/route');
+        }
+    });
+}
+
 // Inizializzazione Completa
 window.onload = () => {
     renderJourneyResume();
+    setupLicenseShortcut();
     initHomeMap();
     checkImportantNotices();
 };

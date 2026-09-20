@@ -144,6 +144,7 @@ class Controller {
     }
 
     function routes() {
+        AdminAuth::requireAuth();
         global $router;
         $routes = $router -> list();
         require_once BASE_PATH . '/app/views/routes.php';
