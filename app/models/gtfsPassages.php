@@ -27,7 +27,10 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
             return;
         }
 
-        $now = date('H:i:s');
+        // Conserva anche le corse appena trascorse: sono proprio quelle che
+        // ricompaiono nel JSON quando viaggiano in ritardo. Escluderle rendeva
+        // inevitabile associare il passaggio alla corsa GTFS successiva.
+        $lookback = date('H:i:s', time() - 2 * 3600);
         $date = date('Ymd');
 
         // Risolvi prima la piccola tabella fermate. Il precedente LIKE era
@@ -91,7 +94,7 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
                 ORDER BY st.departure_time ASC
                 LIMIT 40";
 
-        $rows = $db->query($sql, array_merge($stopIds, $serviceIds, [$now]));
+        $rows = $db->query($sql, array_merge($stopIds, $serviceIds, [$lookback]));
 
         $seen = [];
         $out = [];

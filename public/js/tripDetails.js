@@ -42,6 +42,8 @@ let tripMapSelectedStopId = null;
 let tripMapStops = [];
 let tripMapProgress = null;
 let tripMapNextStopScrolled = false;
+let tripDetailsRefreshTimer = null;
+let tripMapVehiclePosition = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -62,6 +64,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /** Inizializzazione della pagina */
+function renderAvailableTripData() {
+    if (!Array.isArray(state.stopsGTFS) || !state.stopsGTFS.length) return;
+    state.mergedStops = mergeStops();
+    renderTimeline();
+}
+
 async function init() {
     const dow = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
     state.today = dow[new Date().getDay()];
@@ -77,72 +85,57 @@ async function init() {
     const lineId = contextValue('contextLineId', 'lineId');
     state.tripContext = { stop: timedStop, time: realTime, destination: lastStop, lineId };
 
-    let initUnpackTripId = async () => {
+    state.currentStopId = urlParams.get('stopId') || sessionStorage.getItem('tripDetails_selectedStop');
 
-        let data = await unpackTripId(state.tripId);
+    const infoPromise = (async () => {
+        const data = await unpackTripId(state.tripId);
+        if (!data || data.error) return null;
         state.line = data.bus_track;
         state.destination = data.bus_direction;
         state.tag = data.line_tag;
         state.lineFull = state.line + "_" + state.tag;
-
-
-        let loadingBox = document.querySelector('.loading-state');
-        if (loadingBox) loadingBox.innerHTML += '<br>Info corsa caricate';
         updateHeader();
-    }
-    let initStopsGTFS = async () => {
+        updateTripMapHeader();
+        return data;
+    })();
+
+    const gtfsPromise = (async () => {
         state.stopsGTFS = await fetchGTFSStops(state.tripId);
+        renderAvailableTripData();
+        return state.stopsGTFS;
+    })();
 
-
-        let loadingBox = document.querySelector('.loading-state');
-        if (loadingBox) loadingBox.innerHTML += '<br>Percorso caricato';
-    }
-
-    await Promise.all([initUnpackTripId(), initStopsGTFS()]);
-
-    let initStopsJSON = async () => {
-        state.currentStopId = urlParams.get('stopId') || sessionStorage.getItem('tripDetails_selectedStop');
+    const realtimePromise = infoPromise.then(async info => {
+        if (!info || !state.currentStopId) return [];
         state.stopsJSON = await fetchRealTimeInfo(state.currentStopId, state.line, state.today, state.tripContext);
-
-
-        let loadingBox = document.querySelector('.loading-state');
-        if (loadingBox) loadingBox.innerHTML += '<br>Fermate caricate';
-    }
-    await initStopsJSON();
-    // I dati real-time sono appena stati caricati: evita una seconda chiamata
-    // identica (e le relative risoluzioni trip) nel primo refresh.
-    firstIteration.refresh = false;
-
-    //set stopId from url
-    state.currentStopId = urlParams.get('stopId') || sessionStorage.getItem('tripDetails_selectedStop');
-
-    // Destination e last stop non matchano lancio un warn in console
-    if (state.destination != lastStop) {
-        console.warn(`REQUESTED USER CONTROL: \n
-            Destination e last stop non matchano\n
-            dest.   : ${state.destination}\n
-            lastStop: ${lastStop}
-        `);
-    }
-
-    // 1. Identifica il Trip ID univoco nel GTFS
-    //state.tripId = await fetchTripId(trackName, lastStop, state.today, realTime, timedStop, lineId);
+        firstIteration.refresh = false;
+        await gtfsPromise;
+        await refreshData(false);
+        return state.stopsJSON;
+    }).catch(error => {
+        console.error('Caricamento realtime fallito:', error);
+        return [];
+    });
 
     if (!state.tripId) {
         console.error("Impossibile identificare il Trip ID.");
     }
 
-    // Inizializza l'intestazione
-    updateHeader();
+    // Nessuna delle richieste blocca le altre. Il refresh periodico parte
+    // quando il primo tentativo realtime e terminato, anche se senza dati.
+    realtimePromise.finally(() => {
+        clearInterval(tripDetailsRefreshTimer);
+        tripDetailsRefreshTimer = setInterval(() => refreshData(true), 25000);
+    });
 
-    // 2. Carica il percorso statico (GTFS)
-    // state.stopsGTFS = await fetchGTFSStops(state.tripId);
-
-    // 3. Primo rendering e avvio loop di aggiornamento
-    if (state.stopsGTFS) {
-        await refreshData();
-        setInterval(refreshData, 25000);
-    }
+    Promise.allSettled([infoPromise, gtfsPromise]).then(() => {
+        if (state.destination && lastStop && state.destination !== lastStop) {
+            console.warn('Destinazione GTFS diversa dal contesto selezionato', {
+                destination: state.destination,
+                requestedDestination: lastStop
+            });
+        }
+    });
 }
 
 async function unpackTripId(tripId) {
@@ -222,7 +215,7 @@ function formatMinutesRemaining(timeString) {
 }
 
 /** Recupera il Trip ID univoco */
-async function fetchTripId(busTrack, busDirection, day, time, stop, lineId, stopId = null) {
+async function fetchTripId(busTrack, busDirection, day, time, stop, lineId, stopId = null, excludeTripIds = []) {
     let text = '';
     try {
         const params = new URLSearchParams({
@@ -237,6 +230,7 @@ async function fetchTripId(busTrack, busDirection, day, time, stop, lineId, stop
         if (stopId && stopId !== 'null') {
             params.append('stopId', stopId);
         }
+        if (excludeTripIds.length) params.append('excludeTripIds', excludeTripIds.join(','));
         let url = `/api/gtfs-identify?${params.toString()}`;
         // console.log("https://actv-live.test"+url);
 
@@ -260,16 +254,22 @@ async function fetchTripId(busTrack, busDirection, day, time, stop, lineId, stop
 }
 
 /** Aggiorna i dati in tempo reale e ridisegna la lista */
-async function refreshData() {
+async function refreshData(fetchRealtime = true) {
     try {
-        if (firstIteration.refresh) {
-            state.stopsJSON = await fetchRealTimeInfo(state.currentStopId, state.line, state.today);
+        if (fetchRealtime && state.currentStopId && state.line) {
+            state.stopsJSON = await fetchRealTimeInfo(
+                state.currentStopId,
+                state.line,
+                state.today,
+                state.tripContext
+            );
             firstIteration.refresh = false;
         }
 
         // Cerca se la fermata SELEZIONATA è nella lista GTFS
+        const selectedIds = String(state.currentStopId || '').split('-').filter(Boolean);
         const selectedStopInGTFS = state.stopsGTFS.find(s =>
-            state.currentStopId.split('-').includes(s.stop_id.toString())
+            selectedIds.includes(s.stop_id.toString())
         );
 
         if (selectedStopInGTFS) {
@@ -373,10 +373,35 @@ async function fetchRealTimeInfo(currentStopId, line, today, context = null) {
             const tripLine = trip.line?.split('_')[0];
             return tripLine === line;
         });
-        const matchPromises = plausibleTrips.map(async trip => {
+        // La card di partenza porta con se il passaggio JSON preciso scelto
+        // dall'utente. Se stop/orario/destinazione identificano una sola corsa,
+        // non serve ricalcolarne il trip_id: un resolver temporale potrebbe
+        // attribuire l'ID esatto alla corsa vicina quando entrambe sono in ritardo.
+        const contextStop = normalizeStopName(context?.stop);
+        const contextTime = String(context?.time ?? '').slice(0, 5);
+        const contextDestination = normalizeStopName(context?.destination || state.destination);
+        if (contextStop && contextTime) {
+            const contextMatches = plausibleTrips.filter(trip => {
+                if (contextDestination && normalizeStopName(trip.destination) !== contextDestination) return false;
+                return (trip.timingPoints || []).some(point =>
+                    normalizeStopName(point.stop) === contextStop
+                    && String(point.time ?? '').slice(0, 5) === contextTime
+                );
+            });
+            if (contextMatches.length === 1) return contextMatches[0].timingPoints || [];
+        }
+        const results = [];
+        const assignedTripIds = [];
+        // Risoluzione intenzionalmente sequenziale: ogni trip_id assegnato
+        // viene escluso dal candidato successivo, quindi due corse ravvicinate
+        // non possono collassare sullo stesso viaggio GTFS.
+        for (const trip of plausibleTrips) {
             const timingPoints = Array.isArray(trip.timingPoints) ? trip.timingPoints : [];
             const stop = timingPoints[timingPoints.length - 1];
-            if (!stop) return { ...trip, calculatedTripId: null };
+            if (!stop) {
+                results.push({ ...trip, calculatedTripId: null });
+                continue;
+            }
 
             const tid = await fetchTripId(
                 trip.line.split('_')[0],
@@ -384,12 +409,13 @@ async function fetchRealTimeInfo(currentStopId, line, today, context = null) {
                 today,
                 stop.time,
                 stop.stop,
-                trip.lineId
+                trip.lineId,
+                currentStopId,
+                assignedTripIds
             );
-            return { ...trip, calculatedTripId: tid };
-        });
-
-        const results = await Promise.all(matchPromises);
+            if (tid) assignedTripIds.push(String(tid));
+            results.push({ ...trip, calculatedTripId: tid });
+        }
         return selectMatchingTripTimingPoints(results, state.tripId, {
             ...context,
             expectedDestination: state.destination
@@ -448,23 +474,29 @@ async function openMap() {
     }
     dialog.hidden = false;
     document.body.classList.add('trip-map-open');
-    const lineBadge = document.getElementById('trip-map-line');
-    const direction = document.getElementById('trip-map-direction');
-    if (lineBadge) lineBadge.textContent = state.line || '--';
-    if (direction) direction.textContent = state.destination?.replace(/\\/g, '') || 'Corsa ACTV';
+    updateTripMapHeader();
 
     if (!tripMap) {
         tripMap = L.map('trip-map', { attributionControl: false }).setView([45.4384, 12.3359], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(tripMap);
-        await loadTripMap();
+        // Geometria/fermate e posizione live sono indipendenti: il marker puo
+        // apparire subito anche se la shape e ancora in download.
+        void loadTripMap();
     }
     startTripMapUserLocation();
     setTimeout(() => tripMap.invalidateSize(), 0);
-    await refreshTripVehicle();
+    void refreshTripVehicle();
     clearInterval(tripMapRefreshTimer);
     tripMapRefreshTimer = setInterval(refreshTripVehicle, 10000);
+}
+
+function updateTripMapHeader() {
+    const lineBadge = document.getElementById('trip-map-line');
+    const direction = document.getElementById('trip-map-direction');
+    if (lineBadge) lineBadge.textContent = state.line || '--';
+    if (direction) direction.textContent = state.destination?.replace(/\\/g, '') || 'Corsa ACTV';
 }
 
 function closeMap() {
@@ -736,7 +768,8 @@ async function loadTripMap() {
             tripMapStopMarkers.set(index, marker);
         });
         renderMapStops(stops || []);
-        if (status) status.textContent = 'Ricerca posizione del mezzo...';
+        if (tripMapVehiclePosition) updateTripMapProgress(tripMapVehiclePosition);
+        if (status && !tripMapVehiclePosition) status.textContent = 'Ricerca posizione del mezzo...';
     } catch (error) {
         if (status) status.textContent = error.message;
     }
@@ -885,6 +918,7 @@ function startTripMapUserLocation() {
 async function refreshTripVehicle() {
     if (!tripMap || !state.tripId) return;
     const status = document.getElementById('trip-map-status');
+    if (status) status.innerHTML = '<span class="trip-map-live-dot"></span>Ricerca del mezzo in corso…';
     try {
         const params = new URLSearchParams({ service: 'automobilistico', tripId: state.tripId });
         if (tripMapShape?.route_id) params.set('routeId', tripMapShape.route_id);
@@ -917,7 +951,8 @@ async function refreshTripVehicle() {
             if (status) status.innerHTML = '<span class="trip-map-live-dot offline"></span>Nessun mezzo attivo rilevato su questa corsa';
             return;
         }
-        updateTripMapProgress({ lat, lng });
+        tripMapVehiclePosition = { lat, lng };
+        updateTripMapProgress(tripMapVehiclePosition);
         if (!tripMapVehicleMarker) {
             const icon = L.divIcon({ className: 'trip-map-bus-icon', html: busMarkerSvg(), iconSize: [42, 42], iconAnchor: [21, 21] });
             tripMapVehicleMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(tripMap).bindPopup(`<strong>Linea ${state.line || ''}</strong><br>Posizione rilevata in tempo reale`);

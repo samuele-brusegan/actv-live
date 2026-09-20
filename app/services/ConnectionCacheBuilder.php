@@ -8,17 +8,18 @@ class ConnectionCacheBuilder {
     private string $plannerDir;
     private array $profiles;
 
-    public function __construct() {
-        $this->plannerDir = BASE_PATH . '/data/gtfs/cache/planner';
+    public function __construct(?string $dataRoot = null, ?string $plannerDir = null) {
+        $dataRoot = rtrim($dataRoot ?: BASE_PATH . '/data', '/');
+        $this->plannerDir = $plannerDir ?: $dataRoot . '/gtfs/cache/planner';
         $this->profiles = [
             'automobilistico' => [
-                'data' => BASE_PATH . '/data/gtfs',
-                'cache' => BASE_PATH . '/data/gtfs/cache',
+                'data' => $dataRoot . '/gtfs',
+                'cache' => $dataRoot . '/gtfs/cache',
                 'mode' => 'bus',
             ],
             'navigation' => [
-                'data' => BASE_PATH . '/data/gtfs/navigation',
-                'cache' => BASE_PATH . '/data/gtfs/cache/navigation',
+                'data' => $dataRoot . '/gtfs/navigation',
+                'cache' => $dataRoot . '/gtfs/cache/navigation',
                 'mode' => 'water',
             ],
         ];

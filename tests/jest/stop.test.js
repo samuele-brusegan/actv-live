@@ -75,6 +75,45 @@ describe('mergePassages (fallback previsti)', () => {
         ];
         expect(mergePassages([], sched).length).toBe(1);
     });
+
+    test('non assegna lo stesso trip_id a due corse ravvicinate in ritardo', () => {
+        const rt = [
+            { line: '21_UM', destination: 'Mestre Centro', time: '08:08', real: true },
+            { line: '21_UM', destination: 'Mestre Centro', time: '08:13', real: true }
+        ];
+        const sched = [
+            { line: '21', destination: 'Mestre Centro', time: '08:00', trip_id: '21-first' },
+            { line: '21', destination: 'Mestre Centro', time: '08:05', trip_id: '21-second' },
+            { line: '21', destination: 'Mestre Centro', time: '08:10', trip_id: '21-third' }
+        ];
+
+        const merged = mergePassages(rt, sched);
+
+        expect(new Set(merged.map(item => item.trip_id)).size).toBe(2);
+    });
+
+    test('preferisce i trip_id esatti delle corse attive GTFS-RT', () => {
+        const rt = [
+            { line: '21_UM', destination: 'Mestre Centro', time: '08:08' },
+            { line: '21_UM', destination: 'Mestre Centro', time: '08:13' }
+        ];
+        const sched = [
+            { line: '21', destination: 'Mestre Centro', time: '08:00', trip_id: '21-first' },
+            { line: '21', destination: 'Mestre Centro', time: '08:05', trip_id: '21-second' },
+            { line: '21', destination: 'Mestre Centro', time: '08:10', trip_id: '21-third' }
+        ];
+
+        const merged = mergePassages(rt, sched, new Set(['21-first', '21-second']));
+
+        expect(merged.map(item => item.trip_id)).toEqual(['21-first', '21-second']);
+        expect(new Set(merged.map(item => item.trip_id)).size).toBe(2);
+    });
+
+    test('preserva un trip_id gia fornito dalla sorgente', () => {
+        const rt = [{ line: '21', destination: 'Mestre', time: '08:08', trip_id: 'exact-trip' }];
+        const sched = [{ line: '21', destination: 'Mestre', time: '08:08', trip_id: 'other-trip' }];
+        expect(mergePassages(rt, sched)[0].trip_id).toBe('exact-trip');
+    });
 });
 
 describe('isLikelyStrike', () => {

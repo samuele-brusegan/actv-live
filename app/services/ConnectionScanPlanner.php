@@ -13,10 +13,11 @@ class ConnectionScanPlanner {
     private array $stationGroups = [];
     private array $footpaths = [];
 
-    public function __construct() {
-        $this->cacheBuilder = new ConnectionCacheBuilder();
-        $this->loadMetadata('automobilistico', 'bus', BASE_PATH . '/data/gtfs/cache');
-        $this->loadMetadata('navigation', 'water', BASE_PATH . '/data/gtfs/cache/navigation');
+    public function __construct(?string $dataRoot = null) {
+        $dataRoot = rtrim($dataRoot ?: BASE_PATH . '/data', '/');
+        $this->cacheBuilder = new ConnectionCacheBuilder($dataRoot);
+        $this->loadMetadata('automobilistico', 'bus', $dataRoot . '/gtfs/cache');
+        $this->loadMetadata('navigation', 'water', $dataRoot . '/gtfs/cache/navigation');
         $this->buildFootpaths();
     }
 

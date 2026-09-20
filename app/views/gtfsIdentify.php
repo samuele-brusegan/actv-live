@@ -18,10 +18,11 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         $stop = $_GET['stop'] ?? null;                  //Martellago delle Motte
         $lineId = $_GET['lineId'] ?? null;              //29387
         $stopId = $_GET['stopId'] ?? null;              //337-web-aut
+        $excludeTripIds = array_values(array_filter(array_map('trim', explode(',', (string)($_GET['excludeTripIds'] ?? '')))));
         $limit = $_GET['limit'] ?? 1;
 
         $pdo = getPDOConnection();
-        $trips = dbquery($pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId);
+        $trips = dbquery($pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId, $excludeTripIds);
 
         /*
             {
@@ -236,7 +237,7 @@ function addCombinedScores(array &$trips, string $busDirection, $realSec) {
     });
 }
 
-function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId = null) {
+function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop, $stopId = null, array $excludeTripIds = []) {
     $allowedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     $day = strtolower($day);
     if (!in_array($day, $allowedDays)) {
@@ -297,6 +298,12 @@ function dbquery(PDO $pdo, $time, $busTrack, $busDirection, $day, $lineId, $stop
 
     $realSec = timeStrToSec($time);
     addCombinedScores($trips, $busDirection, $realSec);
+    if ($excludeTripIds) {
+        $excluded = array_fill_keys(array_map('strval', $excludeTripIds), true);
+        $trips = array_values(array_filter($trips, static fn($trip) => !isset($excluded[(string)($trip['trip_id'] ?? '')])));
+    }
+
+    if (!$trips) return [];
 
     //Rimuovi tutte le chiavi vuote che non sono valorizzate per nessun trip
     $keys = array_keys($trips[0]);

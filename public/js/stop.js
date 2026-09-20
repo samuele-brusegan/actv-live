@@ -281,32 +281,51 @@ function lineDestKey(p) {
 
 /** Unisce real-time e previsti: aggiunge i previsti per le combinazioni
  *  linea+destinazione NON già presenti nel real-time (dati mancanti). */
-function mergePassages(realtime, scheduled) {
-    const result = Array.isArray(realtime) ? realtime.slice() : [];
+function mergePassages(realtime, scheduled, activeTripIds = null) {
+    // Non mutare il payload ACTV: serve conservarlo integro per rifare il
+    // match quando arrivano gli ID esatti delle corse attive dal GTFS-RT.
+    const result = Array.isArray(realtime) ? realtime.map(p => ({ ...p })) : [];
+    const active = activeTripIds instanceof Set
+        ? activeTripIds
+        : new Set((activeTripIds || []).map(String));
     const scheduledByKey = new Map();
     (Array.isArray(scheduled) ? scheduled : []).forEach(p => {
         const key = lineDestKey(p);
         if (!scheduledByKey.has(key)) scheduledByKey.set(key, []);
         scheduledByKey.get(key).push(p);
     });
+    // Un trip GTFS rappresenta una sola corsa: non puo essere assegnato a due
+    // passaggi realtime diversi. Il vecchio nearest-neighbour indipendente
+    // permetteva invece, per esempio, a due 21 distanziati di pochi minuti e
+    // entrambi in ritardo di ricevere il trip_id della seconda corsa.
+    const usedTripIds = new Set(result.map(p => String(p.trip_id || '')).filter(Boolean));
     result.forEach(p => {
-        const candidates = scheduledByKey.get(lineDestKey(p)) || [];
+        if (p.trip_id) return; // ID fornito dalla sorgente: non ricalcolarlo.
+        let candidates = (scheduledByKey.get(lineDestKey(p)) || [])
+            .filter(candidate => candidate.trip_id && !usedTripIds.has(String(candidate.trip_id)));
+        const activeCandidates = candidates.filter(candidate => active.has(String(candidate.trip_id)));
+        const hasActiveCandidates = activeCandidates.length > 0;
+        if (hasActiveCandidates) candidates = activeCandidates;
         const relativeMinutes = /^\s*\d+\s*'\s*$/.test(String(p.time || '')) ? parseInt(p.time, 10) : null;
         const target = new Date();
         if (relativeMinutes != null) target.setMinutes(target.getMinutes() + relativeMinutes);
         const targetMinutes = relativeMinutes != null
             ? target.getHours() * 60 + target.getMinutes()
             : (() => { const parts = String(p.time || '').split(':').map(Number); return Number.isFinite(parts[0]) && Number.isFinite(parts[1]) ? parts[0] * 60 + parts[1] : null; })();
-        const candidate = candidates.slice().sort((a, b) => {
+        const candidate = (hasActiveCandidates ? candidates : candidates.slice().sort((a, b) => {
             const minutes = item => { const parts = String(item.time || '').split(':').map(Number); return Number.isFinite(parts[0]) && Number.isFinite(parts[1]) ? parts[0] * 60 + parts[1] : Number.MAX_SAFE_INTEGER; };
             return targetMinutes == null ? 0 : Math.abs(minutes(a) - targetMinutes) - Math.abs(minutes(b) - targetMinutes);
-        })[0];
-        if (candidate) Object.assign(p, {
-            trip_id: candidate.trip_id,
-            gtfs_stop_id: candidate.gtfs_stop_id,
-            stop_lat: candidate.stop_lat,
-            stop_lon: candidate.stop_lon
-        });
+        }))[0];
+        if (candidate) {
+            usedTripIds.add(String(candidate.trip_id));
+            Object.assign(p, {
+                trip_id: candidate.trip_id,
+                gtfs_stop_id: candidate.gtfs_stop_id,
+                stop_lat: candidate.stop_lat,
+                stop_lon: candidate.stop_lon,
+                scheduled_time: candidate.time
+            });
+        }
     });
     const covered = new Set(result.map(lineDestKey));
     const added = new Set();
@@ -410,7 +429,11 @@ async function loadPassages() {
     }
 
     const passages = mergePassages(realtime, scheduled);
-    const vehiclesPromise = fetchStopVehicles(passages.concat(navigationPassages).map(passage => passage.trip_id));
+    // Chiedi i mezzi per tutte le corse candidate, non solo per il primo match
+    // euristico: il feed GTFS-RT restituisce trip_id esatti e disambigua le
+    // corse quando il ritardo supera la loro distanza in orario.
+    const candidateTripIds = scheduled.concat(navigationPassages).map(passage => passage.trip_id);
+    const vehiclesPromise = fetchStopVehicles(candidateTripIds);
 
     if (passages.length === 0 && navigationPassages.length === 0) {
         const message = strike
@@ -433,6 +456,11 @@ async function loadPassages() {
     // fermate mancanti e link mappa senza trattenere i dati fondamentali.
     vehiclesPromise.then(async vehicles => {
         if (loadToken !== passagesLoadToken) return;
+        const activeTripIds = new Set((vehicles || []).map(vehicle => String(vehicle.trip_id || '')).filter(Boolean));
+        if (activeTripIds.size && Array.isArray(realtime)) {
+            const exactPassages = mergePassages(realtime, scheduled, activeTripIds);
+            passages.splice(0, passages.length, ...exactPassages);
+        }
         attachVehiclesToPassages(passages, vehicles);
         attachVehiclesToPassages(navigationPassages, vehicles);
         await enrichPassageProgress(passages.concat(navigationPassages));
@@ -575,7 +603,8 @@ function createPassageCard(p) {
         sessionStorage.setItem('lineId', lineId);
         sessionStorage.setItem('tripDetails_selectedStop', stationId);
 
-        // Fetch tripId
+        // mergePassages ha gia associato questa specifica corsa al GTFS. Il
+        // resolver resta solo come fallback per payload privi di trip_id.
         const dow = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
         let day = dow[new Date().getDay()];
 
@@ -593,7 +622,20 @@ function createPassageCard(p) {
         sessionStorage.setItem('tripDetails_url', url);
 
 
-        const tripId = await fetchTripId(lineName, destination, day, timingPoint.time, timingPoint.stop, lineId);
+        const tripId = p.trip_id || await fetchTripId(
+            lineName,
+            destination,
+            day,
+            timingPoint.time,
+            timingPoint.stop,
+            lineId,
+            stationId
+        );
+
+        if (!tripId) {
+            errorPopup('Impossibile identificare con certezza questa corsa.');
+            return;
+        }
 
         const params = new URLSearchParams({
             tripId: tripId,
@@ -622,7 +664,7 @@ function createPassageCard(p) {
     return div;
 }
 
-async function fetchTripId(busTrack, busDirection, day, time, stop, lineId) {
+async function fetchTripId(busTrack, busDirection, day, time, stop, lineId, stopId = null) {
     let text = '';
     try {
         const params = new URLSearchParams({
@@ -634,6 +676,7 @@ async function fetchTripId(busTrack, busDirection, day, time, stop, lineId) {
             stop: stop,
             lineId: lineId
         });
+        if (stopId) params.set('stopId', stopId);
         let url = `/api/gtfs-identify?${params.toString()}`;
         //console.log("https://actv-live.test"+url);
 

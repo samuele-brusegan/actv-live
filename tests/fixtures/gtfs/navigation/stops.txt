@@ -1,0 +1,4 @@
+stop_id,stop_name,stop_lat,stop_lon
+100,Mestre Transfer,45.482,12.237
+4609,Pellestrina Centro Ittico,45.278,12.303
+200,Lido,45.417,12.368

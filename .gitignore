@@ -3,6 +3,7 @@
 /bak1/
 /app/bak_views/
 .env
+tests/fixtures/gtfs/cache/planner/
 data/
 bak*
 node_modules/

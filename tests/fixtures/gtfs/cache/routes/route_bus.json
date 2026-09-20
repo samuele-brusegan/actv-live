@@ -1,0 +1,6 @@
+{
+  "bus_trip": [
+    {"stop_id": "162", "arrival_time": "16:56:00", "departure_time": "16:56:00", "stop_sequence": 1},
+    {"stop_id": "100", "arrival_time": "17:10:00", "departure_time": "17:10:00", "stop_sequence": 2}
+  ]
+}

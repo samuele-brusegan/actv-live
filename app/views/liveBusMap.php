@@ -33,11 +33,15 @@
             <button type="button" class="service-switch-btn" data-service="navigation">Navigazione</button>
             <button type="button" class="service-switch-btn" data-service="automobilistico">Automobilistico</button>
         </div>
-        <input type="text" id="filter-input" placeholder="Filtra: linea, tripId, routeId..." autocomplete="off">
+        <input type="text" id="filter-input" list="search-history-list" placeholder="Filtra: linea, destinazione, tripId..." autocomplete="off">
+        <datalist id="search-history-list"></datalist>
         <button id="filter-clear" class="filter-btn" title="Cancella filtro">✕</button>
+        <button id="btn-search-history" class="filter-btn" type="button" title="Cronologia ricerche" aria-controls="search-history-panel">◷</button>
+        <button id="btn-my-position" class="filter-btn" type="button" title="Mostra la mia posizione">◎</button>
         <button id="btn-toggle-nd" class="filter-btn nd-toggle-btn" type="button" title="Mostra i mezzi senza linea"><span class="nd-toggle-icon">⊘</span><span class="nd-toggle-label">Mostra N/D</span></button>
         <button id="btn-refresh" class="filter-btn" title="Aggiorna">↻</button>
     </div>
+    <div id="search-history-panel" class="map-floating-panel hidden" aria-label="Cronologia ricerche"></div>
 
     <!-- Map -->
     <div id="map"></div>
@@ -50,6 +54,11 @@
         </div>
         <div id="last-update"></div>
     </div>
+
+    <aside id="bus-details-panel" class="bus-details-panel hidden" aria-live="polite">
+        <button id="bus-details-close" class="bus-details-close" type="button" aria-label="Chiudi dettagli">×</button>
+        <div id="bus-details-content"></div>
+    </aside>
 
     <script src="/js/liveBusMap.js"></script>
 </body>

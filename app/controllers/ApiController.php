@@ -164,7 +164,7 @@ class ApiController {
         header('Content-Type: application/json');
         header('Cache-Control: public, max-age=300, stale-while-revalidate=900');
         require_once BASE_PATH . '/app/services/ResponseCache.php';
-        $keys = ['time', 'busTrack', 'busDirection', 'day', 'stop', 'lineId', 'stopId', 'limit'];
+        $keys = ['time', 'busTrack', 'busDirection', 'day', 'stop', 'lineId', 'stopId', 'excludeTripIds', 'limit'];
         $arguments = [];
         foreach ($keys as $key) $arguments[$key] = (string)($_GET[$key] ?? '');
         $payload = ResponseCache::remember('gtfs-identify|' . hash('sha256', json_encode($arguments)), 300, function () {
@@ -627,10 +627,63 @@ class ApiController {
         require_once BASE_PATH . '/app/services/ResponseCache.php';
         $vehicles = ResponseCache::remember('realtime-vehicles-' . $service, 3, function () use ($service) {
             $items = GtfsRealtime::read('vehicles', $service);
+            $items = $this->enrichRealtimeVehicleTrips($items, $service);
             return $service === 'automobilistico' ? $this->guessBusRoutes($items) : $items;
         });
         $vehicles = $this->filterRequestedVehicles($vehicles);
         echo json_encode(['success'=>true, 'service'=>$service, 'vehicles'=>$vehicles], JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    private function enrichRealtimeVehicleTrips(array $vehicles, string $service): array {
+        $base = BASE_PATH . '/data/gtfs/cache' . ($service === 'navigation' ? '/navigation' : '');
+        $trips = is_file($base . '/trips.json') ? json_decode((string)file_get_contents($base . '/trips.json'), true) : [];
+        $routes = is_file($base . '/routes.json') ? json_decode((string)file_get_contents($base . '/routes.json'), true) : [];
+        if (!is_array($trips)) $trips = [];
+        if (!is_array($routes)) $routes = [];
+        foreach ($vehicles as &$vehicle) {
+            $trip = $trips[(string)($vehicle['trip_id'] ?? '')] ?? null;
+            $routeId = (string)((is_array($trip) ? ($trip['route_id'] ?? null) : null) ?? $vehicle['route_id'] ?? '');
+            $route = is_array($routes[$routeId] ?? null) ? $routes[$routeId] : [];
+            $vehicle['route_id'] = $routeId;
+            $vehicle['route_short_name'] = (string)($route['short_name'] ?? $route['route_short_name'] ?? $vehicle['route_short_name'] ?? $routeId);
+            $vehicle['route_long_name'] = (string)($route['long_name'] ?? $route['route_long_name'] ?? '');
+            if (is_array($trip)) $vehicle['trip_headsign'] = (string)($trip['headsign'] ?? $trip['trip_headsign'] ?? '');
+            $color = (string)($route['route_color'] ?? $route['color'] ?? '');
+            if ($color !== '') $vehicle['route_color'] = '#' . ltrim($color, '#');
+        }
+        unset($vehicle);
+        if ($service === 'automobilistico') {
+            $missingIds = array_values(array_unique(array_filter(array_map(
+                static fn($vehicle) => empty($vehicle['trip_headsign']) ? (string)($vehicle['trip_id'] ?? '') : '',
+                $vehicles
+            ))));
+            if ($missingIds) {
+                try {
+                    $placeholders = implode(',', array_fill(0, count($missingIds), '?'));
+                    $rows = $this->getDb()->query(
+                        "SELECT t.trip_id, t.trip_headsign, t.route_id, r.route_short_name, r.route_long_name, r.route_color
+                         FROM trips t JOIN routes r ON r.route_id = t.route_id
+                         WHERE t.trip_id IN ($placeholders)",
+                        $missingIds
+                    );
+                    $byTrip = array_column($rows, null, 'trip_id');
+                    foreach ($vehicles as &$vehicle) {
+                        $row = $byTrip[(string)($vehicle['trip_id'] ?? '')] ?? null;
+                        if (!is_array($row)) continue;
+                        $vehicle['trip_headsign'] = (string)($row['trip_headsign'] ?? '');
+                        $vehicle['route_id'] = (string)($row['route_id'] ?? $vehicle['route_id'] ?? '');
+                        $vehicle['route_short_name'] = (string)($row['route_short_name'] ?? $vehicle['route_short_name'] ?? '');
+                        $vehicle['route_long_name'] = (string)($row['route_long_name'] ?? $vehicle['route_long_name'] ?? '');
+                        $color = (string)($row['route_color'] ?? '');
+                        if ($color !== '') $vehicle['route_color'] = '#' . ltrim($color, '#');
+                    }
+                    unset($vehicle);
+                } catch (Throwable $e) {
+                    // Il feed posizioni deve restare disponibile anche senza DB.
+                }
+            }
+        }
+        return $vehicles;
     }
 
     private function requestedTripIds(): array {

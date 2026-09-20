@@ -21,6 +21,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterInput  = document.getElementById('filter-input');
     const filterClear  = document.getElementById('filter-clear');
     const btnRefresh   = document.getElementById('btn-refresh');
+    const btnSearchHistory = document.getElementById('btn-search-history');
+    const searchHistoryPanel = document.getElementById('search-history-panel');
+    const searchHistoryList = document.getElementById('search-history-list');
+    const btnMyPosition = document.getElementById('btn-my-position');
+    const busDetailsPanel = document.getElementById('bus-details-panel');
+    const busDetailsContent = document.getElementById('bus-details-content');
+    const busDetailsClose = document.getElementById('bus-details-close');
     const btnToggleNd  = document.getElementById('btn-toggle-nd');
     const counterText  = document.getElementById('counter-text');
     const lastUpdateEl = document.getElementById('last-update');
@@ -101,6 +108,37 @@ document.addEventListener('DOMContentLoaded', () => {
     let busLoadRunning = false;
     let refreshTimer = null;
     let stopCache = new Map();  // Cache per i passaggi alle fermate
+    let selectedShapeTripId = null;
+    let userPositionMarker = null;
+    let userAccuracyCircle = null;
+    const SEARCH_HISTORY_KEY = 'actv-live-map-search-history';
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+    }
+
+    function getSearchHistory() {
+        try {
+            const value = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]');
+            return Array.isArray(value) ? value.filter(Boolean).slice(0, 10) : [];
+        } catch (_) { return []; }
+    }
+
+    function renderSearchHistory() {
+        const history = getSearchHistory();
+        searchHistoryList.innerHTML = history.map(value => `<option value="${escapeHtml(value)}"></option>`).join('');
+        searchHistoryPanel.innerHTML = history.length
+            ? history.map(value => `<button type="button" class="search-history-item" data-query="${escapeHtml(value)}">◷ <span>${escapeHtml(value)}</span></button>`).join('')
+            : '<div class="search-history-empty">Nessuna ricerca recente</div>';
+    }
+
+    function rememberSearch(value) {
+        const query = String(value || '').trim();
+        if (!query) return;
+        const history = [query, ...getSearchHistory().filter(item => item.toLowerCase() !== query.toLowerCase())].slice(0, 10);
+        localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+        renderSearchHistory();
+    }
 
     map.on('zoomend moveend', updateMarkerSizes);
     // Also trigger after load
@@ -129,8 +167,29 @@ document.addEventListener('DOMContentLoaded', () => {
     let filterTimeout = null;
     filterInput.addEventListener('input', () => {
         clearTimeout(filterTimeout);
-        filterTimeout = setTimeout(() => { loadBuses(); loadNavigationVehicles(); }, 400);
+        filterTimeout = setTimeout(() => {
+            loadBuses();
+            loadNavigationVehicles();
+        }, 400);
     });
+    filterInput.addEventListener('keydown', event => {
+        if (event.key === 'Enter') rememberSearch(filterInput.value);
+    });
+    filterInput.addEventListener('change', () => rememberSearch(filterInput.value));
+
+    renderSearchHistory();
+    btnSearchHistory.addEventListener('click', () => searchHistoryPanel.classList.toggle('hidden'));
+    searchHistoryPanel.addEventListener('click', event => {
+        const item = event.target.closest('[data-query]');
+        if (!item) return;
+        filterInput.value = item.dataset.query;
+        rememberSearch(filterInput.value);
+        searchHistoryPanel.classList.add('hidden');
+        loadBuses();
+        loadNavigationVehicles();
+    });
+    busDetailsClose.addEventListener('click', () => busDetailsPanel.classList.add('hidden'));
+    btnMyPosition.addEventListener('click', showUserPosition);
 
     filterClear.addEventListener('click', () => {
         filterInput.value = '';
@@ -540,17 +599,50 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (status === 'SCHEDULED_API_FLAG') typeClass = ' scheduled-api';
         else typeClass = ' realtime';
 
-        // Add specific class for easy selection
-        const markerClass = `bus-marker-${lineName.replace(/\s+/g, '-')}`;
-        
+        const markerColor = status === 'SCHEDULED_NO_DATA' || status === 'SCHEDULED_API_FLAG'
+            ? '#999999'
+            : normalizeHexColor(color, getColor(lineName));
+        const textColor = getContrastTextColor(markerColor);
+        const markerClass = `bus-marker-${lineName.replace(/[^a-zA-Z0-9_-]+/g, '-')}`;
+
         // Data attribute for content in mini mode
         return L.divIcon({
-            className: `bus-div-icon ${markerClass}`, 
-            html: `<div class="bus-icon${typeClass}" style="background-color:${color}" data-line="${lineName}">${lineName}</div>`,
+            className: `bus-div-icon ${markerClass}`,
+            html: `<div class="bus-icon${typeClass}" style="background-color:${markerColor};color:${textColor}" data-line="${escapeHtml(lineName)}">${escapeHtml(lineName)}</div>`,
             iconSize: [30, 30],
             iconAnchor: [15, 15],
             popupAnchor: [0, -15]
         });
+    }
+
+    function showUserPosition() {
+        if (!navigator.geolocation) {
+            counterText.textContent = 'Posizione del dispositivo non disponibile';
+            return;
+        }
+        spinnerEl.classList.remove('hidden');
+        counterText.textContent = 'Ricerca della tua posizione in corso…';
+        navigator.geolocation.getCurrentPosition(position => {
+            const lat = Number(position.coords.latitude), lng = Number(position.coords.longitude);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            if (!userPositionMarker) {
+                userPositionMarker = L.marker([lat, lng], {
+                    icon: L.divIcon({ className: '', html: '<div class="user-position-marker"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
+                    zIndexOffset: 1500
+                }).bindPopup('La tua posizione').addTo(map);
+            } else userPositionMarker.setLatLng([lat, lng]);
+            const accuracy = Number(position.coords.accuracy);
+            if (Number.isFinite(accuracy)) {
+                if (!userAccuracyCircle) userAccuracyCircle = L.circle([lat, lng], { radius: accuracy, color: '#1769e0', weight: 1, fillOpacity: .1 }).addTo(map);
+                else userAccuracyCircle.setLatLng([lat, lng]).setRadius(accuracy);
+            }
+            map.setView([lat, lng], Math.max(map.getZoom(), 15));
+            spinnerEl.classList.add('hidden');
+            counterText.textContent = 'Posizione trovata';
+        }, error => {
+            spinnerEl.classList.add('hidden');
+            counterText.textContent = error.code === 1 ? 'Permesso posizione non concesso' : 'Posizione non disponibile';
+        }, { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 });
     }
 
     function navigationLineName(vehicle) {
@@ -572,9 +664,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function makeNavigationIcon(lineName, color) {
+        const markerColor = normalizeHexColor(color, '#5B5B5B');
+        const textColor = getContrastTextColor(markerColor);
         return L.divIcon({
             className: 'bus-div-icon navigation-marker',
-            html: `<div class="bus-icon navigation" style="background-color:${color}" data-line="${lineName}">${lineName}<span class="navigation-symbol" aria-hidden="true">⛴</span></div>`,
+            html: `<div class="bus-icon navigation" style="background-color:${markerColor};color:${textColor}" data-line="${escapeHtml(lineName)}">${escapeHtml(lineName)}<span class="navigation-symbol" aria-hidden="true">⛴</span></div>`,
             iconSize: [30, 30],
             iconAnchor: [15, 15],
             popupAnchor: [0, -15]
@@ -623,6 +717,154 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
         `;
+    }
+
+    function realtimePopup(vehicle, lineName) {
+        const position = vehicle.vehicle_position || {};
+        const headsign = vehicle.trip_headsign || vehicle.route_long_name || 'Destinazione non disponibile';
+        return `<div class="bus-popup">
+            <div class="bus-popup-line">Linea ${escapeHtml(lineName)}</div>
+            <div class="bus-popup-direction">→ ${escapeHtml(headsign)}</div>
+            <div class="bus-popup-position">Posizione: ${Number(position.lat).toFixed(5)}, ${Number(position.lon).toFixed(5)}</div>
+            <div class="bus-popup-time">Trip: ${escapeHtml(vehicle.trip_id || 'non disponibile')}</div>
+            <div class="bus-popup-hint">Click: mostra percorso · doppio click: dettagli corsa</div>
+        </div>`;
+    }
+
+    function normalizeHexColor(value, fallback = '#000000') {
+        let color = String(value || '').trim().replace(/^#/, '');
+        if (/^[0-9a-f]{3}$/i.test(color)) color = color.split('').map(part => part + part).join('');
+        return /^[0-9a-f]{6}$/i.test(color) ? `#${color.toUpperCase()}` : fallback;
+    }
+
+    function getContrastTextColor(background) {
+        const color = normalizeHexColor(background);
+        const channels = [1, 3, 5].map(index => parseInt(color.slice(index, index + 2), 16) / 255);
+        const luminance = channels.map(channel => channel <= 0.03928
+            ? channel / 12.92
+            : ((channel + 0.055) / 1.055) ** 2.4);
+        const relativeLuminance = (0.2126 * luminance[0]) + (0.7152 * luminance[1]) + (0.0722 * luminance[2]);
+        const whiteContrast = 1.05 / (relativeLuminance + 0.05);
+        const blackContrast = (relativeLuminance + 0.05) / 0.05;
+        return whiteContrast >= blackContrast ? '#FFFFFF' : '#000000';
+    }
+
+    function shapeGeometry(entry) {
+        const geometry = Array.isArray(entry?.shape) && entry.shape.length > 1
+            ? entry.shape
+            : Array.isArray(entry?.path) ? entry.path : [];
+        const points = geometry
+            .map(point => ({ lat: Number(point?.lat), lng: Number(point?.lng) }))
+            .filter(point => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+        return points.length > 1 ? points : [];
+    }
+
+    async function fetchShapeGeometry(url, tripId) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        try {
+            const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const payload = await response.json();
+            const entries = Array.isArray(payload)
+                ? payload
+                : Array.isArray(payload?.shapes) ? payload.shapes : [];
+            const exact = entries.find(entry => String(entry?.trip_id || '') === String(tripId));
+            const candidate = exact && shapeGeometry(exact).length > 1
+                ? exact
+                : entries.find(entry => shapeGeometry(entry).length > 1);
+            const geometry = shapeGeometry(candidate);
+            console.debug('[live-map] risposta shape', {
+                url,
+                status: response.status,
+                entries: entries.length,
+                exactTrip: Boolean(exact),
+                points: geometry.length
+            });
+            return geometry;
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+
+    async function showBusShape(id, item) {
+        if (!item?.busData?.trip_id) return;
+        if (selectedShapeTripId && selectedShapeTripId !== id) {
+            const previous = busMarkers.get(selectedShapeTripId);
+            if (previous?.polyline) { map.removeLayer(previous.polyline); previous.polyline = null; }
+        }
+        selectedShapeTripId = id;
+        if (item.polyline) {
+            if (!map.hasLayer(item.polyline)) item.polyline.addTo(map);
+            return;
+        }
+        if (Array.isArray(item.shape) && item.shape.length > 1) {
+            item.polyline = L.polyline(item.shape.map(point => [Number(point.lat), Number(point.lng)]), {
+                color: getColor(item.busData.route_short_name || ''), weight: 5, opacity: .78
+            }).addTo(map);
+            return;
+        }
+        if (item.shapeRequest) return item.shapeRequest;
+
+        const tripId = String(item.busData.trip_id);
+        const lineName = String(item.busData.route_short_name || '').replace(/_(?:UN|EN|US|UM|UL|ES)$/i, '');
+        const tripParams = new URLSearchParams({ tripId, service: 'automobilistico' });
+        const urls = [`/api/lines-shapes?${tripParams.toString()}`];
+        if (lineName) {
+            const lineParams = new URLSearchParams({ line: lineName, service: 'automobilistico', cache: '1' });
+            urls.push(`/api/lines-shapes?${lineParams.toString()}`);
+        }
+
+        item.shapeRequest = (async () => {
+            for (const url of urls) {
+                try {
+                    const geometry = await fetchShapeGeometry(url, tripId);
+                    if (geometry.length < 2) continue;
+                    if (selectedShapeTripId !== id) return;
+                    item.shape = geometry;
+                    item.polyline = L.polyline(geometry.map(point => [point.lat, point.lng]), {
+                        color: getColor(item.busData.route_short_name || ''), weight: 5, opacity: .78
+                    }).addTo(map);
+                    return;
+                } catch (error) {
+                    console.warn('[live-map] shape non disponibile', { url, error: error.message });
+                }
+            }
+            console.warn('[live-map] nessuna geometria trovata', { tripId, lineName });
+        })();
+        try {
+            await item.shapeRequest;
+        } finally {
+            item.shapeRequest = null;
+        }
+    }
+
+    function openBusDetails(id, item) {
+        const bus = item?.busData || {};
+        const position = bus.vehicle_position || item?.currentPos || {};
+        const headsign = bus.trip_headsign || bus.route_long_name || 'Destinazione non disponibile';
+        const detailsUrl = bus.trip_id ? `/trip-details?tripId=${encodeURIComponent(bus.trip_id)}` : '#';
+        busDetailsContent.innerHTML = `
+            <h2 class="bus-details-title">Linea ${escapeHtml(bus.route_short_name || bus.route_id || 'N/D')}</h2>
+            <div class="bus-details-destination">→ ${escapeHtml(headsign)}</div>
+            <dl class="bus-details-grid">
+                <dt>Trip ID</dt><dd>${escapeHtml(bus.trip_id || 'Non disponibile')}</dd>
+                <dt>Route ID</dt><dd>${escapeHtml(bus.route_id || 'Non disponibile')}</dd>
+                <dt>Stato</dt><dd>${escapeHtml(item?.status === 'REALTIME' ? 'Posizione realtime' : 'Posizione stimata')}</dd>
+                <dt>Coordinate</dt><dd>${Number(position.lat).toFixed(5)}, ${Number(position.lon ?? position.lng).toFixed(5)}</dd>
+                ${item?.currentPos?.nextStop ? `<dt>Prossima fermata</dt><dd>${escapeHtml(item.currentPos.nextStop)}</dd>` : ''}
+            </dl>
+            <div class="bus-details-actions"><a href="${detailsUrl}">Apri dettaglio corsa</a></div>`;
+        busDetailsPanel.classList.remove('hidden');
+        void showBusShape(id, item);
+    }
+
+    function bindBusInteractions(id, item) {
+        item.marker.on('click', () => void showBusShape(id, item));
+        item.marker.on('dblclick', event => {
+            if (event.originalEvent) L.DomEvent.stop(event.originalEvent);
+            openBusDetails(id, item);
+        });
     }
 
     // ── Filtro ─────────────────────────────────────────────────
@@ -710,7 +952,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // un bollino N/D sulla mappa.
             if (!rawLine && !vehicle.route_guess && ndHidden) return;
             const lineName = rawLine.replace(/_(?:UN|EN|US|UM|UL|ES)$/i, '') || 'N/D';
-            const searchable = `${rawLine} ${vehicle.trip_id || ''} ${vehicle.route_id || ''}`.toLowerCase();
+            const searchable = `${rawLine} ${vehicle.trip_id || ''} ${vehicle.route_id || ''} ${vehicle.trip_headsign || ''}`.toLowerCase();
             if (query && !searchable.includes(query)) return;
             const id = vehicle.trip_id || vehicle.route_id || `aut-${index}`;
             active.add(id); shown++;
@@ -719,8 +961,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const routeColor = String(vehicle.route_color || '');
             const marker = L.marker([Number(position.lat), Number(position.lon)], {
                 icon: makeBusIcon(lineName, /^#[0-9a-f]{6}$/i.test(routeColor) ? routeColor : getColor(lineName), 'realtime')
-            }).bindPopup(`<div class="bus-popup"><div class="bus-popup-line">Linea ${lineName}</div><div class="bus-popup-direction">Bus in servizio</div><div class="bus-popup-time">Trip: ${vehicle.trip_id || 'non disponibile'}</div></div>`).addTo(map);
-            busMarkers.set(id, { marker, polyline: null, shape: null, currentPos: position, busData: vehicle, status: 'REALTIME' });
+            }).bindPopup(realtimePopup(vehicle, lineName)).addTo(map);
+            const item = { marker, polyline: null, shape: null, currentPos: position, busData: vehicle, status: 'REALTIME' };
+            busMarkers.set(id, item);
+            bindBusInteractions(id, item);
         });
         busMarkers.forEach((item, id) => {
             if (!active.has(id)) { map.removeLayer(item.marker); if (item.polyline) map.removeLayer(item.polyline); busMarkers.delete(id); }
@@ -742,7 +986,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const signal = abortCtrl.signal;
 
         spinnerEl.classList.remove('hidden');
-        counterText.textContent = 'Caricamento...';
+        counterText.textContent = 'Ricerca dei mezzi in servizio…';
 
         try {
             if (await loadRealtimeBusVehicles(signal)) return;
@@ -781,7 +1025,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const nowSec = timeToSec(data.time);
             let loaded = 0;
             const total = buses.length;
-            counterText.textContent = `0 / ${total}`;
+            counterText.textContent = `Ricerca posizione bus: 0 / ${total}`;
 
             // Trip IDs che devono rimanere sulla mappa
             const validTripIds = new Set(buses.map(b => b.trip_id));
@@ -894,21 +1138,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         .bindPopup(makePopup(bus, pos, delayInfo))
                         .addTo(map);
 
-                    let polyline = null;
-                    if (shape && shape.length > 0) {
-                        polyline = L.polyline(shape.map(p => [p.lat, p.lng]), {
-                            color: color,
-                            weight: 3,
-                            opacity: 0.4,
-                            dashArray: '5, 10'
-                        }).addTo(map);
-                    }
-
-                    busMarkers.set(bus.trip_id, { marker, polyline, shape, currentPos: pos, busData: bus, status });
+                    const item = { marker, polyline: null, shape, currentPos: pos, busData: bus, status };
+                    busMarkers.set(bus.trip_id, item);
+                    bindBusInteractions(bus.trip_id, item);
                 } catch (e) { }
 
                 loaded++;
-                counterText.textContent = `${loaded} / ${total}`;
+                counterText.textContent = `Ricerca posizione bus: ${loaded} / ${total}`;
             });
 
             await parallelPool(tasks, MAX_CONCURRENT, signal);

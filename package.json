@@ -1,7 +1,7 @@
 {
   "name": "actv-live",
   "version": "1.0.0",
-  "description": "Questo progetto è rilasciato sotto la licenza MIT. Vedere il file [LICENSE](LICENSE.md) per maggiori dettagli.",
+  "description": "Web app ACTV per orari, percorsi, fermate e monitoraggio realtime del trasporto pubblico veneziano.",
   "main": "index.js",
   "directories": {
     "doc": "docs"
@@ -13,9 +13,9 @@
     "type": "git",
     "url": "git+https://github.com/samuele-brusegan/actv-live.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["actv", "venezia", "gtfs", "transit", "public-transport"],
+  "author": "Samuele Brusegan",
+  "license": "MIT",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/samuele-brusegan/actv-live/issues"
