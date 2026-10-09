@@ -23,6 +23,13 @@ I dati utili per la diagnosi sono:
 ritardo medio, ritardo massimo, copertura GPS e distribuzione per linea. La
 dashboard usa le API realtime e non rappresenta un archivio storico server-side.
 
+## Stato del database
+
+`/admin/database-health` verifica la connessione SQL, l’esecuzione di una query
+semplice, la presenza delle tabelle richieste e l’eventuale presenza di tabelle
+temporanee GTFS. La pagina è in sola lettura; le stime delle righe e delle
+dimensioni provengono da `information_schema`.
+
 ## Aggiornamento dati
 
 `/admin/gtfs-update` è il pannello per l’importazione atomica dei feed GTFS.

@@ -118,6 +118,11 @@ class Controller {
         require_once BASE_PATH . '/app/views/admin/dashboard.php';
     }
 
+    function adminDatabaseHealth() {
+        AdminAuth::requireAuth();
+        require_once BASE_PATH . '/app/views/admin/databaseHealth.php';
+    }
+
     function adminGtfsUpdate() {
         AdminAuth::requireAuth();
         $csrf = AdminAuth::csrfToken();

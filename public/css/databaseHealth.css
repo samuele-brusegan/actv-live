@@ -1,0 +1,23 @@
+.db-health-subtitle { margin: 6px 0 0; color: var(--text-secondary); }
+.db-health-button { min-height: 40px; padding: 9px 14px; border: 1px solid var(--accent-color); border-radius: 7px; background: var(--accent-color); color: #fff; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
+.db-health-button:hover { filter: brightness(1.1); }
+.db-health-button:disabled { cursor: wait; opacity: .65; }
+.db-health-button.secondary { border-color: var(--border-color); background: #2a2a2a; color: var(--text-primary); }
+.db-health-overview { display: grid; gap: 16px; }
+.db-health-banner { padding: 14px 16px; border: 1px solid var(--border-color); border-radius: 8px; font-weight: 750; }
+.db-health-banner.ok { border-color: var(--success-color); color: var(--success-color); }
+.db-health-banner.warning { border-color: var(--warning-color, #eab308); color: var(--warning-color, #eab308); }
+.db-health-banner.error { border-color: var(--danger-color); color: var(--danger-color); }
+.db-health-banner.pending { color: var(--text-secondary); }
+.db-health-messages { margin: -6px 0 0; padding-left: 22px; color: var(--text-secondary); }
+.db-health-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.db-health-stat-value { overflow-wrap: anywhere; color: var(--text-primary); font-size: 1rem; font-weight: 750; line-height: 1.4; }
+.db-health-note, .db-health-section-heading p { margin: 0; color: var(--text-secondary); font-size: .9rem; }
+.db-health-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-secondary); font-size: .9rem; }
+.db-health-section-heading { margin-bottom: 14px; }
+.db-health-section-heading h2 { margin-bottom: 5px; }
+.db-health-table td { vertical-align: middle; }
+.db-health-error-panel pre { margin: 0; padding: 12px; overflow-wrap: anywhere; white-space: pre-wrap; color: var(--danger-color); }
+@media (max-width: 720px) {
+    .db-health-footer { align-items: flex-start; }
+}

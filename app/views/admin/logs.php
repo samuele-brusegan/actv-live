@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestione Log ed Eccezioni - ACTV Live</title>
     <?php require COMMON_HTML_HEAD; ?>
+    <link rel="stylesheet" href="/css/admin-shell.css">
     <style>
         .log-card { margin-bottom: 1rem; border-left: 5px solid #ccc; }
         .log-PHP_ERROR { border-left-color: #dc3545; }
@@ -18,9 +19,9 @@
     <nav class="navbar navbar-dark bg-dark">
         <div class="container-fluid">
             <span class="navbar-brand mb-0 h1">Log ed Eccezioni</span>
-            <div class="d-flex gap-2">
-                <a href="/" class="btn btn-outline-light btn-sm">Torna alla Home</a>
-                <a href="/admin/logout" class="btn btn-outline-warning btn-sm">Logout</a>
+            <div class="admin-actions">
+                <a href="/" class="admin-action">Torna alla Home</a>
+                <a href="/admin/logout" class="admin-action">Logout</a>
             </div>
         </div>
     </nav>

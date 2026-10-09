@@ -43,6 +43,22 @@ class ApiController {
         }
     }
 
+    function adminDatabaseHealth() {
+        if (!$this->requireAdminJson()) return;
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, max-age=0');
+        try {
+            require_once BASE_PATH . '/app/services/DatabaseHealthService.php';
+            echo json_encode([
+                'success' => true,
+                'data' => (new DatabaseHealthService())->inspect(),
+            ], JSON_INVALID_UTF8_SUBSTITUTE);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Impossibile completare la verifica del database.'], JSON_INVALID_UTF8_SUBSTITUTE);
+        }
+    }
+
     function adminGtfsUpdateConfig() {
         if (!$this->requireAdminJson()) return;
         $data = $this->adminJsonInput();
@@ -1312,12 +1328,34 @@ class ApiController {
             $yesterdayDate = date('Ymd', strtotime('yesterday'));
         }
 
+        $timeParts = explode(':', $currentTime);
+        $searchSec = (((int) ($timeParts[0] ?? 0) * 3600) + ((int) ($timeParts[1] ?? 0) * 60)) % 86400;
+        // Filtra in SQL la finestra di ±30 minuti, includendo il passaggio
+        // della mezzanotte e gli orari GTFS oltre le 24:00. L'indice
+        // (stop_id, arrival_time) limita la scansione alle corse vicine all'ora
+        // richiesta, invece di caricare tutte le corse del giorno in PHP.
+        $timeWindows = [];
+        for ($offset = -86400; $offset <= 86400; $offset += 86400) {
+            $from = max(0, $searchSec - 1800 + $offset);
+            $to = $searchSec + 1800 + $offset;
+            if ($to < 0) continue;
+            $formatGtfsTime = static function (int $seconds): string {
+                $hours = intdiv($seconds, 3600);
+                $minutes = intdiv($seconds % 3600, 60);
+                return sprintf('%02d:%02d:00', $hours, $minutes);
+            };
+            $timeWindows[] = [$formatGtfsTime($from), $formatGtfsTime($to)];
+        }
+        $timePredicate = '(' . implode(' OR ', array_fill(0, count($timeWindows), 'st.arrival_time BETWEEN ? AND ?')) . ')';
+        $timeParams = array_merge(...$timeWindows);
+
         // Query: bus di oggi + bus notturni di ieri (arrival_time >= 24:00:00)
         $sql = "SELECT r.route_short_name, r.route_id, t.trip_headsign, st.arrival_time, t.trip_id, 'today' as source
                 FROM stops s
-                JOIN stop_times st ON s.stop_id = st.stop_id
-                JOIN trips t ON st.trip_id = t.trip_id
-                JOIN routes r ON t.route_id = r.route_id
+                STRAIGHT_JOIN stop_times st FORCE INDEX (idx_stop_times_stop_arrival)
+                    ON s.stop_id = st.stop_id AND $timePredicate
+                STRAIGHT_JOIN trips t ON st.trip_id = t.trip_id
+                STRAIGHT_JOIN routes r ON t.route_id = r.route_id
                 LEFT JOIN calendar c ON t.service_id = c.service_id
                 WHERE (
                     (
@@ -1341,9 +1379,10 @@ class ApiController {
                 UNION ALL
                 SELECT r.route_short_name, r.route_id, t.trip_headsign, st.arrival_time, t.trip_id, 'yesterday' as source
                 FROM stops s
-                JOIN stop_times st ON s.stop_id = st.stop_id
-                JOIN trips t ON t.trip_id = st.trip_id
-                JOIN routes r ON t.route_id = r.route_id
+                STRAIGHT_JOIN stop_times st FORCE INDEX (idx_stop_times_stop_arrival)
+                    ON s.stop_id = st.stop_id AND $timePredicate
+                STRAIGHT_JOIN trips t ON t.trip_id = st.trip_id
+                STRAIGHT_JOIN routes r ON t.route_id = r.route_id
                 LEFT JOIN calendar c ON t.service_id = c.service_id
                 WHERE (
                     (
@@ -1367,13 +1406,11 @@ class ApiController {
                 ORDER BY arrival_time ASC";
 
         $allTrips = $db->query($sql, [
-            $todayDate, $todayDate, $todayDate,
-            $yesterdayDate, $yesterdayDate, $yesterdayDate
+            ...$timeParams, $todayDate, $todayDate, $todayDate,
+            ...$timeParams, $yesterdayDate, $yesterdayDate, $yesterdayDate
         ]);
 
         // Filtro: solo trip entro ±30 min dall'orario richiesto
-        $timeParts = explode(':', $currentTime);
-        $searchSec = ($timeParts[0] * 3600) + ($timeParts[1] * 60);
         $range = 1800; // 30 minuti
 
         $seen = []; // trip_id già visti (deduplicazione)

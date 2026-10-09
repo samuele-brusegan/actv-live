@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login Amministrazione - ACTV Live</title>
     <?php require COMMON_HTML_HEAD; ?>
+    <link rel="stylesheet" href="/css/admin-shell.css">
 </head>
 <body class="bg-light">
     <nav class="navbar navbar-dark bg-dark">
         <div class="container-fluid">
             <span class="navbar-brand mb-0 h1">Area Amministrazione</span>
-            <a href="/" class="btn btn-outline-light btn-sm">Torna alla Home</a>
+            <div class="admin-actions"><a href="/" class="admin-action">Torna alla Home</a></div>
         </div>
     </nav>
 

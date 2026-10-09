@@ -7,3 +7,51 @@ body.admin-page { padding-bottom: 24px; }
 .stat-card,.panel-card { background: var(--actv-surface) !important; border: 1px solid var(--actv-border) !important; border-radius: 18px !important; box-shadow: var(--actv-shadow-sm) !important; }
 .admin-table th { color: var(--actv-muted); background: var(--actv-surface-2); }
 .admin-table td { color: var(--actv-ink); border-color: var(--actv-border); }
+
+/* Shared navigation controls used at the right side of Admin page headers. */
+.admin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+.admin-action {
+    box-sizing: border-box;
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    border: 1px solid var(--border-color, #3b4a45);
+    border-radius: 8px;
+    background: var(--bg-panel, #1e2724);
+    color: var(--text-primary, #eef4f1);
+    font: inherit;
+    font-weight: 650;
+    line-height: 1.25;
+    text-align: center;
+    text-decoration: none;
+    white-space: normal;
+    transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+}
+.admin-action:hover {
+    border-color: var(--success-color, #10b981);
+    background: #24332e;
+    color: var(--text-primary, #eef4f1);
+}
+.admin-action:focus-visible {
+    outline: 2px solid var(--success-color, #10b981);
+    outline-offset: 2px;
+}
+.admin-header-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+}
+@media (max-width: 760px) {
+    .admin-header { align-items: flex-start; flex-direction: column; gap: 15px; }
+    .admin-actions, .admin-header-tools { justify-content: flex-start; }
+}

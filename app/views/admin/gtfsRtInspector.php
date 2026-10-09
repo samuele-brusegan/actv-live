@@ -7,6 +7,7 @@
     <?php require COMMON_HTML_HEAD; ?>
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="stylesheet" href="/css/gtfsRtInspector.css">
+    <link rel="stylesheet" href="/css/admin-shell.css">
     <script defer src="/js/gtfsRtInspector.js"></script>
 </head>
 <body class="admin-page">
@@ -16,10 +17,10 @@
             <h1>GTFS-RT Inspector</h1>
             <p class="inspector-subtitle">Payload protobuf ricevuto dal feed ACTV e risultato del decoder locale.</p>
         </div>
-        <div class="inspector-actions">
-            <a href="/admin/dashboard" class="inspector-button secondary">Dashboard</a>
-            <a href="/admin/gtfs-update" class="inspector-button secondary">Aggiornamento GTFS</a>
-            <a href="/admin/logout" class="inspector-button secondary">Logout</a>
+        <div class="admin-actions">
+            <a href="/admin/dashboard" class="admin-action">Dashboard</a>
+            <a href="/admin/gtfs-update" class="admin-action">Aggiornamento GTFS</a>
+            <a href="/admin/logout" class="admin-action">Logout</a>
         </div>
     </header>
 

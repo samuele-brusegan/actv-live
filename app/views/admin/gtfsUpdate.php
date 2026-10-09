@@ -7,6 +7,7 @@
     <?php require COMMON_HTML_HEAD; ?>
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="stylesheet" href="/css/gtfsUpdate.css">
+    <link rel="stylesheet" href="/css/admin-shell.css">
     <script defer src="/js/gtfsUpdate.js"></script>
 </head>
 <body>
@@ -16,10 +17,11 @@
                 <h1>Aggiornamento GTFS</h1>
                 <div class="gtfs-muted">Import atomico di feed, cache, database, shape e data_url.</div>
             </div>
-            <div class="gtfs-actions">
-                <a href="/admin/dashboard" class="gtfs-button secondary">Dashboard</a>
-                <a href="/admin/gtfs-rt-inspector" class="gtfs-button secondary">GTFS-RT Inspector</a>
-                <a href="/admin/logout" class="gtfs-button secondary">Logout</a>
+            <div class="admin-actions">
+                <a href="/admin/dashboard" class="admin-action">Dashboard</a>
+                <a href="/admin/database-health" class="admin-action">Stato database</a>
+                <a href="/admin/gtfs-rt-inspector" class="admin-action">GTFS-RT Inspector</a>
+                <a href="/admin/logout" class="admin-action">Logout</a>
             </div>
         </div>
 

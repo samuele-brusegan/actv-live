@@ -1,5 +1,4 @@
 .inspector-subtitle { margin: 6px 0 0; color: var(--text-secondary); }
-.inspector-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .inspector-button { min-height: 40px; padding: 9px 14px; border: 1px solid var(--accent-color); border-radius: 7px; background: var(--accent-color); color: #fff; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
 .inspector-button:hover { filter: brightness(1.1); }
 .inspector-button:disabled { cursor: wait; opacity: .65; }
@@ -22,7 +21,6 @@
 .inspector-details pre { max-height: 230px; margin-top: 10px; padding: 14px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 720px) {
     .admin-header { align-items: flex-start; flex-direction: column; gap: 15px; }
-    .inspector-actions { justify-content: flex-start; }
     .inspector-controls > div, .inspector-controls select, .inspector-controls .inspector-button { width: 100%; }
     .inspector-status { width: 100%; margin-left: 0; }
 }
