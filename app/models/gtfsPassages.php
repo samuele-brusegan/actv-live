@@ -33,13 +33,24 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
         $lookback = date('H:i:s', time() - 2 * 3600);
         $date = date('Ymd');
 
-        // Risolvi prima la piccola tabella fermate. Il precedente LIKE era
-        // applicato dentro il join principale e costringeva MySQL a esaminare
-        // una porzione enorme di stop_times.
+        // Risolvi prima la piccola tabella fermate. Il match su data_url deve
+        // essere a token delimitato da '-': un LIKE non ancorato ('%96%')
+        // confondeva id diversi (es. 96 con 1096, 196, 960...) caricando
+        // passaggi di fermate che non servono quella richiesta.
+        $stopTokens = array_values(array_filter(explode('-', $stop), fn($t) => $t !== ''));
+        $conditions = [];
+        $params = [];
+        foreach ($stopTokens as $token) {
+            $conditions[] = "CONCAT('-', data_url, '-') LIKE CONCAT('%-', ?, '-%')";
+            $params[] = $token;
+        }
+        // Consenti anche il match diretto sullo stop_id GTFS.
+        $conditions[] = "stop_id = ?";
+        $params[] = $stop;
         $matchedStops = $db->query(
             "SELECT stop_id, stop_name, stop_lat, stop_lon
-             FROM stops WHERE data_url LIKE CONCAT('%', ?, '%')",
-            [$stop]
+             FROM stops WHERE " . implode(' OR ', $conditions),
+            $params
         );
         if (!$matchedStops) {
             echo json_encode([]);
