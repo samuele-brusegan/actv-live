@@ -99,6 +99,76 @@ document.addEventListener('DOMContentLoaded', () => {
         attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
+    // ── Tooltip flottante sopra i bus ─────────────────────────
+    // I popup Leaflet restano ritagliati dentro il container della mappa:
+    // questo tooltip vive nel body, segue il marker e puo' uscire dai bordi.
+    const busTooltip = document.createElement('div');
+    busTooltip.id = 'bus-map-tooltip';
+    busTooltip.className = 'bus-map-tooltip hidden';
+    document.body.appendChild(busTooltip);
+    let tooltipAnchor = null;
+    let tooltipSource = null;
+
+    function positionBusTooltip() {
+        if (!tooltipAnchor || busTooltip.classList.contains('hidden')) return;
+        const latlng = tooltipAnchor();
+        if (!latlng) { closeBusTooltip(); return; }
+        const pt = map.latLngToContainerPoint(latlng);
+        const rect = map.getContainer().getBoundingClientRect();
+        const halfW = busTooltip.offsetWidth / 2;
+        const x = Math.min(Math.max(rect.left + pt.x, halfW + 8), window.innerWidth - halfW - 8);
+        busTooltip.style.left = `${x}px`;
+        busTooltip.style.top = `${rect.top + pt.y - 18}px`;
+    }
+
+    function openBusTooltip(html, anchorFn, source = null) {
+        tooltipAnchor = anchorFn;
+        tooltipSource = source;
+        busTooltip.innerHTML = '<button class="bus-map-tooltip-close" type="button" aria-label="Chiudi">&times;</button>' + html;
+        busTooltip.classList.remove('hidden');
+        positionBusTooltip();
+    }
+
+    function closeBusTooltip() {
+        tooltipAnchor = null;
+        tooltipSource = null;
+        busTooltip.classList.add('hidden');
+    }
+
+    busTooltip.addEventListener('click', e => {
+        if (e.target.closest('.bus-map-tooltip-close')) closeBusTooltip();
+    });
+
+    // Swipe verso il basso per chiudere (mobile)
+    let tooltipTouchY = null;
+    busTooltip.addEventListener('touchstart', e => { tooltipTouchY = e.touches[0].clientY; }, { passive: true });
+    busTooltip.addEventListener('touchend', e => {
+        if (tooltipTouchY != null && e.changedTouches[0].clientY - tooltipTouchY > 50) closeBusTooltip();
+        tooltipTouchY = null;
+    });
+
+    // Tap/click fuori dal tooltip lo chiude
+    document.addEventListener('pointerdown', e => {
+        if (!busTooltip.classList.contains('hidden') && !busTooltip.contains(e.target)) closeBusTooltip();
+    }, true);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBusTooltip(); });
+
+    // Il tooltip segue il marker quando la mappa si muove
+    map.on('move zoom viewreset resize', positionBusTooltip);
+    window.addEventListener('resize', positionBusTooltip);
+
+    // Converte i popup Leaflet nel tooltip flottante
+    map.on('popupopen', e => {
+        const content = e.popup.getContent();
+        const source = e.popup._source;
+        map.closePopup();
+        const html = typeof content === 'string' ? content : (content?.outerHTML || '');
+        if (!html) return;
+        openBusTooltip(html, () => source?.getLatLng?.(), source);
+        // Se il marker sparisce (refresh posizioni) il tooltip si chiude
+        source?.once?.('remove', () => { if (tooltipSource === source) closeBusTooltip(); });
+    });
+
     // ── Stato ─────────────────────────────────────────────────
     let busMarkers = new Map(); // tripId -> { marker, polyline }
     let navigationMarkers = new Map();

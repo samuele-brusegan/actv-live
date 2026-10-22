@@ -73,6 +73,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const requests = services.map(async serviceName => {
                 const params = new URLSearchParams(window.location.search);
                 params.set('service', serviceName);
+                // Vista "tutte le linee": usa la cache JSON dei feed, molto più
+                // veloce della query completa sul DB.
+                if (!hasFilter && !showStops) params.set('cache', '1');
                 const response = await fetch(`/api/lines-shapes?${params.toString()}`, { cache: 'no-store' });
             const responseText = await response.text();
             if (!response.ok) {

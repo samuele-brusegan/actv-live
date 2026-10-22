@@ -268,19 +268,47 @@ async function enrichPassageProgress(passages) {
 
 let passagesLoadToken = 0;
 
-/** Chiave linea+destinazione per individuare i passaggi già coperti dal real-time */
-function lineDestKey(p) {
-    const line = (p.line || '').split('_')[0];
-    let dest = (p.destination || '').trim().toLowerCase();
-    // Se dest è regex: mestre centro [a-z][1-9] o piazzale roma [a-z][1-9] o mestre fs [a-z][1-9] rimuovo il suffisso generico [a-z][1-9]
-    if (/^(mestre centro|piazzale roma|mestre fs) [a-z][1-9]$/.test(dest)) {
-        dest = dest.replace(/[a-z][1-9]$/, '');
-    }
-    return `${line}|${dest}`;
+/** Normalizza un nome destinazione per il confronto tra real-time ACTV e
+ *  headsign GTFS: minuscole, senza accenti, senza suffissi corsia ("b1",
+ *  "a2"), senza parentesi finali, solo [a-z0-9]. */
+function normalizeDestination(dest) {
+    let d = String(dest || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s*\([^)]*\)\s*$/, '')
+        .replace(/\s+[a-z]\d+$/, '')
+        .replace(/[^a-z0-9]/g, '');
+    return d;
 }
 
-/** Unisce real-time e previsti: aggiunge i previsti per le combinazioni
- *  linea+destinazione NON già presenti nel real-time (dati mancanti). */
+/** Chiave linea+destinazione per individuare i passaggi già coperti dal real-time */
+function lineDestKey(p) {
+    const line = String(p.line || '').split('_')[0].toUpperCase();
+    return `${line}|${normalizeDestination(p.destination)}`;
+}
+
+/** Minuti del giorno (0-1439): uniforma "24:15" GTFS a 75 e "8'" a now+8. */
+function passageMinutes(p) {
+    const time = String(p.time || '');
+    if (/^\s*\d+\s*'\s*$/.test(time)) {
+        const target = new Date();
+        target.setMinutes(target.getMinutes() + parseInt(time, 10));
+        return target.getHours() * 60 + target.getMinutes();
+    }
+    const parts = time.split(':').map(Number);
+    if (!Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) return null;
+    return (parts[0] * 60 + parts[1]) % 1440;
+}
+
+/** Distanza circolare in minuti su orologio 24h (gestisce 23:55 vs 00:05). */
+function minutesDistance(a, b) {
+    if (a == null || b == null) return null;
+    const d = Math.abs(a - b) % 1440;
+    return Math.min(d, 1440 - d);
+}
+
+/** Unisce real-time e previsti: assegna i trip_id GTFS ai passaggi real-time
+ *  e aggiunge le corse previste NON coperte dal real-time. */
 function mergePassages(realtime, scheduled, activeTripIds = null) {
     // Non mutare il payload ACTV: serve conservarlo integro per rifare il
     // match quando arrivano gli ID esatti delle corse attive dal GTFS-RT.
@@ -294,30 +322,47 @@ function mergePassages(realtime, scheduled, activeTripIds = null) {
         if (!scheduledByKey.has(key)) scheduledByKey.set(key, []);
         scheduledByKey.get(key).push(p);
     });
+    // ID delle sotto-fermate della stazione corrente: a parità di orario
+    // privilegia il candidato della direzione giusta (fermate unite 96+1096).
+    const stationStopIds = new Set(String(stationId || '').split('-').filter(Boolean));
     // Un trip GTFS rappresenta una sola corsa: non puo essere assegnato a due
-    // passaggi realtime diversi. Il vecchio nearest-neighbour indipendente
-    // permetteva invece, per esempio, a due 21 distanziati di pochi minuti e
-    // entrambi in ritardo di ricevere il trip_id della seconda corsa.
+    // passaggi realtime diversi.
     const usedTripIds = new Set(result.map(p => String(p.trip_id || '')).filter(Boolean));
+    const assignedTripIds = new Set();
     result.forEach(p => {
-        if (p.trip_id) return; // ID fornito dalla sorgente: non ricalcolarlo.
+        if (p.trip_id) { assignedTripIds.add(String(p.trip_id)); return; }
         let candidates = (scheduledByKey.get(lineDestKey(p)) || [])
             .filter(candidate => candidate.trip_id && !usedTripIds.has(String(candidate.trip_id)));
+        const targetMinutes = passageMinutes(p);
+        // Un ID attivo puo riferirsi a una corsa vecchia. La sola presenza
+        // nel feed veicoli non giustifica assegnazioni distanti un'ora.
+        candidates = candidates.filter(candidate => {
+            const distance = minutesDistance(passageMinutes(candidate), targetMinutes);
+            return distance != null && distance <= 10;
+        });
         const activeCandidates = candidates.filter(candidate => active.has(String(candidate.trip_id)));
-        const hasActiveCandidates = activeCandidates.length > 0;
-        if (hasActiveCandidates) candidates = activeCandidates;
-        const relativeMinutes = /^\s*\d+\s*'\s*$/.test(String(p.time || '')) ? parseInt(p.time, 10) : null;
-        const target = new Date();
-        if (relativeMinutes != null) target.setMinutes(target.getMinutes() + relativeMinutes);
-        const targetMinutes = relativeMinutes != null
-            ? target.getHours() * 60 + target.getMinutes()
-            : (() => { const parts = String(p.time || '').split(':').map(Number); return Number.isFinite(parts[0]) && Number.isFinite(parts[1]) ? parts[0] * 60 + parts[1] : null; })();
-        const candidate = (hasActiveCandidates ? candidates : candidates.slice().sort((a, b) => {
-            const minutes = item => { const parts = String(item.time || '').split(':').map(Number); return Number.isFinite(parts[0]) && Number.isFinite(parts[1]) ? parts[0] * 60 + parts[1] : Number.MAX_SAFE_INTEGER; };
-            return targetMinutes == null ? 0 : Math.abs(minutes(a) - targetMinutes) - Math.abs(minutes(b) - targetMinutes);
-        }))[0];
+        let candidate;
+        if (activeCandidates.length > 0) {
+            // Con i trip_id esatti di GTFS-RT si preserva l'ordine orario:
+            // i ritardi di solito sono uniformi, quindi la coppia corretta
+            // e' quella cronologica, non il nearest-neighbour.
+            candidate = activeCandidates.slice().sort((a, b) =>
+                (passageMinutes(a) ?? Infinity) - (passageMinutes(b) ?? Infinity))[0];
+        } else {
+            // Fallback euristico: vicinanza oraria; a parità vince la
+            // sotto-fermata specifica (direzione corretta con fermate unite).
+            candidate = candidates.slice().sort((a, b) => {
+                const da = minutesDistance(passageMinutes(a), targetMinutes);
+                const db = minutesDistance(passageMinutes(b), targetMinutes);
+                if (da !== db) return (da ?? Infinity) - (db ?? Infinity);
+                const sa = stationStopIds.has(String(a.gtfs_stop_id || a.stop || '')) ? 0 : 1;
+                const sb = stationStopIds.has(String(b.gtfs_stop_id || b.stop || '')) ? 0 : 1;
+                return sa - sb;
+            })[0];
+        }
         if (candidate) {
             usedTripIds.add(String(candidate.trip_id));
+            assignedTripIds.add(String(candidate.trip_id));
             Object.assign(p, {
                 trip_id: candidate.trip_id,
                 gtfs_stop_id: candidate.gtfs_stop_id,
@@ -327,17 +372,36 @@ function mergePassages(realtime, scheduled, activeTripIds = null) {
             });
         }
     });
-    const covered = new Set(result.map(lineDestKey));
-    const added = new Set();
 
+    // Un passaggio previsto è "coperto" solo se il real-time ne mostra uno con
+    // la stessa linea+destinazione entro ±10 minuti. Le corse successive della
+    // stessa linea restano visibili.
+    const COVER_TOLERANCE_MIN = 10;
+    const nowDate = new Date();
+    const nowMin = nowDate.getHours() * 60 + nowDate.getMinutes();
+    const added = new Set();
     (Array.isArray(scheduled) ? scheduled : []).forEach(p => {
         const ld = lineDestKey(p);
-        if (covered.has(ld)) return; // già coperto dal real-time
+        if (p.trip_id && assignedTripIds.has(String(p.trip_id))) return; // già fuso nel real-time
+        const pMin = passageMinutes(p);
+        // Orario programmato già trascorso e nessuna traccia realtime: la
+        // corsa è già passata, non va elencata tra quelle in arrivo.
+        if (pMin != null) {
+            const signedDiff = ((pMin - nowMin + 720) % 1440 + 1440) % 1440 - 720;
+            if (signedDiff < -5) return;
+        }
+        const coveredByRealtime = result.some(r =>
+            r.real !== false &&
+            lineDestKey(r) === ld &&
+            // Senza orario nel realtime non si può confrontare: la chiave
+            // resta coperta come nel comportamento precedente.
+            (passageMinutes(r) == null ||
+             (minutesDistance(passageMinutes(r), pMin) ?? Infinity) <= COVER_TOLERANCE_MIN));
+        if (coveredByRealtime) return;
 
         // Se l'orario è relativo lo converto ad assoluto
         let time = p.time;
         if (time && time.includes("'")) {
-            // TODO: convertire in orario assoluto
             const now = new Date();
             const minutes = parseInt(time.replace("'", ""));
             const target = new Date(now.getTime() + minutes * 60000);
@@ -599,6 +663,7 @@ function createPassageCard(p) {
         sessionStorage.setItem('timedStop', timingPoint.stop);
         sessionStorage.setItem('busTrack', lineName);
         sessionStorage.setItem('realTime', timingPoint.time);
+        sessionStorage.setItem('contextIsRealtime', isReal ? '1' : '0');
         sessionStorage.setItem('lastStop', destination);
         sessionStorage.setItem('lineId', lineId);
         sessionStorage.setItem('tripDetails_selectedStop', stationId);
@@ -622,12 +687,15 @@ function createPassageCard(p) {
         sessionStorage.setItem('tripDetails_url', url);
 
 
+        // stopId identifica la fermata interrogata: anche l'orario passato
+        // al resolver deve essere quello iniziale del feed, non il capolinea.
+        const resolutionPoint = p.timingPoints?.[0] || timingPoint;
         const tripId = p.trip_id || await fetchTripId(
             lineName,
             destination,
             day,
-            timingPoint.time,
-            timingPoint.stop,
+            resolutionPoint.time,
+            resolutionPoint.stop,
             lineId,
             stationId
         );
@@ -643,7 +711,8 @@ function createPassageCard(p) {
             contextStop: timingPoint.stop,
             contextTime: timingPoint.time,
             contextDestination: destination,
-            contextLineId: lineId
+            contextLineId: lineId,
+            contextRealtime: isReal ? '1' : '0'
         });
 
         window.location.href = `/trip-details?${params.toString()}`;
@@ -741,6 +810,10 @@ function updateFilter() {
 
         filterContainer.appendChild(btn);
     });
+
+    // La riga filtri è scrollabile orizzontalmente: se resta uno scrollLeft
+    // residuo la prima chip appare tagliata a metà ("non allineata").
+    filterContainer.scrollLeft = 0;
 
     // Applica il filtro alla lista
     let hasMatch = false;

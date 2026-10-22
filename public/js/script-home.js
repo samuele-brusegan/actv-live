@@ -128,11 +128,26 @@ async function fetchAllStations() {
         const response = await fetch('https://oraritemporeale.actv.it/aut/backend/page/stops');
         if (!response.ok) return [];
         const data = await response.json();
-        return (data || []).map(s => ({
-            id: s.name,
-            name: s.description.replace(/\[\d+\]/g, '').trim(),
-            lat: s.latitude,
-            lng: s.longitude
+        // Unisci le fermate con lo stesso nome (es. le due direzioni di
+        // "Zelarino Chiesa"): una sola voce con tutti gli id concatenati.
+        const byName = new Map();
+        (data || []).forEach(s => {
+            const name = String(s.description || '').replace(/\[\d+\]/g, '').trim();
+            const key = name.toLocaleLowerCase('it-IT').replace(/\s+/g, ' ');
+            const ids = String(s.name || '').split('-web-aut')[0].split('-').filter(Boolean);
+            const existing = byName.get(key);
+            if (existing) {
+                ids.forEach(id => { if (!existing.ids.includes(id)) existing.ids.push(id); });
+            } else {
+                byName.set(key, { name, ids, lat: s.latitude, lng: s.longitude });
+            }
+        });
+        return Array.from(byName.values()).map(s => ({
+            id: s.ids.join('-') + '-web-aut',
+            ids: s.ids,
+            name: s.name,
+            lat: s.lat,
+            lng: s.lng
         }));
     } catch (e) {
         return [];
@@ -151,7 +166,7 @@ function updateNearbyUI(near, map, userPos) {
     if (hr) hr.style.display = 'block';
 
     list.innerHTML = near.map(stop => {
-        const ids = stop.id.split('-web-aut')[0].split('-');
+        const ids = stop.ids || stop.id.split('-web-aut')[0].split('-');
         const idBadges = ids.map(id => `<div class="id-badge-small">${id}</div>`).join('');
 
         return `
@@ -289,10 +304,29 @@ function setupLicenseShortcut() {
     });
 }
 
+/** Pannello di benvenuto mostrato solo al primo avvio */
+function showHomeTutorialIfFirstRun() {
+    const el = document.getElementById('home-tutorial');
+    if (!el) return;
+    try {
+        if (localStorage.getItem('home_tutorial_seen')) return;
+        el.style.display = 'block';
+    } catch (e) {
+        el.style.display = 'block';
+    }
+}
+
+function dismissHomeTutorial() {
+    const el = document.getElementById('home-tutorial');
+    if (el) el.style.display = 'none';
+    try { localStorage.setItem('home_tutorial_seen', '1'); } catch (e) {}
+}
+
 // Inizializzazione Completa
 window.onload = () => {
     renderJourneyResume();
     setupLicenseShortcut();
+    showHomeTutorialIfFirstRun();
     initHomeMap();
     checkImportantNotices();
 };

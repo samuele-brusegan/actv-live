@@ -21,7 +21,7 @@
 }
 
 .parent-wrapper {
-    padding: 0 var(--spacing-md) 0 var(--spacing-md);
+    /* padding: 0 var(--spacing-md) 0 var(--spacing-md); */
 }
 
 #filter-container {

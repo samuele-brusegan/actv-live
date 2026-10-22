@@ -9,6 +9,8 @@
         ?>
         <link rel="stylesheet" href="/css/structure/structure-stopList.css">
         <link rel="stylesheet" href="/css/stopList.css">
+        <link rel="stylesheet" href="/css/home.css">
+        <script src="/js/tour.js"></script>
     </head>
     <body>
 

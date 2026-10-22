@@ -52,6 +52,14 @@ describe('mezzi realtime alla fermata', () => {
 });
 
 describe('mergePassages (fallback previsti)', () => {
+    test('non assegna una corsa attiva di un ora prima al passaggio 31H delle 23:44', () => {
+        const rt = [{ line: '31H_UM', destination: 'Mestre Centro', time: '23:44', real: true }];
+        const old = { line: '31H', destination: 'Mestre Centro', time: '22:44', trip_id: 'AUT_ACTV_794_26811' };
+        const current = { ...old, time: '23:44', trip_id: 'AUT_ACTV_794_26812' };
+        expect(mergePassages(rt, [old, current], new Set([old.trip_id]))[0].trip_id).toBe(current.trip_id);
+        expect(mergePassages(rt, [old], new Set([old.trip_id]))[0].trip_id).toBeUndefined();
+    });
+
     test('aggiunge i previsti per linee non coperte dal real-time', () => {
         const rt = [{ line: '2_US', destination: 'Mestre', real: true }];
         const sched = [

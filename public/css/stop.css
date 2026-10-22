@@ -75,6 +75,8 @@
     /* Gestione Scorrimento */
     overflow-x: auto;                   /* Abilita lo scroll orizzontale */
     overflow-y: hidden;                 /* Evita scroll verticale indesiderato */
+    padding: 4px 2px;                   /* spazio per pulse/box-shadow delle chip */
+    scroll-behavior: smooth;
     /*white-space: nowrap;              /* Impedisce agli elementi di andare a capo */
     
     /* Miglioramenti UX */
@@ -669,3 +671,12 @@
     justify-content: center;
     padding: 0 5px;
 }
+
+/* Sotto il badge tempo: ETA assoluta + scostamento dall'orario di linea */
+.passage-schedule { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.passage-eta { font-size: 12px; color: var(--color-text-gray); font-weight: 600; }
+.passage-sched { font-size: 11px; color: var(--color-text-gray); }
+.passage-delay { font-size: 11px; font-weight: 800; }
+.passage-delay.is-late { color: var(--color-primary-red); }
+.passage-delay.is-early { color: var(--color-primary-blue); }
+.passage-delay.is-ontime { color: var(--color-primary-green); }

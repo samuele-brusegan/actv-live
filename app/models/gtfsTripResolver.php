@@ -7,6 +7,13 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
 
         $dataUnpacked = dbquery($db, $tripId);
 
+        // I feed real-time possono usare prefissi diversi dal GTFS statico
+        // (es. AUT_LL_793_* invece di AUT_ACTV_794_*). Il suffisso numerico
+        // identifica comunque la corsa: riprova con match sul suffisso.
+        if (count($dataUnpacked) == 0 && preg_match('/_(\d+)$/', $tripId, $m)) {
+            $dataUnpacked = dbquery($db, '%_' . $m[1], true);
+        }
+
         if (count($dataUnpacked) == 0) {
             echo json_encode(["error" => "No trips found", "query" => queryBuilder(), "params" => [$tripId]]);
             exit;
@@ -51,9 +58,12 @@ function queryBuilder() {
     return $q;
 }
 
-function dbquery(DatabaseConnector $db, $tripId)
+function dbquery(DatabaseConnector $db, $tripId, $bySuffix = false)
 {
     $query = queryBuilder();
+    if ($bySuffix) {
+        $query = str_replace('WHERE t.trip_id = ?', 'WHERE t.trip_id LIKE ?', $query);
+    }
 
     $dataUnpacked = $db->query($query, [$tripId]);
 

@@ -656,7 +656,20 @@ class ApiController {
         $routes = is_file($base . '/routes.json') ? json_decode((string)file_get_contents($base . '/routes.json'), true) : [];
         if (!is_array($trips)) $trips = [];
         if (!is_array($routes)) $routes = [];
+        // Il feed RT usa prefissi diversi dal GTFS statico (es. AUT_LL_793_*
+        // vs AUT_ACTV_794_*). Il suffisso numerico e' univoco per servizio:
+        // indicizzalo per normalizzare i trip_id dei veicoli a quelli GTFS,
+        // altrimenti nessun match downstream (merge passaggi, forme) funziona.
+        $tripBySuffix = [];
+        foreach ($trips as $tid => $_t) {
+            if (preg_match('/_(\d+)$/', (string)$tid, $m)) $tripBySuffix[$m[1]] = (string)$tid;
+        }
         foreach ($vehicles as &$vehicle) {
+            $vid = (string)($vehicle['trip_id'] ?? '');
+            if ($vid !== '' && !isset($trips[$vid]) && preg_match('/_(\d+)$/', $vid, $m) && isset($tripBySuffix[$m[1]])) {
+                $vehicle['trip_id'] = $tripBySuffix[$m[1]];
+                $vehicle['trip_id_rt'] = $vid;
+            }
             $trip = $trips[(string)($vehicle['trip_id'] ?? '')] ?? null;
             $routeId = (string)((is_array($trip) ? ($trip['route_id'] ?? null) : null) ?? $vehicle['route_id'] ?? '');
             $route = is_array($routes[$routeId] ?? null) ? $routes[$routeId] : [];
@@ -1108,7 +1121,10 @@ class ApiController {
 
         // Preferisce la shape stradale già presente. Solo se manca, prova lo
         // snapping on-the-fly e persiste il risultato per le richieste future.
-        foreach ($shapes as &$shape) {
+        // ATTENZIONE: lo snap chiama un servizio esterno (OSRM) — nella vista
+        // "tutte le linee" farebbe ~100 richieste HTTP seriali e l'endpoint
+        // andrebbe in timeout (504). Si applica solo alle richieste filtrate.
+        if ($isFiltered) foreach ($shapes as &$shape) {
             if (($shape['service'] ?? 'automobilistico') === 'navigation') continue;
             if (!empty($shape['shape']) || count($shape['path'] ?? []) < 2) continue;
 

@@ -198,6 +198,44 @@ body {
     100% { transform: rotate(360deg); }
 }
 
+/* Tooltip flottante sopra i bus: vive fuori dal container Leaflet,
+   puo' superare i bordi della mappa e si chiude tappando fuori. */
+.bus-map-tooltip {
+    position: fixed;
+    z-index: 5000;
+    transform: translate(-50%, -100%);
+    background: var(--color-white);
+    color: var(--color-text-dark);
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+    padding: 10px 14px;
+    max-width: min(300px, 92vw);
+    touch-action: pan-x;
+}
+.bus-map-tooltip.hidden { display: none; }
+.bus-map-tooltip::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -7px;
+    transform: translateX(-50%);
+    border: 8px solid transparent;
+    border-bottom: 0;
+    border-top-color: var(--color-white);
+}
+.bus-map-tooltip-close {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    border: 0;
+    background: none;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+}
+
 /* Bus marker popup */
 .bus-popup {
     text-align: center;

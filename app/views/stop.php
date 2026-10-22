@@ -7,6 +7,8 @@
         <?php require COMMON_HTML_HEAD; ?>
         <link rel="stylesheet" href="/css/structure/structure-stop.css">
         <link rel="stylesheet" href="/css/stop.css">
+        <link rel="stylesheet" href="/css/home.css">
+        <script src="/js/tour.js"></script>
         <script src="/js/notifications.js"></script>
         <script src="/js/widget.js"></script>
         <script src="/js/delayHistory.js"></script>
@@ -38,9 +40,7 @@
                 </button>
             </div>
         </div>
-        <div class="parent-wrapper">
-            <div id="filter-container"></div>
-        </div>
+        
 
         <!-- Notification Settings Panel -->
         <div id="notification-panel" class="notification-panel" style="display: none;">
@@ -64,6 +64,9 @@
 
         <!-- Contenuto Principale -->
         <div class="main-content pb-5">
+            <div class="parent-wrapper">
+                <div id="filter-container"></div>
+            </div>
 
             <!-- Bacheca avvisi (popolata via JS, nascosta se vuota) -->
             <div id="noticeboard"></div>

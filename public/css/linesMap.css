@@ -142,3 +142,20 @@ body {
 .route-map-service-filter { position: absolute; z-index: 1000; top: 12px; right: 12px; display: flex; gap: 4px; background: rgba(20,20,20,.9); padding: 5px; border-radius: 8px; }
 .route-map-service-filter button { border: 0; border-radius: 5px; padding: 7px 10px; color: #fff; background: #444; cursor: pointer; }
 .route-map-service-filter button.active { background: #087f5b; }
+
+/* Tema scuro: l'overlay di caricamento non deve essere bianco */
+[data-theme="dark"] .loading-overlay {
+    background: rgba(17, 17, 17, 0.9);
+    color: var(--color-text-dark);
+}
+
+[data-theme="dark"] .route-map-legend {
+    background: rgba(30, 30, 30, 0.94);
+    color: var(--color-text-dark);
+}
+
+[data-theme="dark"] .route-map-toggle {
+    background: #2a2a2a;
+    color: var(--color-text-dark);
+    border-color: #444;
+}

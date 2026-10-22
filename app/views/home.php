@@ -15,7 +15,7 @@
         <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/Leaflet.fullscreen.min.js'></script>
         <link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css' rel='stylesheet' />
         <script src="/components/StopCard.js"></script>
-        
+        <script src="/js/tour.js"></script>
         <script src="/js/script-home.js"></script>
     </head>
     <body>
@@ -35,10 +35,20 @@
         <!-- Contenuto Principale -->
         <div class="main-content /*pb-5*/ pb-2">
             
-            <section class="home-welcome" aria-labelledby="home-actions-title">
+            <section id="home-tutorial" class="home-welcome" aria-labelledby="home-actions-title" style="display:none;">
+                <div class="eyebrow">Benvenuto</div>
+                <h2 id="home-actions-title">Vuoi fare un giro?</h2>
+                <p class="home-tutorial-text">Ti mostro in pochi secondi dove sono fermate, mappa, preferiti e tutte le altre funzioni dell'app.</p>
+                <div class="home-tutorial-actions">
+                    <button type="button" class="btn btn-primary rounded-pill px-4 py-2" onclick="ACTVTour.start()">Inizia il tour</button>
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4 py-2" onclick="dismissHomeTutorial()">Salta</button>
+                </div>
+            </section>
+
+            <section class="home-welcome" aria-labelledby="home-stops-title">
                 <div class="eyebrow">Servizio ACTV</div>
-                <h2 id="home-actions-title">Da dove vuoi partire?</h2>
-                <a class="home-primary-action" href="/route-finder"><span class="action-symbol">⇄</span><span><strong>Trova un percorso</strong><small>Partenza, destinazione e orario</small></span><span aria-hidden="true">›</span></a>
+                <h2 id="home-stops-title">Dove passa il tuo bus?</h2>
+                <a class="home-primary-action" href="/stopList"><span class="action-symbol">◉</span><span><strong>Cerca una fermata</strong><small>Passaggi in tempo reale per ogni fermata</small></span><span aria-hidden="true">›</span></a>
             </section>
 
             <section id="journey-resume" class="journey-resume" aria-labelledby="journey-resume-title">

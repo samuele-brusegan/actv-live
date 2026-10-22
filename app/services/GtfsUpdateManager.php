@@ -326,7 +326,7 @@ class GtfsUpdateManager
         $tasks = [
             ['id' => 'download', 'name' => 'Download GTFS più recente', 'current' => 0, 'total' => 1, 'status' => 'pending'],
             ['id' => 'extract', 'name' => 'Estrazione archivio', 'current' => 0, 'total' => 1, 'status' => 'pending'],
-            ['id' => 'cache', 'name' => 'Creazione cache JSON', 'current' => 0, 'total' => 4, 'status' => 'pending'],
+            ['id' => 'cache', 'name' => 'Creazione cache JSON', 'current' => 0, 'total' => 5, 'status' => 'pending'],
             ['id' => 'import_routes', 'name' => 'Import linee', 'current' => 0, 'total' => 1, 'status' => 'pending'],
             ['id' => 'import_trips', 'name' => 'Import corse', 'current' => 0, 'total' => 1, 'status' => 'pending'],
             ['id' => 'import_stops', 'name' => 'Import fermate', 'current' => 0, 'total' => 1, 'status' => 'pending'],
@@ -403,7 +403,10 @@ class GtfsUpdateManager
             $this->advanceTask($state, 'cache');
             $this->setTaskDetail($state, 'cache', 'parseStopTimes() - lettura e suddivisione per route');
             $parser->parseStopTimes();
-            $this->setTask($state, 'cache', 'completed', 4);
+            $this->advanceTask($state, 'cache');
+            $this->setTaskDetail($state, 'cache', 'parseShapes()');
+            $parser->parseShapes();
+            $this->setTask($state, 'cache', 'completed', 5);
 
             $pdo = $this->connectPdo();
             $staging = $this->createStagingTables($pdo);
@@ -451,6 +454,10 @@ class GtfsUpdateManager
             $backups = $this->publishTables($pdo, $staging);
             try {
                 $this->publishCache($cacheDir);
+                // Pubblica anche i .txt grezzi: il planner dei percorsi legge
+                // calendar.txt/calendar_dates.txt da data/gtfs/ e un feed
+                // scaduto produce zero connessioni ("Nessun percorso trovato").
+                $this->publishRawFeed($extractDir);
             } catch (Throwable $publishError) {
                 $this->rollbackTables($pdo, $backups);
                 throw $publishError;
@@ -751,11 +758,44 @@ class GtfsUpdateManager
         if (is_dir($target) && !rename($target, $backup)) {
             throw new RuntimeException('Impossibile archiviare la cache GTFS corrente.');
         }
+        // Merge e non sostituzione: la cache nuova contiene solo i file bus,
+        // mentre nella directory vivono anche navigation/, planner/ e shapes/
+        // che non devono essere cancellati dall'aggiornamento automobilistico.
+        if (is_dir($backup)) $this->copyMissing($backup, $newCache);
         if (!rename($newCache, $target)) {
             if (is_dir($backup)) rename($backup, $target);
             throw new RuntimeException('Impossibile pubblicare la nuova cache GTFS.');
         }
         $this->removeTree($backup);
+    }
+
+    private function copyMissing(string $from, string $to): void
+    {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($from, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($iterator as $item) {
+            $rel = substr($item->getPathname(), strlen($from));
+            $dest = $to . $rel;
+            if ($item->isDir()) {
+                if (!is_dir($dest)) mkdir($dest, 0775, true);
+            } elseif (!file_exists($dest)) {
+                copy($item->getPathname(), $dest);
+            }
+        }
+    }
+
+    private function publishRawFeed(string $extractDir): void
+    {
+        $target = BASE_PATH . '/data/gtfs';
+        if (!is_dir($target)) mkdir($target, 0775, true);
+        foreach (glob($extractDir . '/*.txt') ?: [] as $file) {
+            $destination = $target . '/' . basename($file);
+            if (!copy($file, $destination)) {
+                throw new RuntimeException('Impossibile pubblicare ' . basename($file));
+            }
+        }
     }
 
     private function setTask(array &$state, string $id, string $status, ?int $current = null): void
