@@ -60,11 +60,13 @@ describe('mergePassages (fallback previsti)', () => {
         expect(mergePassages(rt, [old], new Set([old.trip_id]))[0].trip_id).toBeUndefined();
     });
 
+    const inMin = n => new Date(Date.now() + n * 60000).toTimeString().slice(0, 5);
+
     test('aggiunge i previsti per linee non coperte dal real-time', () => {
         const rt = [{ line: '2_US', destination: 'Mestre', real: true }];
         const sched = [
-            { line: '2', destination: 'Mestre', real: false, time: '10:05' },   // già coperto -> escluso
-            { line: '5E', destination: 'Marghera', real: false, time: '10:08' } // mancante -> incluso
+            { line: '2', destination: 'Mestre', real: false, time: inMin(5) },   // già coperto -> escluso
+            { line: '5E', destination: 'Marghera', real: false, time: inMin(8) } // mancante -> incluso
         ];
         const merged = mergePassages(rt, sched);
         expect(merged.length).toBe(2);
@@ -72,16 +74,27 @@ describe('mergePassages (fallback previsti)', () => {
     });
 
     test('con real-time null usa solo i previsti', () => {
-        const sched = [{ line: '5E', destination: 'Marghera', real: false, time: '10:08' }];
+        const sched = [{ line: '5E', destination: 'Marghera', real: false, time: inMin(8) }];
         expect(mergePassages(null, sched).length).toBe(1);
     });
 
     test('deduplica i previsti identici', () => {
+        const time = inMin(8);
         const sched = [
-            { line: '5E', destination: 'Marghera', time: '10:08' },
-            { line: '5E', destination: 'Marghera', time: '10:08' }
+            { line: '5E', destination: 'Marghera', time },
+            { line: '5E', destination: 'Marghera', time }
         ];
         expect(mergePassages([], sched).length).toBe(1);
+    });
+
+    test('non elenca corse programmate gia trascorse senza riscontro realtime', () => {
+        const sched = [
+            { line: '5E', destination: 'Marghera', time: inMin(-30) },
+            { line: '5E', destination: 'Marghera', time: inMin(20) }
+        ];
+        const merged = mergePassages([], sched);
+        expect(merged.length).toBe(1);
+        expect(merged[0].time).toBe(inMin(20));
     });
 
     test('non assegna lo stesso trip_id a due corse ravvicinate in ritardo', () => {
