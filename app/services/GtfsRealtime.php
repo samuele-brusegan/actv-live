@@ -3,6 +3,7 @@
 /** Minimal GTFS-RT protobuf decoder for ACTV vehicle positions and trip updates. */
 class GtfsRealtime
 {
+    private const MAX_POSITION_AGE = 120;
     private const URLS = [
         'navigation' => ['vehicles' => 'https://tpl.actv.it/nav/GTFSRT/vehiclePositions', 'updates' => 'https://tpl.actv.it/nav/GTFSRT/tripUpdates'],
         'automobilistico' => ['vehicles' => 'https://tpl.actv.it/aut/GTFSRT/vehiclePositions', 'updates' => 'https://tpl.actv.it/aut/GTFSRT/tripUpdates'],
@@ -19,11 +20,23 @@ class GtfsRealtime
             // La cache è opzionale: il feed live deve funzionare anche quando
             // il volume è read-only o appartiene a un altro utente.
             @file_put_contents($cacheFile, json_encode(['updated_at' => date(DATE_ATOM), 'data' => $decoded], JSON_PRETTY_PRINT), LOCK_EX);
-            return $decoded;
+            return $kind === 'vehicles' ? self::freshVehicles($decoded) : $decoded;
         } catch (Throwable $e) {
             $cached = is_file($cacheFile) ? json_decode((string)file_get_contents($cacheFile), true) : null;
-            return is_array($cached['data'] ?? null) ? $cached['data'] : [];
+            $updated = strtotime((string)($cached['updated_at'] ?? ''));
+            if (!$updated || time() - $updated > self::MAX_POSITION_AGE) return [];
+            $data = is_array($cached['data'] ?? null) ? $cached['data'] : [];
+            return $kind === 'vehicles' ? self::freshVehicles($data) : $data;
         }
+    }
+
+    public static function freshVehicles(array $vehicles, ?int $now = null): array
+    {
+        $now ??= time();
+        return array_values(array_filter($vehicles, static function ($vehicle) use ($now) {
+            $timestamp = $vehicle['position_timestamp'] ?? null;
+            return $timestamp === null || ($timestamp >= $now - self::MAX_POSITION_AGE && $timestamp <= $now + 60);
+        }));
     }
 
     public static function decode(string $kind, string $raw, string $service = 'navigation'): array
@@ -69,6 +82,8 @@ class GtfsRealtime
     private static function vehicles(string $raw, string $service): array
     {
         $out = [];
+        $header = self::fieldMessage($raw, 1);
+        $feedTimestamp = $header !== null ? self::varintField($header, 3) : null;
         foreach (self::messages(self::fieldMessages($raw, 2)) as $entity) {
             $vehicle = self::fieldMessage($entity, 4);
             if ($vehicle === null) continue;
@@ -78,7 +93,13 @@ class GtfsRealtime
             $route = self::stringField($trip, 5);
             $tripId = self::stringField($trip, 1);
             $relationship = self::varintField($trip, 3);
+            $descriptor = self::fieldMessage($vehicle, 8);
             $out[] = [
+                'entity_id' => self::stringField($entity, 1),
+                'vehicle_id' => $descriptor !== null ? self::stringField($descriptor, 1) : '',
+                'position_timestamp' => self::varintField($vehicle, 5) ?? $feedTimestamp,
+                'current_stop_sequence' => self::varintField($vehicle, 3),
+                'current_status' => self::varintField($vehicle, 4),
                 'service' => $service, 'trip_id' => $tripId, 'route_id' => $route,
                 'route_short_name' => $route, 'status' => $relationship === 3 ? 'cancelled' : 'scheduled',
                 'delay_seconds' => 0,
