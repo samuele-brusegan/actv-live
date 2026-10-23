@@ -39,13 +39,13 @@ document.addEventListener('DOMContentLoaded', () => {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Palette ad alta luminanza: leggibile sia sulle tile chiare sia
+    // Palette desaturata: leggibile sia sulle tile chiare sia: leggibile sia sulle tile chiare sia
     // su quelle scurite dal tema scuro (invert/hue-rotate in style.css).
     const LINE_COLORS = [
-        '#FF4A3D', '#3F8CFF', '#2ECC5E', '#FF9F1C',
-        '#B84DFF', '#19C3D6', '#F23D7F', '#8BC34A',
-        '#FFB300', '#5C6BC0', '#26A69A', '#FF7043',
-        '#7E57C2', '#D4E157'
+        '#D95D50', '#5B8DC9', '#5FA871', '#D99A45',
+        '#9B72CF', '#4FA8A4', '#C4659B', '#83A05C',
+        '#D9A63C', '#6878B8', '#4E9E97', '#D98862',
+        '#8577B8', '#A8B45C'
     ];
 
     const currentParams = () => new URLSearchParams(window.location.search);
