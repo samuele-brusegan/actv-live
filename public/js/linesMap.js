@@ -284,18 +284,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     : getDeterministicColor(shape.route_short_name, true)));
                 const style = {
                     color: color,
-                    weight: isTarget ? 8 : 4,
-                    opacity: isTarget ? 1 : 0.7,
+                    weight: isTarget ? 8 : 5,
+                    opacity: isTarget ? 1 : 0.9,
                     zIndex: isTarget ? 1000 : 1
                 };
 
-                // Casing: bordo di contrasto sotto la linea, scuro in tema
-                // chiaro e chiaro in tema scuro, per staccarla dalle tile.
+                // Casing sottile sotto la linea: stacca il tratto dalle tile
+                // senza coprire il colore (bianco in dark, scuro in light).
                 const isDark = document.documentElement.dataset.theme === 'dark';
                 const casing = L.polyline(validPoints, {
                     color: isDark ? '#FFFFFF' : '#10231F',
-                    weight: style.weight + 3,
-                    opacity: isDark ? 0.55 : 0.35,
+                    weight: style.weight + 2,
+                    opacity: isDark ? 0.35 : 0.3,
                     interactive: false
                 }).addTo(layers);
                 const polyline = L.polyline(validPoints, style).addTo(layers);
