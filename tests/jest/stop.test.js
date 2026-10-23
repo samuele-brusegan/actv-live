@@ -138,14 +138,27 @@ describe('mergePassages (fallback previsti)', () => {
 });
 
 describe('isLikelyStrike', () => {
-    test('vero se real-time vuoto ma esistono corse previste', () => {
-        expect(isLikelyStrike([], [{ line: '2' }])).toBe(true);
+    const twoTrips = [{ line: '2' }, { line: '5' }];
+    test('vero se real-time vuoto ma esistono almeno due corse previste', () => {
+        jest.useFakeTimers().setSystemTime(new Date('2026-01-01T12:00:00'));
+        expect(isLikelyStrike([], twoTrips)).toBe(true);
+        jest.useRealTimers();
+    });
+    test('falso con una sola corsa prevista (possibile falso positivo)', () => {
+        jest.useFakeTimers().setSystemTime(new Date('2026-01-01T12:00:00'));
+        expect(isLikelyStrike([], [{ line: '2' }])).toBe(false);
+        jest.useRealTimers();
+    });
+    test('falso di notte anche se il realtime è vuoto', () => {
+        jest.useFakeTimers().setSystemTime(new Date('2026-01-01T03:00:00'));
+        expect(isLikelyStrike([], twoTrips)).toBe(false);
+        jest.useRealTimers();
     });
     test('falso se ci sono passaggi real-time', () => {
-        expect(isLikelyStrike([{ line: '2' }], [{ line: '2' }])).toBe(false);
+        expect(isLikelyStrike([{ line: '2' }], twoTrips)).toBe(false);
     });
     test('falso se real-time è null (errore di rete)', () => {
-        expect(isLikelyStrike(null, [{ line: '2' }])).toBe(false);
+        expect(isLikelyStrike(null, twoTrips)).toBe(false);
     });
     test('falso se non ci sono nemmeno corse previste', () => {
         expect(isLikelyStrike([], [])).toBe(false);

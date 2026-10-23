@@ -420,9 +420,20 @@ function mergePassages(realtime, scheduled, activeTripIds = null) {
 
 /** Sciopero/servizio non monitorato: real-time vuoto ma corse previste esistono. */
 function isLikelyStrike(realtime, scheduled) {
-    const rtEmpty = Array.isArray(realtime) && realtime.length === 0;
-    const schedHas = Array.isArray(scheduled) && scheduled.length > 0;
-    return rtEmpty && schedHas;
+    // Il realtime deve aver risposto OK con lista vuota (null = errore di rete:
+    // in quel caso non sappiamo nulla e non accusiamo uno sciopero).
+    if (!Array.isArray(realtime) || realtime.length !== 0) return false;
+
+    // Una singola corsa teorica non e' evidenza sufficiente: orari limite,
+    // linee a chiamata e finestre a cavallo producono falsi positivi.
+    if (!Array.isArray(scheduled) || scheduled.length < 2) return false;
+
+    // Fra le 00:00 e le 05:00 il realtime ACTV smette di trasmettere anche
+    // in condizioni normali: non e' uno sciopero.
+    const hour = new Date().getHours();
+    if (hour < 5) return false;
+
+    return true;
 }
 
 /** Recupera eventuali avvisi/comunicazioni per la fermata */
@@ -471,7 +482,7 @@ async function loadPassages() {
     if (strike) {
         notes.push({
             type: 'strike',
-            html: '<strong>&#9888;&#65039; Possibile sciopero o servizio non monitorato.</strong><br>' +
+            html: '<strong>Possibile sciopero o servizio non monitorato.</strong><br>' +
                   'I passaggi in tempo reale non sono disponibili: gli orari mostrati sono quelli <em>previsti</em> ' +
                   'e i bus potrebbero non passare.'
         });
@@ -561,7 +572,9 @@ function ensureBoardBubble() {
         bubble.style.display = 'none';
         bubble.setAttribute('title', 'Apri bacheca');
         bubble.onclick = expandBoard;
-        bubble.innerHTML = '<span class="board-bubble-icon">&#128203;</span><span class="board-bubble-count"></span>';
+        bubble.innerHTML = '<span class="board-bubble-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4a3 3 0 0 1 6 0M9 10h6M9 14h6"/></svg></span><span class="board-bubble-count"></span>';
+        bubble.setAttribute('role', 'button');
+        bubble.setAttribute('aria-label', 'Apri bacheca avvisi');
         document.body.appendChild(bubble);
     }
     return bubble;
@@ -578,15 +591,26 @@ function renderBoard(notes) {
         return;
     }
 
-    const notesHtml = notes.map(n =>
-        `<div class="board-note board-note-${n.type || 'notice'}">${n.html}</div>`
+    const NOTE_ICONS = {
+        strike: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2.5 19.5h19L12 3Zm0 7v4m0 3.5h.01"/></svg>',
+        notice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/></svg>'
+    };
+
+    const notesHtml = notes.map(n => `
+        <div class="board-note board-note-${n.type || 'notice'}">
+            <span class="board-note-icon">${NOTE_ICONS[n.type] || NOTE_ICONS.notice}</span>
+            <div class="board-note-text">${n.html}</div>
+        </div>`
     ).join('');
 
     container.innerHTML = `
-        <div class="board-card" id="board-card">
+        <div class="board-card" id="board-card" role="region" aria-label="Bacheca avvisi">
             <div class="board-header">
-                <span class="board-title">&#128203; Bacheca</span>
-                <button class="board-collapse" onclick="collapseBoard()" title="Riduci">&minus;</button>
+                <span class="board-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4a3 3 0 0 1 6 0M9 10h6M9 14h6"/></svg>
+                    Bacheca
+                </span>
+                <button class="board-collapse" onclick="collapseBoard()" aria-label="Riduci bacheca">&minus;</button>
             </div>
             <div class="board-body">${notesHtml}</div>
         </div>`;
