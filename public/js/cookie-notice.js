@@ -35,6 +35,7 @@ class CookieNotice {
 
     setConsent() {
         localStorage.setItem(this.options.cookieName, 'true');
+        if (typeof window.actvLoadAnalytics === 'function') window.actvLoadAnalytics();
         this.hide();
     }
 

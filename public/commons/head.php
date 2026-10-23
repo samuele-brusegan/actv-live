@@ -1,11 +1,20 @@
-	<!-- Google tag (gtag.js) -->
-	<script async src="https://www.googletagmanager.com/gtag/js?id=G-56Z18G0ZJT"></script>
+	<!-- Google tag (gtag.js) — caricato solo dopo consenso cookie -->
 	<script>
 	window.dataLayer = window.dataLayer || [];
 	function gtag(){dataLayer.push(arguments);}
-	gtag('js', new Date());
-
-	gtag('config', 'G-56Z18G0ZJT');
+	window.actvLoadAnalytics = function () {
+		if (window.__gaLoaded) return;
+		window.__gaLoaded = true;
+		var s = document.createElement('script');
+		s.async = true;
+		s.src = 'https://www.googletagmanager.com/gtag/js?id=G-56Z18G0ZJT';
+		document.head.appendChild(s);
+		gtag('js', new Date());
+		gtag('config', 'G-56Z18G0ZJT');
+	};
+	try {
+		if (localStorage.getItem('cookie_consent_accepted') === 'true') window.actvLoadAnalytics();
+	} catch (e) {}
 	</script>
 	<!-- <script src="/js/time-machine.js"></script> -->
 	<link  href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
