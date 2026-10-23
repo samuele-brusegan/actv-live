@@ -23,7 +23,8 @@ class databaseConnector {
         }
 
         try {
-            $dsn = "mysql:host=$url;dbname=$dbName;charset=utf8mb4";
+            $port = ENV['DB_PORT'] ?? 3306;
+            $dsn = "mysql:host=$url;port=$port;dbname=$dbName;charset=utf8mb4";
             $options = [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

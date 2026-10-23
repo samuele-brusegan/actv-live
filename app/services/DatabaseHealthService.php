@@ -12,7 +12,7 @@ class DatabaseHealthService
         $startedAt = microtime(true);
         try {
             $pdo = new PDO(
-                'mysql:host=' . ENV['DB_HOST'] . ';dbname=' . ENV['DB_NAME'] . ';charset=utf8mb4',
+                'mysql:host=' . ENV['DB_HOST'] . ';port=' . (ENV['DB_PORT'] ?? 3306) . ';dbname=' . ENV['DB_NAME'] . ';charset=utf8mb4',
                 ENV['DB_USER'],
                 ENV['DB_PASS'],
                 [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_EMULATE_PREPARES => false, PDO::ATTR_TIMEOUT => 5]

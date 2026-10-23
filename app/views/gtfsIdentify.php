@@ -96,7 +96,7 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
 function getPDOConnection() {
     static $pdo = null;
     if ($pdo === null) {
-        $dsn = "mysql:host=" . ENV['DB_HOST'] . ";dbname=" . ENV['DB_NAME'] . ";charset=utf8mb4";
+        $dsn = "mysql:host=" . ENV['DB_HOST'] . ";port=" . (ENV['DB_PORT'] ?? 3306) . ";dbname=" . ENV['DB_NAME'] . ";charset=utf8mb4";
         $pdo = new PDO($dsn, ENV['DB_USER'], ENV['DB_PASS'], [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
