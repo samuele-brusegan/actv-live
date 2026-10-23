@@ -1,3 +1,220 @@
+(() => {
+function vehicleKey(vehicle) {
+    const id = vehicle.vehicle_id || vehicle.entity_id || vehicle.trip_id;
+    return id ? `${vehicle.service || ''}:${vehicle.vehicle_id ? 'vehicle' : vehicle.entity_id ? 'entity' : 'trip'}:${id}` : null;
+}
+
+function validVehiclePosition(vehicle, now = Date.now() / 1000) {
+    const position = vehicle.vehicle_position;
+    if (!position || position.lat == null || position.lon == null) return false;
+    const lat = Number(position.lat), lon = Number(position.lon);
+    return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
+        && (vehicle.position_timestamp == null || (now - vehicle.position_timestamp <= 120 && vehicle.position_timestamp <= now + 60));
+}
+
+function positionAgeLabel(vehicle) {
+    return vehicle.position_timestamp
+        ? 'Posizione rilevata ' + new Date(vehicle.position_timestamp * 1000).toLocaleTimeString('it-IT')
+        : 'Ora rilevamento non disponibile';
+}
+
+function matchesVehicleFilter(vehicle, query, params) {
+    const line = String(vehicle.route_short_name || '');
+    const trip = String(vehicle.trip_id || '');
+    const headsign = String(vehicle.trip_headsign || '');
+    if (params.get('tripId') && trip !== params.get('tripId')) return false;
+    if (params.get('line') && line !== params.get('line')) return false;
+    if (params.get('destination') && !headsign.toLowerCase().includes(params.get('destination').toLowerCase())) return false;
+    return !query || `${line} ${trip} ${vehicle.route_id || ''} ${headsign}`.toLowerCase().includes(query.toLowerCase());
+}
+
+function timeToSec(t) {
+    if (!t) return 0;
+    const p = t.split(':');
+    const sec = (+p[0]) * 3600 + (+p[1]) * 60 + (p[2] ? +p[2] : 0);
+    return sec; // Mantieni il giorno di servizio GTFS (24:xx, 25:xx).
+}
+
+/**
+ * Converte secondi dal mezzanotte in "HH:MM:SS"
+ */
+function secToTime(t) {
+    if (!t) return 0;
+    const hours = Math.floor(t / 3600);
+    const minutes = Math.floor((t % 3600) / 60);
+    const seconds = t % 60;
+    return `${hours}:${minutes}:${seconds}`;
+}
+
+/**
+ * Calcola la distanza tra due coordinate (m)
+ */
+function getDist(lat1, ln1, lat2, ln2) {
+    const R = 6371e3;
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (ln2 - ln1) * Math.PI / 180;
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Interpolazione precisa lungo la shape
+ */
+function interpolateWithShape(stops, shape, nowSec, delaySec = 0) {
+    if (!stops || stops.length === 0) return null;
+
+    const times = [];
+    stops.forEach(stop => {
+        let time = timeToSec(stop.arrival_time || stop.departure_time);
+        while (times.length && time < times[times.length - 1]) time += 86400;
+        times.push(time);
+    });
+    const firstSec = times[0];
+    const lastSec = times[times.length - 1];
+    // Align wall-clock time to this service interval before applying delay.
+    const midpoint = (firstSec + lastSec) / 2;
+    const serviceNow = nowSec + Math.round((midpoint - nowSec) / 86400) * 86400;
+    const virtualNowSec = serviceNow - delaySec;
+
+    stops.forEach( (stop) => {
+        let real_stop_id = stop.data_url ? stop.data_url.replace(/-web-aut$/, "") : String(stop.stop_id || "");
+        stop.real_stop_id = real_stop_id;
+    });
+
+
+    // Capolinea iniziale
+    if (virtualNowSec <= firstSec) {
+        return {
+            lat: parseFloat(stops[0].stop_lat),
+            lng: parseFloat(stops[0].stop_lon),
+            nextStop: stops[0].stop_name,
+            nextStopId: stops[0].real_stop_id,
+            prevStop: null,
+            progress: 0,
+            nextTime: stops[0].arrival_time
+        };
+    }
+
+    // Capolinea finale
+    if (virtualNowSec >= lastSec) {
+        return null;
+    }
+
+    // Trova il segmento GTFS corrente
+    let segment = null;
+    for (let i = 0; i < stops.length - 1; i++) {
+        let aSec = times[i];
+        let bSec = times[i + 1];
+
+        // Gestione mezzanotte: se b < a, b è il giorno dopo
+        if (bSec < aSec) bSec += 86400;
+
+        if (virtualNowSec >= aSec && virtualNowSec <= bSec) {
+            segment = {
+                idx: i,
+                progress: (bSec - aSec) > 0 ? (virtualNowSec - aSec) / (bSec - aSec) : 0,
+                stopA: stops[i],
+                stopB: stops[i + 1]
+            };
+            break;
+        }
+    }
+
+    // console.log("Linea 198", segment);
+
+
+    if (!segment) return null;
+
+    // Se non abbiamo una shape, fallback a lineare tra le fermate
+    if (!shape || shape.length === 0) {
+        const latA = parseFloat(segment.stopA.stop_lat);
+        const lngA = parseFloat(segment.stopA.stop_lon);
+        const latB = parseFloat(segment.stopB.stop_lat);
+        const lngB = parseFloat(segment.stopB.stop_lon);
+        return {
+            lat: latA + (latB - latA) * segment.progress,
+            lng: lngA + (lngB - lngA) * segment.progress,
+            nextStop: segment.stopB.stop_name,
+            nextStopId: segment.stopB.real_stop_id,
+            prevStop: segment.stopA.stop_name,
+            nextTime: segment.stopB.arrival_time
+        };
+    }
+
+    // Identifica gli indici della shape corrispondenti alle fermate A e B
+    // (Cerchiamo il punto della shape più vicino a ciascuna fermata)
+    function findNearest(lat, lon) {
+        let minD = Infinity, bestIdx = 0;
+        for (let i = 0; i < shape.length; i++) {
+            const d = getDist(lat, lon, shape[i].lat, shape[i].lng);
+            if (d < minD) { minD = d; bestIdx = i; }
+        }
+        return bestIdx;
+    }
+
+    const idxA = findNearest(segment.stopA.stop_lat, segment.stopA.stop_lon);
+    const idxB = findNearest(segment.stopB.stop_lat, segment.stopB.stop_lon);
+
+    // Se la shape è al contrario o incoerente, fallback lineare
+    if (idxA >= idxB) {
+        const latA = parseFloat(segment.stopA.stop_lat);
+        const lngA = parseFloat(segment.stopA.stop_lon);
+        const latB = parseFloat(segment.stopB.stop_lat);
+        const lngB = parseFloat(segment.stopB.stop_lon);
+        return {
+            lat: latA + (latB - latA) * segment.progress,
+            lng: lngA + (lngB - lngA) * segment.progress,
+            nextStop: segment.stopB.stop_name,
+            nextStopId: segment.stopB.real_stop_id,
+            prevStop: segment.stopA.stop_name,
+            nextTime: segment.stopB.arrival_time
+        };
+    }
+
+    // Calcola distanze cumulative tra idxA e idxB
+    const subShape = shape.slice(idxA, idxB + 1);
+    let dists = [0];
+    let totalD = 0;
+    for (let i = 1; i < subShape.length; i++) {
+        totalD += getDist(subShape[i-1].lat, subShape[i-1].lng, subShape[i].lat, subShape[i].lng);
+        dists.push(totalD);
+    }
+
+    const targetD = totalD * segment.progress;
+
+    // Trova il punto esatto sulla shape
+    for (let i = 0; i < dists.length - 1; i++) {
+        if (targetD >= dists[i] && targetD <= dists[i+1]) {
+            const segProg = (dists[i+1] - dists[i]) > 0 ? (targetD - dists[i]) / (dists[i+1] - dists[i]) : 0;
+            const p1 = subShape[i];
+            const p2 = subShape[i+1];
+            return {
+                lat: parseFloat(p1.lat) + (parseFloat(p2.lat) - parseFloat(p1.lat)) * segProg,
+                lng: parseFloat(p1.lng) + (parseFloat(p2.lng) - parseFloat(p1.lng)) * segProg,
+                nextStop: segment.stopB.stop_name,
+                nextStopId: segment.stopB.real_stop_id,
+                prevStop: segment.stopA.stop_name,
+                nextTime: segment.stopB.arrival_time
+            };
+        }
+    }
+
+    // Ultimo punto della sub-shape come fallback
+    return {
+        lat: subShape[subShape.length-1].lat,
+        lng: subShape[subShape.length-1].lng,
+        nextStop: segment.stopB.stop_name,
+        nextStopId: segment.stopB.real_stop_id,
+        prevStop: segment.stopA.stop_name,
+        nextTime: segment.stopB.arrival_time
+    };
+}
+
+
 /**
  * liveBusMap.js
  * Mappa in tempo reale dei bus ACTV in servizio.
@@ -170,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ── Stato ─────────────────────────────────────────────────
-    let busMarkers = new Map(); // tripId -> { marker, polyline }
+    let busMarkers = new Map(); // vehicle identity (GPS) or tripId (estimated) -> marker data
     let navigationMarkers = new Map();
     let navigationColors = new Map();
     let navigationColorsPromise = null;
@@ -310,194 +527,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Converte "HH:MM:SS" o "HH:MM" in secondi dal mezzanotte
-     */
-    function timeToSec(t) {
-        if (!t) return 0;
-        const p = t.split(':');
-        const sec = (+p[0]) * 3600 + (+p[1]) * 60 + (p[2] ? +p[2] : 0);
-        return sec % 86400; // Normalizza 24:xx a 00:xx
-    }
-
-    /**
-     * Converte secondi dal mezzanotte in "HH:MM:SS"
-     */
-    function secToTime(t) {
-        if (!t) return 0;
-        const hours = Math.floor(t / 3600);
-        const minutes = Math.floor((t % 3600) / 60);
-        const seconds = t % 60;
-        return `${hours}:${minutes}:${seconds}`;
-    }
-
-    /**
-     * Calcola la distanza tra due coordinate (m)
-     */
-    function getDist(lat1, ln1, lat2, ln2) {
-        const R = 6371e3;
-        const φ1 = lat1 * Math.PI / 180;
-        const φ2 = lat2 * Math.PI / 180;
-        const Δφ = (lat2 - lat1) * Math.PI / 180;
-        const Δλ = (ln2 - ln1) * Math.PI / 180;
-        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                  Math.cos(φ1) * Math.cos(φ2) *
-                  Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    }
-
-    /**
-     * Interpolazione precisa lungo la shape
-     */
-    function interpolateWithShape(stops, shape, nowSec, delaySec = 0) {
-        if (!stops || stops.length === 0) return null;
-
-        const virtualNowSec = nowSec - delaySec;
-        const firstSec = timeToSec(stops[0].arrival_time);
-        const lastSec  = timeToSec(stops[stops.length - 1].arrival_time);
-
-        stops.forEach( (stop) => {
-            let real_stop_id = stop.data_url.split("-").slice(0, -2).join("-");            
-            stop.real_stop_id = real_stop_id;
-        }); 
-                
-
-        // Capolinea iniziale
-        if (virtualNowSec <= firstSec) {
-            return {
-                lat: parseFloat(stops[0].stop_lat),
-                lng: parseFloat(stops[0].stop_lon),
-                nextStop: stops[0].stop_name,
-                nextStopId: stops[0].real_stop_id,
-                prevStop: null,
-                progress: 0,
-                nextTime: stops[0].arrival_time
-            };
-        }
-
-        // Capolinea finale
-        if (virtualNowSec >= lastSec) {
-            return null;
-            const last = stops[stops.length - 1];
-            return {
-                lat: parseFloat(last.stop_lat),
-                lng: parseFloat(last.stop_lon),
-                nextStop: last.stop_name  + ' (capolinea)' ,
-                nextStopId: last.real_stop_id,
-                prevStop: stops.length > 1 ? stops[stops.length - 2].stop_name : null,
-                progress: 1,
-                nextTime: last.arrival_time
-            };
-        }
-
-        // Trova il segmento GTFS corrente
-        let segment = null;
-        for (let i = 0; i < stops.length - 1; i++) {
-            let aSec = timeToSec(stops[i].arrival_time);
-            let bSec = timeToSec(stops[i + 1].arrival_time);
-            
-            // Gestione mezzanotte: se b < a, b è il giorno dopo
-            if (bSec < aSec) bSec += 86400;
-
-            if (virtualNowSec >= aSec && virtualNowSec <= bSec) {
-                segment = {
-                    idx: i,
-                    progress: (bSec - aSec) > 0 ? (virtualNowSec - aSec) / (bSec - aSec) : 0,
-                    stopA: stops[i],
-                    stopB: stops[i + 1]
-                };
-                break;
-            }
-        }
-        
-        // console.log("Linea 198", segment);
-        
-
-        if (!segment) return null;
-
-        // Se non abbiamo una shape, fallback a lineare tra le fermate
-        if (!shape || shape.length === 0) {
-            const latA = parseFloat(segment.stopA.stop_lat);
-            const lngA = parseFloat(segment.stopA.stop_lon);
-            const latB = parseFloat(segment.stopB.stop_lat);
-            const lngB = parseFloat(segment.stopB.stop_lon);
-            return {
-                lat: latA + (latB - latA) * segment.progress,
-                lng: lngA + (lngB - lngA) * segment.progress,
-                nextStop: segment.stopB.stop_name,
-                nextStopId: segment.stopB.real_stop_id,
-                prevStop: segment.stopA.stop_name
-            };
-        }
-
-        // Identifica gli indici della shape corrispondenti alle fermate A e B
-        // (Cerchiamo il punto della shape più vicino a ciascuna fermata)
-        function findNearest(lat, lon) {
-            let minD = Infinity, bestIdx = 0;
-            for (let i = 0; i < shape.length; i++) {
-                const d = getDist(lat, lon, shape[i].lat, shape[i].lng);
-                if (d < minD) { minD = d; bestIdx = i; }
-            }
-            return bestIdx;
-        }
-
-        const idxA = findNearest(segment.stopA.stop_lat, segment.stopA.stop_lon);
-        const idxB = findNearest(segment.stopB.stop_lat, segment.stopB.stop_lon);
-        
-        // Se la shape è al contrario o incoerente, fallback lineare
-        if (idxA >= idxB) {
-            const latA = parseFloat(segment.stopA.stop_lat);
-            const lngA = parseFloat(segment.stopA.stop_lon);
-            const latB = parseFloat(segment.stopB.stop_lat);
-            const lngB = parseFloat(segment.stopB.stop_lon);
-            return {
-                lat: latA + (latB - latA) * segment.progress,
-                lng: lngA + (lngB - lngA) * segment.progress,
-                nextStop: segment.stopB.stop_name,
-                nextStopId: segment.stopB.real_stop_id,
-                prevStop: segment.stopA.stop_name
-            };
-        }
-
-        // Calcola distanze cumulative tra idxA e idxB
-        const subShape = shape.slice(idxA, idxB + 1);
-        let dists = [0];
-        let totalD = 0;
-        for (let i = 1; i < subShape.length; i++) {
-            totalD += getDist(subShape[i-1].lat, subShape[i-1].lng, subShape[i].lat, subShape[i].lng);
-            dists.push(totalD);
-        }
-
-        const targetD = totalD * segment.progress;
-
-        // Trova il punto esatto sulla shape
-        for (let i = 0; i < dists.length - 1; i++) {
-            if (targetD >= dists[i] && targetD <= dists[i+1]) {
-                const segProg = (dists[i+1] - dists[i]) > 0 ? (targetD - dists[i]) / (dists[i+1] - dists[i]) : 0;
-                const p1 = subShape[i];
-                const p2 = subShape[i+1];
-                return {
-                    lat: parseFloat(p1.lat) + (parseFloat(p2.lat) - parseFloat(p1.lat)) * segProg,
-                    lng: parseFloat(p1.lng) + (parseFloat(p2.lng) - parseFloat(p1.lng)) * segProg,
-                    nextStop: segment.stopB.stop_name,
-                    nextStopId: segment.stopB.real_stop_id,
-                    prevStop: segment.stopA.stop_name,
-                    nextTime: segment.stopB.arrival_time
-                };
-            }
-        }
-
-        // Ultimo punto della sub-shape come fallback
-        return {
-            lat: subShape[subShape.length-1].lat,
-            lng: subShape[subShape.length-1].lng,
-            nextStop: segment.stopB.stop_name,
-            nextStopId: segment.stopB.real_stop_id,
-            prevStop: segment.stopA.stop_name,
-            nextTime: segment.stopB.arrival_time
-        };
-    }
-
-    /**
      * Fetch dei dati real-time per una fermata (con caching)
      */
     async function getRealTimeDelay(stopId, lineName, tripHeadsign, gtfsStopSec, signal) {
@@ -583,6 +612,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 1. Punteggio Tempo
             let timeScore = 0;
             const candSec = parseRealTime(cand.time, now);
+            if (candSec === null) return;
             
             if (candSec !== null) {
                 // Gestione scavallamento mezzanotte (semplificata)
@@ -753,7 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let rtStatus = '<span style="color:#999">○ Programmato (Dati non disp.)</span>';
         if (delayInfo?.status === 'REALTIME') {
-            rtStatus = '<span style="color:#009E61">● Real-time</span>';
+            rtStatus = '<span style="color:#009E61">Posizione stimata da previsioni realtime</span>';
         } else if (delayInfo?.status === 'SCHEDULED_API_FLAG') {
             // rtStatus = '<span style="color:#FF9800">⚠️ Programmato (No GPS)</span>';
              rtStatus = '<span style="color:#757575">○ Programmato (No GPS)</span>';
@@ -797,6 +827,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="bus-popup-direction">→ ${escapeHtml(headsign)}</div>
             <div class="bus-popup-position">Posizione: ${Number(position.lat).toFixed(5)}, ${Number(position.lon).toFixed(5)}</div>
             <div class="bus-popup-time">Trip: ${escapeHtml(vehicle.trip_id || 'non disponibile')}</div>
+            <div>${vehicle.route_guess ? 'Linea stimata · ' : ''}${escapeHtml(positionAgeLabel(vehicle))}</div>
             <div class="bus-popup-hint">Click: mostra percorso · doppio click: dettagli corsa</div>
         </div>`;
     }
@@ -840,9 +871,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? payload
                 : Array.isArray(payload?.shapes) ? payload.shapes : [];
             const exact = entries.find(entry => String(entry?.trip_id || '') === String(tripId));
-            const candidate = exact && shapeGeometry(exact).length > 1
-                ? exact
-                : entries.find(entry => shapeGeometry(entry).length > 1);
+            const candidate = exact;
             const geometry = shapeGeometry(candidate);
             console.debug('[live-map] risposta shape', {
                 url,
@@ -879,7 +908,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const tripId = String(item.busData.trip_id);
         const lineName = String(item.busData.route_short_name || '').replace(/_(?:UN|EN|US|UM|UL|ES)$/i, '');
         const tripParams = new URLSearchParams({ tripId, service: 'automobilistico' });
-        const urls = [`/api/lines-shapes?${tripParams.toString()}`];
+        const urls = [`/api/lines-shapes?${tripParams.toString()}`, `/api/lines-shapes?${tripParams.toString()}&cache=1`];
         if (lineName) {
             const lineParams = new URLSearchParams({ line: lineName, service: 'automobilistico', cache: '1' });
             urls.push(`/api/lines-shapes?${lineParams.toString()}`);
@@ -920,7 +949,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <dl class="bus-details-grid">
                 <dt>Trip ID</dt><dd>${escapeHtml(bus.trip_id || 'Non disponibile')}</dd>
                 <dt>Route ID</dt><dd>${escapeHtml(bus.route_id || 'Non disponibile')}</dd>
-                <dt>Stato</dt><dd>${escapeHtml(item?.status === 'REALTIME' ? 'Posizione realtime' : 'Posizione stimata')}</dd>
+                <dt>Stato</dt><dd>${escapeHtml(item?.status === 'REALTIME' ? 'Posizione GPS' + (bus.route_guess ? ' · linea stimata' : '') : 'Posizione stimata')}</dd>
                 <dt>Coordinate</dt><dd>${Number(position.lat).toFixed(5)}, ${Number(position.lon ?? position.lng).toFixed(5)}</dd>
                 ${item?.currentPos?.nextStop ? `<dt>Prossima fermata</dt><dd>${escapeHtml(item.currentPos.nextStop)}</dd>` : ''}
             </dl>
@@ -958,7 +987,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await loadNavigationColors();
             const response = await fetch('/api/navigation/vehicles', { cache: 'no-store' });
-            if (!response.ok) return;
+            if (!response.ok) throw new Error('Posizioni navigazione non disponibili');
             const vehicles = await response.json();
             if (serviceMode === 'automobilistico') { clearNavigationMarkers(); return; }
             const active = new Set();
@@ -966,10 +995,11 @@ document.addEventListener('DOMContentLoaded', () => {
             (Array.isArray(vehicles) ? vehicles : []).forEach(vehicle => {
                 const position = vehicle.vehicle_position;
                 const rawLine = String(vehicle.route_short_name || vehicle.route_id || '');
-                const id = vehicle.trip_id || vehicle.route_id || `nav-${active.size}`;
-                if (!position || position.lat == null || position.lon == null) return;
+                const id = vehicleKey(vehicle);
+                if (!id) return;
+                if (!validVehiclePosition(vehicle)) return;
                 if (!rawLine && ndHidden) return;
-                if (query && !String(vehicle.route_short_name || vehicle.route_id || '').toLowerCase().includes(query) && !String(vehicle.trip_id || '').toLowerCase().includes(query)) return;
+                if (!matchesVehicleFilter(vehicle, query, new URLSearchParams(window.location.search))) return;
                 active.add(id);
                 const lineName = navigationLineName(vehicle);
                 const color = navigationColors.get(String(vehicle.route_id || '')) || navigationColors.get(lineName) || '#5B5B5B';
@@ -977,13 +1007,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const old = navigationMarkers.get(id);
                 if (old) map.removeLayer(old);
                 const marker = L.marker([Number(position.lat), Number(position.lon)], { icon })
-                    .bindPopup(`<strong>⛴ Navigazione ${lineName}</strong><br>Trip ${vehicle.trip_id || '-'}<br>${vehicle.status === 'cancelled' ? 'Corsa cancellata' : vehicle.status === 'delayed' ? `Ritardo: ${Math.round((vehicle.delay_seconds || 0) / 60)} min` : 'Programmata'}`)
+                    .bindPopup(`<strong>⛴ Navigazione ${escapeHtml(lineName)}</strong><br>Trip ${escapeHtml(vehicle.trip_id || '-')}<br>${escapeHtml(positionAgeLabel(vehicle))}<br>${vehicle.status === 'cancelled' ? 'Corsa cancellata' : vehicle.status === 'delayed' ? `Ritardo: ${Math.round((vehicle.delay_seconds || 0) / 60)} min` : 'Programmata'}`)
                     .addTo(map);
                 navigationMarkers.set(id, marker);
             });
             navigationMarkers.forEach((marker, id) => { if (!active.has(id)) { map.removeLayer(marker); navigationMarkers.delete(id); } });
             window.ACTVPerf?.mark('navigation-load-end', { vehicles: navigationMarkers.size });
         } catch (error) {
+            clearNavigationMarkers();
             console.warn('Veicoli Navigazione non disponibili:', error);
         }
     }
@@ -1008,23 +1039,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const response = await fetch('/api/realtime/vehicles?service=automobilistico', { signal, cache: 'no-store' });
         if (!response.ok) return false;
         const payload = await response.json();
-        if (!payload || !Array.isArray(payload.vehicles)) return false;
+        if (!payload || !Array.isArray(payload.vehicles) || !payload.vehicles.some(vehicle => validVehiclePosition(vehicle))) return false;
 
         const query = filterInput.value.trim().toLowerCase();
         const active = new Set();
         let shown = 0;
-        payload.vehicles.forEach((vehicle, index) => {
+        payload.vehicles.forEach(vehicle => {
             const position = vehicle.vehicle_position;
-            if (!position || position.lat == null || position.lon == null) return;
+            if (!validVehiclePosition(vehicle)) return;
             const rawLine = String(vehicle.route_short_name || vehicle.route_id || '');
             // Posizioni senza identificativo realtime e senza corrispondenza
             // GTFS sono normalmente mezzi in deposito/parcheggio: non mostrare
             // un bollino N/D sulla mappa.
             if (!rawLine && !vehicle.route_guess && ndHidden) return;
-            const lineName = rawLine.replace(/_(?:UN|EN|US|UM|UL|ES)$/i, '') || 'N/D';
-            const searchable = `${rawLine} ${vehicle.trip_id || ''} ${vehicle.route_id || ''} ${vehicle.trip_headsign || ''}`.toLowerCase();
-            if (query && !searchable.includes(query)) return;
-            const id = vehicle.trip_id || vehicle.route_id || `aut-${index}`;
+            const lineName = (rawLine.replace(/_(?:UN|EN|US|UM|UL|ES)$/i, '') || 'N/D') + (vehicle.route_guess ? ' ?' : '');
+            if (!matchesVehicleFilter(vehicle, query, new URLSearchParams(window.location.search))) return;
+            const id = vehicleKey(vehicle);
+            if (!id) return;
             active.add(id); shown++;
             const old = busMarkers.get(id);
             if (old) { map.removeLayer(old.marker); if (old.polyline) map.removeLayer(old.polyline); }
@@ -1043,7 +1074,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sidePanel.classList.add('hidden');
         spinnerEl.classList.add('hidden');
         counterText.textContent = `${shown} bus realtime sulla mappa`;
-        lastUpdateEl.textContent = `Agg. ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+        lastUpdateEl.textContent = `Dati ricevuti ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
         window.ACTVPerf?.mark('realtime-bus-load-end', { vehicles: shown });
         return true;
     }
@@ -1059,7 +1090,11 @@ document.addEventListener('DOMContentLoaded', () => {
         counterText.textContent = 'Ricerca dei mezzi in servizio…';
 
         try {
-            if (await loadRealtimeBusVehicles(signal)) return;
+            try {
+                if (await loadRealtimeBusVehicles(signal)) return;
+            } catch (error) {
+                if (signal.aborted) throw error;
+            }
             const res = await fetch('/api/gtfs-bnr', { signal });
             if (!res.ok) throw new Error(`BNR status ${res.status}`);
             const data = await res.json();
@@ -1097,11 +1132,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const total = buses.length;
             counterText.textContent = `Ricerca posizione bus: 0 / ${total}`;
 
-            // Trip IDs che devono rimanere sulla mappa
-            const validTripIds = new Set(buses.map(b => b.trip_id));
 
             // Track non-RT trips to prune stale ones at the end
             const activeTripsInCycle = new Set();
+            const positionedTrips = new Set();
 
             const tasks = buses.map(bus => async () => {
                 if (signal.aborted) return;
@@ -1193,7 +1227,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     const color = getColor(bus.route_short_name);
-                    const status = delayInfo ? delayInfo.status : 'SCHEDULED_NO_DATA';
+                    const status = 'SCHEDULED_NO_DATA';
                     const icon = makeBusIcon(bus.route_short_name, color, status);
 
                     // Rimuovi il vecchio marker per questo trip
@@ -1208,7 +1242,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         .bindPopup(makePopup(bus, pos, delayInfo))
                         .addTo(map);
 
-                    const item = { marker, polyline: null, shape, currentPos: pos, busData: bus, status };
+                    const item = { marker, polyline: null, shape, currentPos: pos, busData: bus, status: 'ESTIMATED' };
+                    positionedTrips.add(bus.trip_id);
                     busMarkers.set(bus.trip_id, item);
                     bindBusInteractions(bus.trip_id, item);
                 } catch (e) { }
@@ -1236,7 +1271,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Rimuovi i bus non più in servizio
             for (let [tripId, b] of busMarkers.entries()) {
-                if (!validTripIds.has(tripId)) {
+                if (!positionedTrips.has(tripId)) {
                     map.removeLayer(b.marker);
                     if (b.polyline) map.removeLayer(b.polyline);
                     busMarkers.delete(tripId);
@@ -1244,12 +1279,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             spinnerEl.classList.add('hidden');
-            counterText.textContent = `${busMarkers.size} bus sulla mappa`;
-            lastUpdateEl.textContent = `Agg. ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+            counterText.textContent = `${busMarkers.size} bus con posizione stimata`;
+            lastUpdateEl.textContent = `Dati ricevuti ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
             window.ACTVPerf?.mark('bus-load-end', { markers: busMarkers.size, nonRealtime: finalNonRtCount });
 
         } catch (e) {
             if (e.name !== 'AbortError') {
+                busMarkers.forEach(item => { map.removeLayer(item.marker); if (item.polyline) map.removeLayer(item.polyline); });
+                busMarkers.clear();
                 spinnerEl.classList.add('hidden');
                 counterText.textContent = 'Errore di caricamento';
             }
@@ -1443,3 +1480,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { timeToSec, interpolateWithShape, vehicleKey, validVehiclePosition, matchesVehicleFilter };
+}
+})();
