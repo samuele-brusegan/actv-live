@@ -113,6 +113,26 @@ body {
     color: var(--color-text-muted);
 }
 
+/* Spinner azzurro attorno al pallino mentre la fermata e' in fetch RT */
+.stop-item.rt-loading .stop-marker {
+    position: relative;
+}
+.stop-item.rt-loading .stop-marker::after {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: -6px;
+    right: -6px;
+    bottom: -6px;
+    border-radius: 50%;
+    border: 2px solid rgba(30, 136, 229, 0.25);
+    border-top-color: #1e88e5;
+    animation: stop-marker-spin 0.8s linear infinite;
+}
+@keyframes stop-marker-spin {
+    to { transform: rotate(360deg); }
+}
+
 /* Map Button */
 .map-fab {
     background: var(--color-primary-green);
@@ -152,6 +172,9 @@ body.trip-map-open { overflow: hidden; }
 .trip-map-stops { position: absolute; z-index: 1000; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); max-height: min(48vh, 430px); overflow: hidden; border: 1px solid var(--color-border-gray); border-radius: var(--radius-xl, 18px); background: var(--color-white); color: var(--color-text-dark); box-shadow: 0 5px 20px rgba(0,0,0,.24); transition: max-height .2s ease; }
 .trip-map-stops.collapsed { max-height: 50px; }
 .trip-map-stops-header { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 50px; padding: 0 18px; border: 0; border-bottom: 1px solid var(--color-border-gray); background: var(--color-white); color: var(--color-text-dark); font: inherit; font-weight: 750; cursor: pointer; }
+.trip-map-stops-head-right { display: flex; align-items: center; gap: 10px; }
+.trip-map-stops-count { min-width: 34px; padding: 3px 9px; border-radius: 999px; background: rgba(8,127,91,.1); color: #087f5b; font-size: 12px; font-weight: 700; text-align: center; }
+.trip-map-stops-count:empty { display: none; }
 .trip-map-chevron { font-size: 22px; transition: transform .2s; }
 .trip-map-stops.collapsed .trip-map-chevron { transform: rotate(180deg); }
 .trip-map-stops-legend { display: flex; align-items: center; gap: 5px; min-height: 27px; padding: 3px 18px 0; color: var(--color-text-muted); font-size: 10px; font-weight: 650; }
@@ -160,16 +183,26 @@ body.trip-map-open { overflow: hidden; }
 .trip-map-legend-dot.visited { background: #8b949e; }
 .trip-map-legend-dot.upcoming { border: 2px solid #087f5b; background: #fff; }
 .trip-map-stops-list { max-height: calc(min(48vh, 430px) - 77px); padding: 0 18px 14px; overflow-y: auto; }
-.trip-map-stop { position: relative; display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; align-items: center; min-height: 42px; color: var(--color-text-dark); }
-.trip-map-stop:not(:last-child)::after { content: ''; position: absolute; left: 7px; top: 28px; bottom: -14px; width: 3px; background: #087f5b; }
+.trip-map-stop { position: relative; display: grid; grid-template-columns: 18px minmax(0,1fr) auto; gap: 10px; align-items: center; min-height: 46px; padding: 2px 4px 2px 0; color: var(--color-text-dark); }
+.trip-map-stop:not(:last-child)::after { content: ''; position: absolute; left: 7px; top: 30px; bottom: -16px; width: 3px; background: #087f5b; }
 .trip-map-stop.passed-segment:not(:last-child)::after { background: #8b949e; }
 .trip-map-stop-marker { width: 15px; height: 15px; z-index: 1; border: 3px solid #087f5b; border-radius: 50%; background: #fff; }
+.trip-map-stop.terminal .trip-map-stop-marker { border-radius: 4px; }
 .trip-map-stop.current .trip-map-stop-marker { width: 18px; height: 18px; margin-left: -1px; border-color: #075bbb; background: #60a5fa; box-shadow: 0 0 0 4px rgba(7,91,187,.22); }
 .trip-map-stop.current .trip-map-stop-name { font-weight: 800; }
 .trip-map-stop.visited .trip-map-stop-marker { border-color: #8b949e; background: #8b949e; }
-.trip-map-stop.visited .trip-map-stop-name { color: var(--color-text-muted); text-decoration: line-through; text-decoration-color: rgba(139,148,158,.55); }
-.trip-map-stop.visited time { color: #8b949e; }
-.trip-map-stop time { max-width: 145px; color: var(--color-text-muted); font-size: 11px; text-align: right; }
+.trip-map-stop.visited .trip-map-stop-name { color: var(--color-text-muted); }
+.trip-map-stop.visited .trip-map-stop-meta { color: #b6bdc5; }
+.trip-map-stop-info { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+.trip-map-stop-name { overflow: hidden; font-size: 14px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.trip-map-stop-meta { overflow: hidden; color: var(--color-text-muted); font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.trip-map-stop-eta { display: flex; min-width: 52px; flex-direction: column; align-items: flex-end; gap: 0; text-align: right; }
+.trip-map-stop-eta strong { color: var(--color-text-dark); font-size: 13px; font-weight: 750; }
+.trip-map-stop-eta small { color: var(--color-text-muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.trip-map-stop-eta.live strong { color: #087f5b; }
+.trip-map-stop-eta.live small { color: #087f5b; }
+.trip-map-stop-eta.done strong { color: #8b949e; font-size: 15px; }
+.trip-map-stop-eta.done small, .trip-map-stop-eta.scheduled small { color: #8b949e; }
 .trip-map-stop[role="button"] { cursor: pointer; border-radius: 10px; }
 .trip-map-stop[role="button"]:hover, .trip-map-stop[role="button"]:focus-visible { outline: 2px solid rgba(7,91,187,.28); background: rgba(7,91,187,.07); }
 .trip-map-stop-icon { width: 24px !important; height: 24px !important; border: 0 !important; background: transparent !important; }

@@ -44,6 +44,11 @@ let tripMapProgress = null;
 let tripMapNextStopScrolled = false;
 let tripDetailsRefreshTimer = null;
 let tripMapVehiclePosition = null;
+let tripMapStopProgress = [];
+let tripMapVehicleSequence = null;
+let tripMapVehicleRefreshing = false;
+let tripMapVehicleObservedAt = null;
+let tripDetailsRefreshing = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -114,11 +119,15 @@ async function init() {
         return state.stopsGTFS;
     })();
 
-    const realtimePromise = infoPromise.then(async info => {
-        if (!info || !state.currentStopId) return [];
+    const realtimePromise = Promise.all([infoPromise, gtfsPromise]).then(async ([info]) => {
+        if (!info) return [];
+        // Senza stopId nell'URL/sessione: centra la vista sulla prima fermata
+        // ancora da servire (o sull'ultima se la corsa e' gia' conclusa),
+        // cosi' il realtime e lo stato passato/attuale funzionano comunque.
+        if (!state.currentStopId) state.currentStopId = pickDefaultStopId(state.stopsGTFS);
+        if (!state.currentStopId) return [];
         state.stopsJSON = await fetchRealTimeInfo(state.currentStopId, state.line, state.today, state.tripContext);
         firstIteration.refresh = false;
-        await gtfsPromise;
         await refreshData(false);
         return state.stopsJSON;
     }).catch(error => {
@@ -218,8 +227,8 @@ function formatMinutesRemaining(timeString) {
     } else {
         // Passato
         return absMin < 60
-            ? `Passato ${absMin} min fa`
-            : `Passato ${hours} h ${mins} min fa &#128512;`;
+            ? `Orario trascorso da ${absMin} min`
+            : `Orario trascorso da ${hours} h ${mins} min`;
     }
 }
 
@@ -264,6 +273,8 @@ async function fetchTripId(busTrack, busDirection, day, time, stop, lineId, stop
 
 /** Aggiorna i dati in tempo reale e ridisegna la lista */
 async function refreshData(fetchRealtime = true) {
+    if (tripDetailsRefreshing) return;
+    tripDetailsRefreshing = true;
     try {
         if (fetchRealtime && state.currentStopId && state.line) {
             state.stopsJSON = await fetchRealTimeInfo(
@@ -275,6 +286,8 @@ async function refreshData(fetchRealtime = true) {
             firstIteration.refresh = false;
         }
 
+        if (tripMapVehicleObservedAt && Date.now() / 1000 - tripMapVehicleObservedAt > 120) clearTripVehicle();
+
         // Cerca se la fermata SELEZIONATA è nella lista GTFS
         const selectedIds = String(state.currentStopId || '').split('-').filter(Boolean);
         const selectedStopInGTFS = state.stopsGTFS.find(s =>
@@ -285,7 +298,7 @@ async function refreshData(fetchRealtime = true) {
         if (selectedStopInGTFS) {
             const selectedStopKey = normalizeStopName(selectedStopInGTFS.stop_name);
             const rtStop = state.stopsJSON.find(s => normalizeStopName(s.stop) === selectedStopKey);
-            if (rtStop) {
+            if (rtStop && rtStop.isRealtime !== false) {
                 state.arrivalTime = rtStop.time;
             }
         }
@@ -318,8 +331,11 @@ async function refreshData(fetchRealtime = true) {
 
 
         renderTimeline();
+        if (tripMapStops.length) renderMapStops(tripMapStops);
     } catch (error) {
         console.error("Refresh fallito:", error);
+    } finally {
+        tripDetailsRefreshing = false;
     }
 }
 
@@ -452,7 +468,9 @@ async function fetchRealTimeInfo(currentStopId, line, today, context = null) {
             if (tid) assignedTripIds.push(String(tid));
             results.push({ ...trip, timingPoints, calculatedTripId: tid });
         }
-        return selectMatchingTripTimingPoints(results, state.tripId, {
+        return selectMatchingTripTimingPoints(results.map(trip => ({ ...trip,
+            timingPoints: (trip.timingPoints || []).map(point => ({ ...point, isRealtime: trip.real === true }))
+        })), state.tripId, {
             ...context,
             expectedDestination: state.destination
         });
@@ -472,7 +490,7 @@ function renderTimeline() {
     timeline.className = 'timeline';
 
     const selectedStopIdx = state.mergedStops.findIndex(s =>
-        state.currentStopId.split('-').includes(s.stop_id.toString())
+        String(state.currentStopId || '').split('-').includes(s.stop_id.toString())
     );
 
     // console.log("Merged: ", state.mergedStops);
@@ -591,9 +609,10 @@ function getContrastTextColor(background) {
 }
 
 function findMergedMapStop(stop) {
-    const id = mapStopId(stop);
-    return state.mergedStops.find(item => String(item.stop_id) === id)
-        || state.mergedStops.find(item => normalizeStopName(item.stop_name) === normalizeStopName(stop?.name || stop?.stop_name));
+    const index = tripMapStops.indexOf(stop);
+    if (index >= 0 && mapStopId(state.mergedStops[index]) === mapStopId(stop)) return state.mergedStops[index];
+    const matches = state.mergedStops.filter(item => mapStopId(item) === mapStopId(stop));
+    return matches.length === 1 ? matches[0] : null;
 }
 
 function mapStopPassageLabel(stop) {
@@ -602,7 +621,8 @@ function mapStopPassageLabel(stop) {
     if (time === 'departure') return 'Il bus è in partenza';
     if (!time.includes(':')) return 'Orario non disponibile';
     const remaining = formatMinutesRemaining(time);
-    return merged?.hasRealTime ? `Passaggio realtime: tra ${remaining}` : `Passaggio previsto: tra ${remaining}`;
+    if (isVisitedMapStop(stop)) return 'Fermata superata secondo la posizione GPS';
+    return `${merged?.hasRealTime ? 'Stima realtime' : 'Orario previsto'}: ${time.substring(0, 5)} · ${remaining}`;
 }
 
 function createMapStopPopup(stop, index) {
@@ -616,10 +636,9 @@ function isSelectedMapStop(stop) {
 
 function isVisitedMapStop(stop) {
     if (!tripMapProgress || !tripMapGeometry.length) return false;
-    const position = findMapProgress({
-        lat: Number(stop?.lat ?? stop?.stop_lat),
-        lng: Number(stop?.lng ?? stop?.stop_lon)
-    });
+    const index = tripMapStops.indexOf(stop);
+    const stopIndex = index >= 0 ? index : state.stopsGTFS.indexOf(stop);
+    const position = tripMapStopProgress[stopIndex];
     if (!position) return false;
     return position.index + position.ratio < tripMapProgress.index + tripMapProgress.ratio - 0.01;
 }
@@ -721,16 +740,62 @@ function scrollMapToNextStopOnce(stops) {
 function renderMapStops(stops) {
     const list = document.getElementById('trip-map-stops-list');
     if (!list) return;
+    const countEl = document.getElementById('trip-map-stops-count');
     const selectedIds = String(state.currentStopId || '').split('-');
+    const visitedCount = stops.filter(isVisitedMapStop).length;
+    if (countEl) countEl.textContent = `${tripMapProgress ? visitedCount : '–'}/${stops.length}`;
+    const legend = document.querySelector('.trip-map-stops-legend');
+    if (legend) legend.innerHTML = tripMapProgress
+        ? '<span class="trip-map-legend-dot visited"></span> Già passata <span class="trip-map-legend-dot upcoming"></span> Da raggiungere'
+        : '<span class="trip-map-legend-dot upcoming"></span> Stato fermate non verificato';
     list.innerHTML = stops.map((stop, index) => {
         const id = String(stop.stop_id || stop.id || '');
-        const current = selectedIds.includes(id) || isSelectedMapStop(stop) ? ' current' : '';
-        const visited = isVisitedMapStop(stop) ? ' visited' : '';
+        const visited = isVisitedMapStop(stop);
+        const current = !visited && (selectedIds.includes(id) || isSelectedMapStop(stop)) ? ' current' : '';
         const nextVisited = stops[index + 1] ? isVisitedMapStop(stops[index + 1]) : false;
         const passedSegment = visited && nextVisited ? ' passed-segment' : '';
+        const visitedClass = visited ? ' visited' : '';
+        const terminal = isMapTerminalStop(stops, index) ? ' terminal' : '';
         const name = escapeMapHtml(stop.name || stop.stop_name || '');
-        const status = visited ? 'Già passata' : 'Da raggiungere';
-        return `<div class="trip-map-stop${current}${visited}${passedSegment}" data-stop-index="${index}" role="button" tabindex="0" aria-label="${escapeMapHtml(name)} · ${status}"><span class="trip-map-stop-marker"></span><span class="trip-map-stop-name">${name}</span><time>${escapeMapHtml(mapStopPassageLabel(stop))}</time></div>`;
+        const status = !tripMapProgress ? 'Posizione non disponibile' : visited ? 'Già passata' : 'Da raggiungere';
+
+        const merged = findMergedMapStop(stop);
+        const rawTime = String(merged?.arrival_time || merged?.departure_time
+            || stop?.arrival_time || stop?.departure_time || '');
+        const scheduledRaw = String(merged?.scheduled_arrival || stop?.arrival_time || stop?.departure_time || '');
+        const schedTime = scheduledRaw.includes(':') ? scheduledRaw.substring(0, 5) : '';
+        const remaining = rawTime.includes(':') ? formatMinutesRemaining(rawTime) : (/^\d+['’]$/.test(rawTime) ? rawTime.replace(/['’]/, ' min') : null);
+
+        let etaClass = 'scheduled', etaMain = '--:--', etaSub = 'n.d.';
+        if (visited) {
+            etaClass = 'done';
+            etaMain = '✓';
+            etaSub = 'passata';
+        } else if (rawTime === 'departure') {
+            etaClass = 'live';
+            etaMain = 'ora';
+            etaSub = 'in partenza';
+        } else if (remaining?.startsWith('Orario trascorso')) {
+            etaMain = merged?.hasRealTime ? 'Stima trascorsa' : 'Orario trascorso';
+            etaSub = `prev. ${schedTime}`;
+        } else if (merged?.hasRealTime && remaining) {
+            etaClass = 'live';
+            etaMain = remaining;
+            etaSub = 'live';
+        } else if (remaining && schedTime) {
+            etaMain = remaining;
+            etaSub = `prev. ${schedTime}`;
+        } else if (schedTime) {
+            etaMain = schedTime;
+            etaSub = 'previsto';
+        }
+        const meta = `${index + 1}ª fermata${schedTime ? ` · ${schedTime}` : ''}`;
+
+        return `<div class="trip-map-stop${current}${visitedClass}${passedSegment}${terminal}" data-stop-index="${index}" role="button" tabindex="0" aria-label="${escapeMapHtml(name)} · ${status}">` +
+            `<span class="trip-map-stop-marker"></span>` +
+            `<span class="trip-map-stop-info"><span class="trip-map-stop-name">${name}</span><span class="trip-map-stop-meta">${escapeMapHtml(meta)}</span></span>` +
+            `<span class="trip-map-stop-eta ${etaClass}"><strong>${etaMain}</strong><small>${escapeMapHtml(etaSub)}</small></span>` +
+            `</div>`;
     }).join('');
 
     list.querySelectorAll('.trip-map-stop').forEach(item => {
@@ -764,7 +829,7 @@ async function loadTripMap() {
             response = await fetch(`/api/lines-shapes?${params.toString()}`, { cache: 'no-store' });
             shapes = response.ok ? await response.json() : [];
         }
-        tripMapShape = Array.isArray(shapes) ? shapes.find(item => String(item.trip_id) === String(state.tripId)) || shapes[0] : null;
+        tripMapShape = Array.isArray(shapes) ? shapes.find(item => String(item.trip_id) === String(state.tripId)) : null;
         if (!tripMapShape) throw new Error('Percorso non disponibile');
         const lineBadge = document.getElementById('trip-map-line');
         if (lineBadge) {
@@ -785,6 +850,7 @@ async function loadTripMap() {
         });
         const stops = Array.isArray(tripMapShape.path) ? tripMapShape.path : state.stopsGTFS;
         tripMapStops = stops || [];
+        tripMapStopProgress = projectOrderedMapStops(tripMapStops, tripMapGeometry);
         tripMapProgress = null;
         tripMapNextStopScrolled = false;
         const selectedStop = state.stopsGTFS.find(stop =>
@@ -974,6 +1040,56 @@ function selectMatchingTripTimingPoints(results, requestedTripId, context = null
     return [];
 }
 
+function selectTripVehicle(vehicles, tripId, now = Date.now() / 1000) {
+    const matches = vehicles.filter(vehicle => String(vehicle.trip_id || '') === String(tripId)
+        && vehicle.vehicle_position?.lat != null && vehicle.vehicle_position?.lon != null
+        && Number.isFinite(Number(vehicle.vehicle_position.lat)) && Number.isFinite(Number(vehicle.vehicle_position.lon))
+        && Math.abs(Number(vehicle.vehicle_position.lat)) <= 90 && Math.abs(Number(vehicle.vehicle_position.lon)) <= 180
+        && !vehicle.route_guess && (vehicle.position_timestamp == null
+            || (now - vehicle.position_timestamp <= 120 && vehicle.position_timestamp <= now + 60)));
+    return matches.length === 1 ? matches[0] : null;
+}
+
+function clearTripVehicle() {
+    if (tripMapVehicleMarker) tripMap?.removeLayer(tripMapVehicleMarker);
+    tripMapVehicleMarker = null;
+    tripMapVehiclePosition = null;
+    tripMapVehicleSequence = null;
+    tripMapVehicleObservedAt = null;
+    tripMapProgress = null;
+    if (tripMapCompletedRoute) tripMap?.removeLayer(tripMapCompletedRoute);
+    tripMapCompletedRoute = null;
+    tripMapRemainingRoute?.setLatLngs(tripMapGeometry);
+    updateMapStopMarkers();
+    if (tripMapStops.length) renderMapStops(tripMapStops);
+    renderTimeline();
+}
+
+function projectOrderedMapStops(stops, geometry) {
+    let minimum = 0;
+    const previousOccurrences = new Map();
+    return stops.map(stop => {
+        const lat = Number(stop.lat ?? stop.stop_lat), lng = Number(stop.lng ?? stop.stop_lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        const key = `${lat},${lng}`;
+        const previous = previousOccurrences.get(key);
+        const floor = previous == null ? minimum : Math.max(minimum, previous + 0.01);
+        let best = null;
+        geometry.slice(0, -1).forEach((start, index) => {
+            const candidate = projectMapPointToSegment([lat, lng], start, geometry[index + 1]);
+            const along = index + candidate.ratio;
+            if (along < floor) return;
+            if (!best || candidate.distanceSquared < best.distanceSquared) best = { ...candidate, index };
+        });
+        if (best && best.distanceSquared <= 250 ** 2) {
+            minimum = best.index + best.ratio;
+            previousOccurrences.set(key, minimum);
+            return best;
+        }
+        return null;
+    });
+}
+
 function busMarkerSvg() {
     return `<svg class="trip-map-bus-svg" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
         <path d="M12 7h24c4.4 0 8 3.6 8 8v18a4 4 0 0 1-4 4h-2v4h-5v-4H15v4h-5v-4H8a4 4 0 0 1-4-4V15c0-4.4 3.6-8 8-8Z"/>
@@ -1000,21 +1116,42 @@ function projectMapPointToSegment(point, start, end) {
     };
 }
 
-function findMapProgress(position) {
+function findMapProgress(position, minimum = 0, maximum = Infinity) {
     if (!tripMapGeometry.length || !position) return null;
     const point = [Number(position.lat), Number(position.lng)];
     if (!point.every(Number.isFinite)) return null;
     let best = null;
+    const candidates = [];
     for (let index = 0; index < tripMapGeometry.length - 1; index++) {
         const candidate = projectMapPointToSegment(point, tripMapGeometry[index], tripMapGeometry[index + 1]);
+        const along = index + candidate.ratio;
+        if (along < minimum || along > maximum) continue;
+        candidates.push({ ...candidate, index });
         if (!best || candidate.distanceSquared < best.distanceSquared) best = { ...candidate, index };
     }
+    if (best && maximum === Infinity && candidates.some(candidate =>
+        Math.abs(candidate.index + candidate.ratio - best.index - best.ratio) > 2
+        && candidate.distanceSquared <= best.distanceSquared + 15 ** 2)) return null;
     return best;
 }
 
 function updateTripMapProgress(position) {
-    const progress = findMapProgress(position);
-    if (!progress || !tripMap) return;
+    const sequenceIndex = tripMapVehicleSequence == null ? -1 : state.stopsGTFS.findIndex(stop => Number(stop.stop_sequence) === Number(tripMapVehicleSequence));
+    const lower = sequenceIndex > 0 ? tripMapStopProgress[sequenceIndex - 1] : null;
+    const upper = sequenceIndex >= 0 ? tripMapStopProgress[sequenceIndex] : null;
+    const progress = findMapProgress(position, lower ? lower.index + lower.ratio : 0,
+        upper ? upper.index + upper.ratio : Infinity);
+    if (!tripMap) return;
+    if (!progress || progress.distanceSquared > 250 ** 2) {
+        tripMapProgress = null;
+        if (tripMapCompletedRoute) tripMap.removeLayer(tripMapCompletedRoute);
+        tripMapCompletedRoute = null;
+        tripMapRemainingRoute?.setLatLngs(tripMapGeometry);
+        updateMapStopMarkers();
+        renderMapStops(tripMapStops);
+        renderTimeline();
+        return;
+    }
     tripMapProgress = { index: progress.index, ratio: progress.ratio };
     const passed = tripMapGeometry.slice(0, progress.index + 1);
     passed.push(progress.point);
@@ -1025,6 +1162,7 @@ function updateTripMapProgress(position) {
     if (tripMapRemainingRoute) tripMapRemainingRoute.setLatLngs(remaining);
     updateMapStopMarkers();
     renderMapStops(tripMapStops);
+    renderTimeline();
 }
 
 function startTripMapUserLocation() {
@@ -1062,41 +1200,25 @@ function startTripMapUserLocation() {
 }
 
 async function refreshTripVehicle() {
-    if (!tripMap || !state.tripId) return;
+    if (!tripMap || !state.tripId || tripMapVehicleRefreshing) return;
+    tripMapVehicleRefreshing = true;
     const status = document.getElementById('trip-map-status');
     if (status) status.innerHTML = '<span class="trip-map-live-dot"></span>Ricerca del mezzo in corso…';
     try {
         const params = new URLSearchParams({ service: 'automobilistico', tripId: state.tripId });
-        if (tripMapShape?.route_id) params.set('routeId', tripMapShape.route_id);
-        const response = await fetch(`/api/realtime/vehicles?${params.toString()}`);
+        const response = await fetch(`/api/realtime/vehicles?${params.toString()}`, { cache: 'no-store' });
         if (!response.ok) throw new Error('Posizione non disponibile');
         const payload = await response.json();
         const vehicles = Array.isArray(payload) ? payload : payload.vehicles || [];
-        const exactVehicle = vehicles.find(item => String(item.trip_id || '') === String(state.tripId));
-        const routeVehicles = vehicles.filter(item =>
-            tripMapShape?.route_id && String(item.route_id || '') === String(tripMapShape.route_id)
-        );
-        const selectedIds = String(state.currentStopId || '').split('-');
-        const selectedStop = (tripMapShape?.path || []).find(stop => selectedIds.includes(String(stop.stop_id || stop.id || '')));
-        const referenceLat = Number(selectedStop?.lat ?? selectedStop?.stop_lat);
-        const referenceLng = Number(selectedStop?.lng ?? selectedStop?.stop_lon);
-        const distanceSquared = item => {
-            const lat = Number(item?.vehicle_position?.lat), lng = Number(item?.vehicle_position?.lon);
-            return Number.isFinite(referenceLat) && Number.isFinite(referenceLng) && Number.isFinite(lat) && Number.isFinite(lng)
-                ? (lat - referenceLat) ** 2 + (lng - referenceLng) ** 2
-                : Number.MAX_VALUE;
-        };
-        const fallbackVehicle = routeVehicles.slice().sort((a, b) => distanceSquared(a) - distanceSquared(b))[0];
-        const vehicle = exactVehicle || fallbackVehicle;
+        const vehicle = selectTripVehicle(vehicles, state.tripId);
         const lat = Number(vehicle?.vehicle_position?.lat), lng = Number(vehicle?.vehicle_position?.lon);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-            if (tripMapVehicleMarker) {
-                tripMap.removeLayer(tripMapVehicleMarker);
-                tripMapVehicleMarker = null;
-            }
+            clearTripVehicle();
             if (status) status.innerHTML = '<span class="trip-map-live-dot offline"></span>Nessun mezzo attivo rilevato su questa corsa';
             return;
         }
+        tripMapVehicleObservedAt = vehicle.position_timestamp ?? Date.now() / 1000;
+        tripMapVehicleSequence = vehicle.current_stop_sequence;
         tripMapVehiclePosition = { lat, lng };
         updateTripMapProgress(tripMapVehiclePosition);
         if (!tripMapVehicleMarker) {
@@ -1105,9 +1227,12 @@ async function refreshTripVehicle() {
         } else {
             tripMapVehicleMarker.setLatLng([lat, lng]);
         }
-        if (status) status.innerHTML = `<span class="trip-map-live-dot"></span>${exactVehicle ? 'Posizione live' : 'Mezzo della linea'} · ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+        if (status) status.innerHTML = `<span class="trip-map-live-dot"></span>Posizione GPS · ${vehicle.position_timestamp ? 'rilevata ' + new Date(vehicle.position_timestamp * 1000).toLocaleTimeString('it-IT') : 'ora rilevamento non disponibile'}`;
     } catch (error) {
+        clearTripVehicle();
         if (status) status.textContent = error.message;
+    } finally {
+        tripMapVehicleRefreshing = false;
     }
 }
 
@@ -1221,7 +1346,7 @@ function mergeStops() {
             // delle fermate precedenti fatto da getPreviousStopsRealTime
             rtTimeline: !!jsonItem,
             // Aggiungi flag per sapere da dove provengono i dati
-            hasRealTime: !!jsonItem,
+            hasRealTime: !!jsonItem && jsonItem.isRealtime !== false,
             hasGTFS: true
         };
 
@@ -1232,7 +1357,7 @@ function mergeStops() {
     // Mantieni visibili eventuali punti RT assenti dal percorso GTFS.
     state.stopsJSON.forEach((jsonItem, index) => {
         if (!usedRealtime.has(index)) {
-            merged.push({ ...jsonItem, hasRealTime: true, hasGTFS: false });
+            merged.push({ ...jsonItem, hasRealTime: jsonItem.isRealtime !== false, hasGTFS: false });
         }
     });
 
@@ -1274,7 +1399,7 @@ function normalizeStopName(value) {
 
 async function getPreviousStopsRealTime_block() {
     // 1. Trova l'indice (corretto con .some per sicurezza)
-    let currentStopIdSplitted = state.currentStopId.split("-");
+    let currentStopIdSplitted = String(state.currentStopId || '').split("-");
     const currentStopIndex = state.mergedStops.findIndex(stop =>
         currentStopIdSplitted.some(id => stop.stop_id == id)
     );
@@ -1366,6 +1491,20 @@ function selectPreviousStopTrip(trips, lineFull, timeline, expectedStop = null) 
     return candidates.length === 1 ? candidates[0] : null;
 }
 
+/** Fermata da centrare quando l'URL non specifica uno stopId: la prima con
+ *  orario ancora futuro, altrimenti l'ultima. Il suffisso di data_url (es.
+ *  "479-481") e' il formato atteso dall'endpoint passages ACTV. */
+function pickDefaultStopId(stops) {
+    if (!Array.isArray(stops) || !stops.length) return null;
+    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    const upcoming = stops.find(stop => {
+        const t = toAbsMinutes(stop.arrival_time || stop.departure_time);
+        return t != null && ((t - nowMin + 1440) % 1440) <= 720;
+    }) || stops[stops.length - 1];
+    const suffix = String(upcoming.data_url || '').replace(/-web-aut$/, '');
+    return suffix || String(upcoming.stop_id ?? '') || null;
+}
+
 async function getPreviousStopsRealTime() {
 
     const mergedStops = state.mergedStops;
@@ -1378,6 +1517,11 @@ async function getPreviousStopsRealTime() {
     await Promise.all(previousStops.map(async stop => {
         // I punti della timeline principale sono gia' associati alla corsa.
         if (stop.rtTimeline || !stop.data_url) return;
+        // Flag sul dato, non sul DOM: renderTimeline puo' ricostruire la
+        // lista mentre la fetch e' in corso e una classe sul vecchio nodo
+        // andrebbe persa.
+        stop.rtLoading = true;
+        updateSingleStopInTimeline(stop, currentStopIndex);
         try {
             const trips = await returnTripList(stop.data_url);
             // Un refresh puo' aver sostituito la timeline durante la richiesta.
@@ -1387,9 +1531,11 @@ async function getPreviousStopsRealTime() {
             stop.arrival_time = trip.time;
             stop.departure_time = trip.time;
             stop.hasRealTime = true;
-            updateSingleStopInTimeline(stop, currentStopIndex);
         } catch (error) {
             console.warn('Realtime fermata precedente non disponibile', { stopId: stop.stop_id, error });
+        } finally {
+            stop.rtLoading = false;
+            updateSingleStopInTimeline(stop, currentStopIndex);
         }
     }));
 }
@@ -1420,16 +1566,16 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl = null) {
     const isSelected = (index === selectedStopIdx);
     // "Passata" non coincide con "senza realtime": il feed RT parte dalla
     // fermata interrogata e NON indica la posizione del bus — le fermate
-    // precedenti possono benissimo essere ancora da servire (bus in anticipo
-    // o non ancora partito). Una fermata e' passata solo se il suo orario
-    // (RT o programmato) e' gia' trascorso.
+    // precedenti possono essere ancora da servire. Il passaggio dipende
+    // dalla posizione GPS associata alla corsa, non dall'orario trascorso.
     const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
     const arrivalMin = toMinutesLocal(stop.arrival_time);
     // Distanza circolare mod 24h: il GTFS usa ore >24 per le corse dopo
     // mezzanotte ("24:15" = 00:15), un confronto lineare sbaglierebbe il segno.
     const circDiff = arrivalMin == null ? null
         : ((arrivalMin % 1440) - nowMin + 1440) % 1440;
-    const isPrevious = circDiff != null && circDiff > 720;
+    const isPrevious = isVisitedMapStop(tripMapStops[index] || stop);
+    const timeElapsed = circDiff != null && circDiff > 720;
 
     let statusClass = '';
     if (isPrevious) statusClass = 'passed';
@@ -1439,15 +1585,13 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl = null) {
     // --- GESTIONE VISUALIZZAZIONE ORARIO ---
     let timeDisplay = "--:--";
 
-    if (stop.arrival_time && stop.arrival_time.includes('\'')) {
-        stop.arrival_time = stop.arrival_time.replace('\'', ' min');
-    }
-
     if (isPrevious) {
         const sched = stop.scheduled_arrival || stop.arrival_time;
-        timeDisplay = "Passato (" + String(sched).substring(0, 5) + ")*";
+        timeDisplay = "Superata · prev. " + String(sched).substring(0, 5);
+    } else if (timeElapsed) {
+        timeDisplay = (stop.hasRealTime ? 'Stima trascorsa · ' : 'Orario trascorso · ') + String(stop.arrival_time).substring(0, 5);
     } else if (stop.hasRealTime) {
-        timeDisplay = formatMinutesRemaining(stop.arrival_time);
+        timeDisplay = formatMinutesRemaining(stop.arrival_time).replace(/^(\d+)['’]$/, '$1 min');
     } else if (arrivalMin == null) {
         timeDisplay = "Info N.D.";
     } else {
@@ -1467,7 +1611,7 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl = null) {
 
     const stopNameEscaped = encodeURIComponent(stop.stop_name);
 
-    stopEl.className = `stop-item ${statusClass}`;
+    stopEl.className = `stop-item ${statusClass}${stop.rtLoading ? ' rt-loading' : ''}`;
     try {
         stopEl.style.cursor = 'pointer';
         // data_url manca per le fermate non mappate nel feed realtime ACTV
@@ -1502,6 +1646,9 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl = null) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         formatMinutesRemaining,
+        selectTripVehicle,
+        projectOrderedMapStops,
+        updateSingleStopInTimeline,
         getContrastTextColor,
         getMapStopArrowRotation,
         isMapTerminalStop,

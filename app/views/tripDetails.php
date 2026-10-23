@@ -8,9 +8,9 @@
         <?php require COMMON_HTML_HEAD; ?>
         <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
         <link rel="stylesheet" href="/css/structure/structure-tripDetails.css">
-        <link rel="stylesheet" href="/css/tripDetails.css">
+        <link rel="stylesheet" href="/css/tripDetails.css?v=<?php echo filemtime(BASE_PATH . '/public/css/tripDetails.css'); ?>">
         <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-        <script type="text/javascript" src="/js/tripDetails.js"></script>
+        <script type="text/javascript" src="/js/tripDetails.js?v=<?php echo filemtime(BASE_PATH . '/public/js/tripDetails.js'); ?>"></script>
         <script type="module" src="https://cdn.jsdelivr.net/npm/ldrs/dist/auto/hatch.js"></script>
     </head>
 
@@ -79,7 +79,11 @@
             </header>
             <section id="trip-map-stops" class="trip-map-stops">
                 <button class="trip-map-stops-header" type="button" onclick="toggleMapStops()" aria-expanded="true">
-                    <span>Fermate della corsa</span><span class="trip-map-chevron">⌄</span>
+                    <span>Fermate della corsa</span>
+                    <span class="trip-map-stops-head-right">
+                        <span id="trip-map-stops-count" class="trip-map-stops-count"></span>
+                        <span class="trip-map-chevron">⌄</span>
+                    </span>
                 </button>
                 <div class="trip-map-stops-legend"><span class="trip-map-legend-dot visited"></span> Già passata <span class="trip-map-legend-dot upcoming"></span> Da raggiungere</div>
                 <div id="trip-map-stops-list" class="trip-map-stops-list"></div>

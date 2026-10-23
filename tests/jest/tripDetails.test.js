@@ -167,13 +167,13 @@ describe('formatMinutesRemaining', () => {
         expect(result).toMatch(/\d+ min/);
     });
 
-    test('ritorna "Passato" per orario nel passato', () => {
+    test('indica un orario trascorso senza affermare il passaggio', () => {
         const past = new Date();
         past.setMinutes(past.getMinutes() - 10);
         const h = String(past.getHours()).padStart(2, '0');
         const m = String(past.getMinutes()).padStart(2, '0');
         const result = formatMinutesRemaining(`${h}:${m}`);
-        expect(result).toMatch(/Passato/);
+        expect(result).toMatch(/Orario trascorso/);
     });
 
     test('gestisce formato con ore e minuti per tempi oltre 60 min', () => {
