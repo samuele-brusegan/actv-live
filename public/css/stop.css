@@ -150,6 +150,25 @@
     color: var(--color-white);
 }
 
+/* Chip filtro per stopId: stile neutro per distinguerle dalle linee */
+.filter-box.box-stop:not(.selected) {
+    border: 3px solid var(--color-light-gray);
+    color: var(--color-text-muted);
+}
+.filter-box.selected.box-stop {
+    border: 3px solid var(--color-light-gray);
+    background: var(--color-light-gray);
+    color: var(--color-white);
+}
+
+.filter-separator {
+    align-self: center;
+    width: 1px;
+    height: 24px;
+    background: var(--color-light-gray);
+    margin-right: 10px;
+}
+
 [data-theme="dark"] .filter-box.selected {
     color: var(--color-black);
 }

@@ -160,6 +160,7 @@ async function fetchNavigationPassages() {
 function createNavigationPassageCard(p) {
     const card = document.createElement('div');
     card.className = 'passage-card navigation-passage';
+    if (p.gtfs_stop_id != null) card.dataset.stopId = String(p.gtfs_stop_id);
     const color = /^#?[0-9a-f]{6}$/i.test(String(p.route_color || '')) ? 'background-color:#' + String(p.route_color).replace('#', '') + ';' : '';
     const textColor = /^#?[0-9a-f]{6}$/i.test(String(p.route_text_color || '')) ? 'color:#' + String(p.route_text_color).replace('#', '') + ';' : '';
     card.innerHTML = '<div class="d-flex align-items-center"><div class="line-badge" style="' + color + textColor + '">⛴ ' + p.line + '</div><div class="passage-info"><span class="passage-dest"><b>' + p.destination + '</b></span><br><span class="passage-meta">Navigazione</span>' + vehicleInfoHtml(p) + '</div></div><div class="passage-time-column"><span class="time-badge scheduled">' + p.time + '</span>' + vehicleMapLinkHtml(p) + '</div>';
@@ -654,6 +655,9 @@ function createPassageCard(p) {
     const div = document.createElement('div');
     div.className = 'passage-card';
     div.style.cursor = 'pointer';
+    div.dataset.line = lineName;
+    const cardStopId = p.gtfs_stop_id ?? p.stop;
+    if (cardStopId != null) div.dataset.stopId = String(cardStopId);
 
     div.onclick = async () => {
         const timingPoint = p.timingPoints[p.timingPoints.length - 1];
@@ -768,64 +772,122 @@ async function fetchTripId(busTrack, busDirection, day, time, stop, lineId, stop
     }
 }
 
-/** Gestione filtri per linea */
+/** Legge una selezione filtro da sessionStorage come array di stringhe.
+ *  Migra il vecchio formato (nome linea singolo) in array. */
+function getFilterSelection(key) {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return [];
+    try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+        if (parsed == null || parsed === '') return [];
+        return [String(parsed)];
+    } catch {
+        return raw === '' ? [] : [raw];
+    }
+}
+
+function setFilterSelection(key, values) {
+    if (!values.length) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, JSON.stringify(values));
+}
+
+/** Gestione filtri: linee selezionabili in multipla (checkbox-like) e
+ *  filtro opzionale per stopId quando la fermata aggrega piu' sotto-fermate. */
 function updateFilter() {
-    const activeFilter = sessionStorage.getItem('filter');
     const passageCards = document.querySelectorAll('.passage-card');
     const filterContainer = document.getElementById('filter-container');
 
     if (!filterContainer) return;
 
-    // Raccoglie le linee uniche presenti
+    // Raccoglie le linee e gli stopId unici presenti
     const linesFound = [];
+    const stopsFound = [];
     passageCards.forEach(card => {
-        const name = card.querySelector('.line-badge').innerText;
-        const colorClass = Array.from(card.querySelector('.line-badge').classList)
+        const badge = card.querySelector('.line-badge');
+        const name = card.dataset.line || badge?.innerText || '';
+        const colorClass = Array.from(badge?.classList || [])
             .find(c => c.startsWith('badge-'))?.split('-')[1] || 'red';
-
-        if (!linesFound.find(l => l.name === name)) {
+        if (name && !linesFound.find(l => l.name === name)) {
             linesFound.push({ name, color: colorClass });
         }
+        const stopId = card.dataset.stopId;
+        if (stopId && !stopsFound.includes(stopId)) stopsFound.push(stopId);
     });
 
-    // Se c'è solo una linea, nasconde i filtri
-    if (linesFound.length <= 1) {
+    const showLineFilters = linesFound.length > 1;
+    const showStopFilters = stopsFound.length > 1;
+
+    if (!showLineFilters && !showStopFilters) {
         filterContainer.innerHTML = '';
         passageCards.forEach(c => c.classList.remove('hidden'));
         return;
     }
 
-    // Renderizza i pulsanti filtro
+    // Elimina selezioni ormai impossibili (linea/fermata sparita dalla lista)
+    let lineFilter = getFilterSelection('filter').filter(v => showLineFilters && linesFound.some(l => l.name === v));
+    let stopFilter = getFilterSelection('stop_filter').filter(v => showStopFilters && stopsFound.includes(v));
+    setFilterSelection('filter', lineFilter);
+    setFilterSelection('stop_filter', stopFilter);
+
+    const toggle = (key, value, selection) => {
+        const next = selection.includes(value)
+            ? selection.filter(v => v !== value)
+            : selection.concat(value);
+        setFilterSelection(key, next);
+        updateFilter();
+    };
+
     filterContainer.innerHTML = '';
-    linesFound.forEach(line => {
-        const btn = document.createElement('div');
-        btn.className = `filter-box box-${line.color} ${activeFilter === line.name ? 'selected' : ''}`;
-        btn.innerText = line.name;
-
-        btn.onclick = () => {
-            const newFilter = activeFilter === line.name ? null : line.name;
-            sessionStorage.setItem('filter', newFilter || "");
-            updateFilter();
-        };
-
-        filterContainer.appendChild(btn);
-    });
+    if (showLineFilters) {
+        linesFound.forEach(line => {
+            const btn = document.createElement('div');
+            btn.className = `filter-box box-${line.color} ${lineFilter.includes(line.name) ? 'selected' : ''}`;
+            btn.innerText = line.name;
+            btn.setAttribute('role', 'checkbox');
+            btn.setAttribute('aria-checked', lineFilter.includes(line.name) ? 'true' : 'false');
+            btn.onclick = () => toggle('filter', line.name, getFilterSelection('filter'));
+            filterContainer.appendChild(btn);
+        });
+    }
+    if (showStopFilters) {
+        if (showLineFilters) {
+            const sep = document.createElement('div');
+            sep.className = 'filter-separator';
+            filterContainer.appendChild(sep);
+        }
+        stopsFound.forEach(stopId => {
+            const btn = document.createElement('div');
+            btn.className = `filter-box box-stop ${stopFilter.includes(stopId) ? 'selected' : ''}`;
+            btn.innerText = `#${stopId}`;
+            btn.title = `Fermata ${stopId}`;
+            btn.setAttribute('role', 'checkbox');
+            btn.setAttribute('aria-checked', stopFilter.includes(stopId) ? 'true' : 'false');
+            btn.onclick = () => toggle('stop_filter', stopId, getFilterSelection('stop_filter'));
+            filterContainer.appendChild(btn);
+        });
+    }
 
     // La riga filtri è scrollabile orizzontalmente: se resta uno scrollLeft
     // residuo la prima chip appare tagliata a metà ("non allineata").
     filterContainer.scrollLeft = 0;
 
-    // Applica il filtro alla lista
+    // Applica i filtri alla lista (AND tra gruppi, OR dentro lo stesso gruppo)
     let hasMatch = false;
     passageCards.forEach(card => {
-        const name = card.querySelector('.line-badge').innerText;
-        const isVisible = !activeFilter || activeFilter === "" || name === activeFilter;
+        const badge = card.querySelector('.line-badge');
+        const name = card.dataset.line || badge?.innerText || '';
+        const matchLine = !lineFilter.length || lineFilter.includes(name);
+        const matchStop = !stopFilter.length || stopFilter.includes(card.dataset.stopId || '');
+        const isVisible = matchLine && matchStop;
         card.classList.toggle('hidden', !isVisible);
         if (isVisible) hasMatch = true;
     });
 
-    if (!hasMatch && activeFilter) {
+    // Combinazione senza risultati: azzera i filtri invece di mostrare il vuoto
+    if (!hasMatch && (lineFilter.length || stopFilter.length)) {
         sessionStorage.removeItem('filter');
+        sessionStorage.removeItem('stop_filter');
         updateFilter();
     }
 }
