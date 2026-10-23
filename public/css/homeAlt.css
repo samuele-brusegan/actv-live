@@ -1,0 +1,281 @@
+/* Home alternativa — stessa identita' ACTV, gerarchia piu' pulita.
+   Usa esclusivamente i token --actv-* di app-shell.css. */
+
+.home-alt {
+    padding-bottom: 96px;
+}
+
+/* ---------- Hero ---------- */
+.ha-hero {
+    background: linear-gradient(160deg, var(--actv-green-dark), var(--actv-green) 70%);
+    color: #fff;
+    padding: 16px max(20px, calc((100vw - var(--actv-max)) / 2)) 44px;
+    border-radius: 0 0 26px 26px;
+    box-shadow: 0 10px 30px rgba(0, 110, 70, .18);
+}
+
+.ha-hero-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ha-brand {
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: .02em;
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, .35);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .12);
+}
+
+.ha-theme {
+    border: 1px solid rgba(255, 255, 255, .35);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .14);
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    padding: 10px;
+}
+.ha-theme img { width: 20px; height: 20px; }
+
+.ha-title {
+    margin: 26px 0 6px;
+    font-size: clamp(30px, 6.5vw, 44px);
+    font-weight: 800;
+    line-height: 1.06;
+    letter-spacing: -.035em;
+    text-wrap: balance;
+}
+
+.ha-subtitle {
+    margin: 0 0 24px;
+    color: rgba(255, 255, 255, .82);
+    font-size: 15px;
+}
+
+/* CTA di ricerca dentro l'hero */
+.ha-search {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 0 8px 0 18px;
+    margin: 0;
+    background: var(--actv-surface);
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0, 40, 25, .22);
+    color: var(--actv-ink);
+    cursor: pointer;
+    text-decoration: none;
+}
+.ha-search-icon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    color: var(--actv-green-dark);
+}
+.ha-search-label {
+    font-weight: 650;
+    font-size: 16px;
+}
+.ha-search-go {
+    margin-left: auto;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--actv-green);
+    color: #fff;
+    font-size: 24px;
+    line-height: 1;
+}
+.ha-search:hover .ha-search-go { background: var(--actv-green-dark); }
+
+/* ---------- Main ---------- */
+.ha-main {
+    width: min(100% - 32px, 720px);
+    margin: 20px auto 0;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.ha-card {
+    background: var(--actv-surface);
+    border: 1px solid var(--actv-border);
+    border-radius: var(--actv-radius);
+    box-shadow: var(--actv-shadow-sm);
+    padding: 20px;
+}
+
+.ha-card-label {
+    color: var(--actv-muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.ha-tutorial h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: -.02em; }
+.ha-tutorial p { margin: 0 0 14px; color: var(--actv-muted); }
+.ha-tutorial-actions { display: flex; gap: 8px; }
+
+.ha-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 0 20px;
+    border-radius: 12px;
+    font-weight: 750;
+    text-decoration: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+.ha-btn-primary { background: var(--actv-green); color: #fff; }
+.ha-btn-primary:hover { background: var(--actv-green-dark); color: #fff; }
+.ha-btn-ghost { background: transparent; border-color: var(--actv-border); color: var(--actv-ink); }
+.ha-btn-ghost:hover { background: var(--actv-surface-2); color: var(--actv-ink); }
+
+.ha-resume { display: none; }
+.ha-resume.is-visible { display: block; }
+.ha-resume-route { margin: 4px 0 14px; font-size: 18px; font-weight: 750; }
+.ha-resume-actions { display: flex; gap: 8px; }
+.ha-resume-actions .ha-btn { flex: 1; }
+
+/* ---------- Griglia azioni ---------- */
+.ha-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+@media (min-width: 560px) {
+    .ha-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.ha-action {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    background: var(--actv-surface);
+    border: 1px solid var(--actv-border);
+    border-radius: 16px;
+    box-shadow: var(--actv-shadow-sm);
+    color: var(--actv-ink);
+    text-decoration: none;
+    transition: transform .12s ease, border-color .12s ease;
+}
+.ha-action:hover {
+    transform: translateY(-1px);
+    border-color: var(--actv-green);
+    color: var(--actv-ink);
+}
+.ha-action:active { transform: scale(.98); }
+.ha-action svg {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    color: var(--actv-green-dark);
+}
+[data-theme="dark"] .ha-action svg { color: var(--actv-green); }
+.ha-action-text strong,
+.ha-action-text small { display: block; }
+.ha-action-text strong { font-size: 14px; font-weight: 750; letter-spacing: -.01em; }
+.ha-action-text small { color: var(--actv-muted); font-size: 12px; margin-top: 1px; }
+
+/* ---------- Sezioni ---------- */
+.ha-section-title {
+    margin: 0 0 12px;
+    font-size: 19px;
+    font-weight: 750;
+    letter-spacing: -.02em;
+    color: var(--actv-ink);
+}
+.ha-hr { border: 0; border-top: 1px solid var(--actv-border); margin: 0; }
+
+.ha-stop-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* Card fermata (markup generato da script-home.js) */
+.home-alt .stop-card {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 14px;
+    background: var(--actv-surface);
+    border: 1px solid var(--actv-border);
+    border-radius: 14px;
+    box-shadow: var(--actv-shadow-sm);
+    text-decoration: none;
+    color: var(--actv-ink);
+    transition: transform .1s;
+}
+.home-alt .stop-card:active { transform: scale(.98); }
+.home-alt .id-badges-container { display: flex; gap: 4px; flex-wrap: wrap; }
+.home-alt .id-badge-small {
+    background: var(--actv-blue) !important;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 8px;
+}
+.home-alt .stop-name { font-weight: 700; color: var(--actv-ink); }
+.home-alt .stop-desc { color: var(--actv-muted); font-size: 13px; }
+.home-alt .chevron { margin-left: auto; font-size: 24px; color: var(--actv-muted); }
+
+/* ---------- Mappa ---------- */
+#status { margin-bottom: 12px; }
+.home-alt #map-container {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--actv-border);
+    border-radius: var(--actv-radius);
+    box-shadow: var(--actv-shadow-sm);
+    background: var(--actv-surface);
+}
+.home-alt #map { height: 340px; }
+
+/* ---------- Avvisi ---------- */
+.home-alt #important-info-btn {
+    position: fixed;
+    right: 18px;
+    bottom: 100px;
+    z-index: 90;
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--color-primary-red, #fa2020);
+    color: #fff;
+    font-size: 24px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, .25);
+}
+.home-alt #important-info-toast {
+    position: fixed;
+    inset: auto 0 110px;
+    z-index: 95;
+    display: flex;
+    justify-content: center;
+    padding: 0 16px;
+}
+
+/* ---------- Footer ---------- */
+.ha-footer {
+    text-align: center;
+    color: var(--actv-muted);
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 8px 0 24px;
+}
+.ha-footer p { margin: 4px 0; }
+.ha-footer-note { font-size: 12px; opacity: .8; }

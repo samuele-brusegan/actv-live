@@ -8,6 +8,7 @@ global $router;
 
 // === Pagine ===
 $router->add('/'                        , 'Controller', 'index');
+$router->add('/home-alt'                , 'Controller', 'homeAlt');
 $router->add('/route-finder'            , 'Controller', 'routeFinder');
 $router->add('/station-selector'        , 'Controller', 'stationSelector');
 $router->add('/route-results'           , 'Controller', 'routeResults');

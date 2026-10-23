@@ -175,6 +175,10 @@ class Controller {
         require_once BASE_PATH . '/app/views/credits.php';
     }
 
+    function homeAlt() {
+        require_once BASE_PATH . '/app/views/homeAlt.php';
+    }
+
     function adminFeedback() {
         AdminAuth::requireAuth();
         if (!class_exists('databaseConnector')) require_once BASE_PATH . '/app/models/databaseConnector.php';
