@@ -46,7 +46,7 @@ class CookieNotice {
         container.innerHTML = `
             <div class="cookie-notice-content">
                 <h4>${this.options.title}</h4>
-                <p>${this.options.message}</p>
+                <p>${this.options.message} <a href="${this.options.moreUrl}">${this.options.moreLabel}</a></p>
             </div>
             <div class="cookie-notice-actions">
                 <button class="btn btn-primary" id="cookie-accept">${this.options.acceptLabel}</button>
