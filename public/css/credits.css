@@ -8,20 +8,24 @@
 }
 
 .credits-card {
-    background: var(--card-bg, #fff);
-    border-radius: 12px;
+    background: var(--actv-surface);
+    border: 1px solid var(--actv-border);
+    border-radius: var(--actv-radius, 12px);
+    box-shadow: var(--actv-shadow-sm, 0 1px 4px rgba(0, 0, 0, .08));
     padding: 1.25rem 1.5rem;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, .08);
+    color: var(--actv-ink);
 }
 
 .credits-card h2 {
     font-size: 1.1rem;
     margin: 0 0 .5rem;
+    color: var(--actv-ink);
 }
 
 .credits-card p {
     margin: 0 0 .75rem;
     line-height: 1.5;
+    color: var(--actv-ink);
 }
 
 .credits-card p:last-child {
@@ -32,11 +36,12 @@
     margin: 0;
     padding-left: 1.25rem;
     line-height: 1.8;
+    color: var(--actv-ink);
 }
 
 .credits-disclaimer {
     font-size: .9rem;
-    opacity: .85;
-    border-left: 3px solid var(--color-primary-green, #2e7d32);
+    color: var(--actv-muted);
+    border-left: 3px solid var(--actv-green);
     padding-left: .75rem;
 }
