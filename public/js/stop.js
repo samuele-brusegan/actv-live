@@ -436,6 +436,61 @@ function isLikelyStrike(realtime, scheduled) {
     return true;
 }
 
+/** Elenco fermate ACTV (id realtime tipo "1234-web-aut"), cache di sessione. */
+let stopsListPromise = null;
+function fetchAllRealtimeStopIds() {
+    if (!stopsListPromise) {
+        stopsListPromise = fetch('https://oraritemporeale.actv.it/aut/backend/page/stops', { cache: 'no-cache' })
+            .then(r => (r.ok ? r.json() : []))
+            .then(data => (Array.isArray(data) ? data : []).map(s => String(s.name || '')).filter(Boolean))
+            .catch(() => []);
+    }
+    return stopsListPromise;
+}
+
+/**
+ * Conferma incrociata dello sciopero: se il realtime e' vuoto anche su
+ * altre fermate campionate, l'ipotesi regge; se una qualsiasi altra
+ * fermata ha passaggi, questa e' solo non monitorata.
+ */
+async function confirmStrikeCrossCheck(sampleSize = 3) {
+    try {
+        const allIds = await fetchAllRealtimeStopIds();
+        const currentIds = new Set(stationId.split('-').filter(Boolean));
+        const pool = allIds.filter(id => !currentIds.has(id.replace(/-web-aut$/, '')));
+        if (pool.length === 0) return false;
+
+        // Campione distribuito sull'elenco, non solo le prime fermate.
+        const step = Math.max(1, Math.floor(pool.length / sampleSize));
+        const sample = [];
+        for (let i = 0; i < pool.length && sample.length < sampleSize; i += step) {
+            sample.push(pool[i]);
+        }
+
+        const results = await Promise.all(sample.map(async id => {
+            try {
+                const ctrl = new AbortController();
+                const timeoutId = setTimeout(() => ctrl.abort(), 2500);
+                const r = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${id}`, {
+                    cache: 'no-cache', signal: ctrl.signal
+                });
+                clearTimeout(timeoutId);
+                if (!r.ok) return 'error';
+                const data = await r.json();
+                return Array.isArray(data) && data.length === 0 ? 'empty' : 'has';
+            } catch (e) {
+                return 'error';
+            }
+        }));
+
+        // Sciopero solo se tutte le fermate campionate sono vuote;
+        // errori di rete rendono il test inconclusivo (nessun banner).
+        return results.length > 0 && results.every(r => r === 'empty');
+    } catch (e) {
+        return false;
+    }
+}
+
 /** Recupera eventuali avvisi/comunicazioni per la fermata */
 async function fetchNoticeboard() {
     if (!stationId) return null;
@@ -475,7 +530,7 @@ async function loadPassages() {
 
     if (loadingEl) loadingEl.style.display = 'none';
 
-    const strike = isLikelyStrike(realtime, scheduled);
+    const strike = isLikelyStrike(realtime, scheduled) && await confirmStrikeCrossCheck();
 
     // ── Bacheca ──
     const notes = [];
