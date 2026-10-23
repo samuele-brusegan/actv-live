@@ -25,6 +25,9 @@ const {
 describe('realtime delle fermate precedenti', () => {
     test('Pertini: il passaggio stop 1258 aggiorna solo il ritorno, mai lo stop 258 prima di Carrer', async () => {
         const originalFetch = global.fetch;
+        // Orologio finto: i tempi della corsa finta (23:31-23:48) devono stare
+        // nella finestra di matching a prescindere dall'ora reale del test.
+        jest.useFakeTimers().setSystemTime(new Date().setHours(23, 0, 0, 0));
         const tail = [{ stop: 'Bissuola Cadorna', time: '23:45' }, { stop: 'MESTRE CENTRO B7', time: '23:48' }];
         const passage = { line: '31H_UM', real: true, stop: '1258', time: "6'",
             timingPoints: [{ stop: 'Pertini Gavagnin', time: '23:37' }, ...tail] };
@@ -41,7 +44,7 @@ describe('realtime delle fermate precedenti', () => {
             expect(outward.arrival_time).toBe('23:31');
             expect(inward.hasRealTime).toBe(true);
             expect(inward.arrival_time).toBe("6'");
-        } finally { global.fetch = originalFetch; }
+        } finally { global.fetch = originalFetch; jest.useRealTimers(); }
     });
 
     test('senza ID rifiuta un feed unito, con ID scarta la direzione opposta prima della disambiguazione', () => {
