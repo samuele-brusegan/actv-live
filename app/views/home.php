@@ -124,7 +124,10 @@
                 App sviluppata da <a href="https://github.com/samuele-brusegan">Samuele Brusegan</a> <br>
                 Grafica e design da <a href="https://github.com/andreadavanzo09-bit">Andrea Davanzo</a> <br>
                 <br>
-                <a href="https://github.com/samuele-brusegan/actv-live">GitHub</a>
+                <a href="https://github.com/samuele-brusegan/actv-live">GitHub</a> ·
+                <a href="/credits">Crediti e licenze</a>
+                <hr>
+                <small>Progetto non ufficiale, non affiliato ad ACTV S.p.A.<br>Dati mappe © OpenStreetMap contributors</small>
             </div>
 
         </div>

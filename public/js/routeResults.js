@@ -910,9 +910,9 @@ async function loadComparisonMap(routes) {
         const shapeByTrip = new Map(shapes.map(shape => [String(shape.trip_id || ''), shape]));
         if (!shapes.length) throw new Error('Geometria non disponibile');
 
-        comparisonMap = L.map(mapEl, { zoomControl: true, attributionControl: false });
+        comparisonMap = L.map(mapEl, { zoomControl: true, attributionControl: true });
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19
         }).addTo(comparisonMap);
 
         const colors = ['#087df5', '#ef7d32', '#9b59b6'];

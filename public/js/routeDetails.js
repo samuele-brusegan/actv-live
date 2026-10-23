@@ -364,7 +364,7 @@ async function initMap() {
     if (!mapInstance) {
         mapInstance = L.map('route-map');
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             maxZoom: 19
         }).addTo(mapInstance);
     } else {

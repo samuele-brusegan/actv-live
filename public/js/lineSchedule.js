@@ -354,7 +354,7 @@
 
         const mini = L.map(el, {
             zoomControl: false,
-            attributionControl: false,
+            attributionControl: true,
             dragging: false,
             scrollWheelZoom: false,
             doubleClickZoom: false,
@@ -365,7 +365,7 @@
             zoomSnap: 0
         });
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mini);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(mini);
 
         const line = L.polyline(path, { color: '#0d6efd', weight: 3, opacity: 0.9 }).addTo(mini);
         // Marker leggeri ai capolinea.

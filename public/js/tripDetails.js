@@ -531,9 +531,9 @@ async function openMap() {
     updateTripMapHeader();
 
     if (!tripMap) {
-        tripMap = L.map('trip-map', { attributionControl: false }).setView([45.4384, 12.3359], 12);
+        tripMap = L.map('trip-map', { attributionControl: true }).setView([45.4384, 12.3359], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(tripMap);
         // Geometria/fermate e posizione live sono indipendenti: il marker puo
         // apparire subito anche se la shape e ancora in download.

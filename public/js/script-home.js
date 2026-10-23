@@ -58,12 +58,12 @@ async function initHomeMap() {
     renderFavorites();
 
     const map = L.map('map', {
-        attributionControl: false,
+        attributionControl: true,
         fullscreenControl: { pseudoFullscreen: true }
     }).setView([45.4384, 12.3359], 12);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
     const stations = await fetchAllStations();

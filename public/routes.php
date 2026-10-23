@@ -25,6 +25,7 @@ $router->add('/line-schedule'           , 'Controller', 'lineSchedule');
 $router->add('/trip-finder'             , 'Controller', 'tripFinder');
 $router->add('/delete-cookie'           , 'Controller', 'deleteCookie');
 $router->add('/feedback'                , 'Controller', 'feedback');
+$router->add('/credits'                 , 'Controller', 'credits');
 
 $router->add('/admin/login'             , 'Controller', 'adminLogin');
 $router->add('/admin/logout'            , 'Controller', 'adminLogout');

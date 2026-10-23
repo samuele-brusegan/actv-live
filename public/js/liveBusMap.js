@@ -334,13 +334,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Mappa Leaflet ─────────────────────────────────────────
     const map = L.map('map', {
-        attributionControl: false,
+        attributionControl: true,
         zoomControl: true,
         maxZoom: 19
     }).setView([45.4384, 12.3359], 12);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap'
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
     // ── Tooltip flottante sopra i bus ─────────────────────────

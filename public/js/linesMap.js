@@ -6,13 +6,13 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Inizializzazione della mappa centrata su Venezia
     const map = L.map('map', {
-        attributionControl: false,
+        attributionControl: true,
         zoomControl: false
     }).setView([45.4384, 12.3359], 12);
 
     // Layer mappa (OpenStreetMap)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
     // Palette di colori vibranti per le linee
