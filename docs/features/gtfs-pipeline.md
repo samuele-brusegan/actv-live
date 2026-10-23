@@ -84,7 +84,16 @@ La pagina autenticata `/admin/gtfs-update` gestisce la pipeline completa:
 4. import nelle tabelle DB di staging;
 5. compilazione di `stops.data_url`;
 6. creazione di `shapes_refined` con ID auto-incrementali;
-7. validazione e pubblicazione con `RENAME TABLE` atomico.
+7. validazione e pubblicazione con `RENAME TABLE` atomico;
+8. aggiornamento del feed navigazione (`data/gtfs/navigation/` e
+   `data/gtfs/cache/navigation/`) e rigenerazione della cache connessioni del
+   planner. Un errore in questa fase non invalida i dati automobilistici già
+   pubblicati e viene riportato nel task `navigation` dello stato.
+
+Lo stesso flusso copre quindi entrambi i feed, sia quando viene avviato
+manualmente dal pannello o da CLI, sia quando parte la pianificazione
+settimanale. Per aggiornare solo la navigazione resta disponibile
+`php scripts/update_navigation.php`.
 
 Il runner usa `flock`, quindi due aggiornamenti non possono essere eseguiti insieme.
 La pianificazione è disabilitata di default. Salvando giorno e ora dalla pagina

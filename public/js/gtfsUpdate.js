@@ -81,7 +81,7 @@
     }
 
     function renderOverview(overview) {
-        const { config, state, database, cache_updated_at: cacheUpdatedAt, log_tail: logTail } = overview;
+        const { config, state, database, cache_updated_at: cacheUpdatedAt, navigation_cache_updated_at: navCacheUpdatedAt, log_tail: logTail } = overview;
         if (!initialized) {
             $('schedule-enabled').checked = !!config.enabled;
             $('schedule-weekday').value = String(config.weekday);
@@ -99,6 +99,7 @@
             ['Automatico', config.enabled ? 'Attivo' : 'Disattivato'],
             ['Ultimo avvio', state.started_at ? new Date(state.started_at).toLocaleString('it-IT') : '--'],
             ['Cache aggiornata', cacheUpdatedAt ? new Date(cacheUpdatedAt).toLocaleString('it-IT') : '--'],
+            ['Cache navigazione', navCacheUpdatedAt ? new Date(navCacheUpdatedAt).toLocaleString('it-IT') : '--'],
             ['Fermate / Corse', `${database.stops ?? '--'} / ${database.trips ?? '--'}`]
         ].map(([title, value]) =>
             `<div class="stat-card"><div class="stat-title">${esc(title)}</div>` +

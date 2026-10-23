@@ -1,27 +1,24 @@
 <?php
 /**
- * Script to create and populate the `shapes_refined` table.
- * This table is used to store high-fidelity road-snapped paths for bus lines.
+ * Rebuild `shapes_refined` from `shapes` without exposing an empty table if
+ * rebuilding fails or the process is interrupted.
  */
 
-// Define BASE_PATH
 if (!defined('BASE_PATH')) {
-    define('BASE_PATH', __DIR__);
+    define('BASE_PATH', dirname(__DIR__));
 }
 
 require_once BASE_PATH . '/app/bootstrap.php';
-require_once BASE_PATH . '/app/models/databaseConnector.php';
 
-echo "Refining shapes...\n";
+try {
+    $pdo = new PDO(
+        'mysql:host=' . ENV['DB_HOST'] . ';port=' . (ENV['DB_PORT'] ?? 3306) . ';dbname=' . ENV['DB_NAME'] . ';charset=utf8mb4',
+        ENV['DB_USER'],
+        ENV['DB_PASS'],
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+    );
 
-$db = new databaseConnector();
-$db->connect(ENV['DB_USER'], ENV['DB_PASS'], ENV['DB_HOST'], ENV['DB_NAME']);
-
-// Since databaseConnector::query expects a result set, we'll use the raw mysqli object
-$mysqli = Closure::bind(function($db) { return $db->db; }, null, 'databaseConnector')($db);
-
-$queries = [
-    "CREATE TABLE IF NOT EXISTS `shapes_refined` (
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `shapes_refined` (
       `id` INT AUTO_INCREMENT PRIMARY KEY,
       `shape_id` VARCHAR(50) NOT NULL,
       `lat` DECIMAL(10, 8) NOT NULL,
@@ -30,34 +27,31 @@ $queries = [
       `dist_traveled` DOUBLE,
       INDEX `idx_shape_id` (`shape_id`),
       INDEX `idx_sequence` (`sequence`)
-    )",
-    "TRUNCATE TABLE `shapes_refined`"
-];
+    )");
 
-foreach ($queries as $sql) {
-    if ($mysqli->query($sql)) {
-        echo "Query executed: " . substr($sql, 0, 50) . "...\n";
-    } else {
-        echo "Error: " . $mysqli->error . "\n";
-        exit(1);
+    $suffix = date('YmdHis') . '_' . getmypid();
+    $staging = 'shapes_refined_stage_' . $suffix;
+    $backup = 'shapes_refined_backup_' . $suffix;
+    $pdo->exec("CREATE TABLE `$staging` LIKE `shapes_refined`");
+
+    try {
+        $pdo->exec("INSERT INTO `$staging` (shape_id, lat, lng, sequence, dist_traveled)
+                    SELECT shape_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence, shape_dist_traveled
+                    FROM `shapes`
+                    ORDER BY shape_id, shape_pt_sequence");
+        $count = (int) $pdo->query("SELECT COUNT(*) FROM `$staging`")->fetchColumn();
+        if ($count === 0) {
+            throw new RuntimeException('La tabella staging è vuota; shapes_refined corrente conservata.');
+        }
+
+        $pdo->exec("RENAME TABLE `shapes_refined` TO `$backup`, `$staging` TO `shapes_refined`");
+        $pdo->exec("DROP TABLE `$backup`");
+        echo "shapes_refined aggiornata: $count punti.\n";
+    } catch (Throwable $e) {
+        $pdo->exec("DROP TABLE IF EXISTS `$staging`");
+        throw $e;
     }
+} catch (Throwable $e) {
+    fwrite(STDERR, 'Errore aggiornamento shapes_refined: ' . $e->getMessage() . "\n");
+    exit(1);
 }
-
-// Populate from existing shapes
-// We use the existing shapes because they are actually road-snapped in the ACTV GTFS
-echo "Copying data from `shapes` to `shapes_refined`...\n";
-$insertSql = "INSERT INTO `shapes_refined` (shape_id, lat, lng, sequence, dist_traveled)
-              SELECT shape_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence, shape_dist_traveled
-              FROM `shapes`
-              ORDER BY shape_id, shape_pt_sequence";
-
-if ($mysqli->query($insertSql)) {
-    echo "Successfully populated `shapes_refined`!\n";
-    $count = $db->query("SELECT COUNT(*) as cnt FROM shapes_refined")[0]['cnt'];
-    echo "Total points: $count\n";
-} else {
-    echo "Error populating table: " . $mysqli->error . "\n";
-}
-
-echo "\n✓ Shapes refined!\n";
-?>

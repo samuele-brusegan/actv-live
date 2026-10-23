@@ -233,11 +233,13 @@ class GtfsUpdateManager
         }
 
         $cacheFile = BASE_PATH . '/data/gtfs/cache/stops.json';
+        $navCacheFile = BASE_PATH . '/data/gtfs/cache/navigation/stops.json';
         return [
             'config' => $this->getConfig(),
             'state' => $this->getState(),
             'database' => $database,
             'cache_updated_at' => is_file($cacheFile) ? date(DATE_ATOM, filemtime($cacheFile)) : null,
+            'navigation_cache_updated_at' => is_file($navCacheFile) ? date(DATE_ATOM, filemtime($navCacheFile)) : null,
             'log_tail' => $this->tailLog(30),
         ];
     }
@@ -338,6 +340,7 @@ class GtfsUpdateManager
             ['id' => 'shapes', 'name' => 'Creazione shapes_refined e ID', 'current' => 0, 'total' => 1, 'status' => 'pending'],
             ['id' => 'validate', 'name' => 'Validazione dati', 'current' => 0, 'total' => count(self::TABLE_FILES), 'status' => 'pending'],
             ['id' => 'publish', 'name' => 'Pubblicazione atomica', 'current' => 0, 'total' => 1, 'status' => 'pending'],
+            ['id' => 'navigation', 'name' => 'Aggiornamento feed navigazione', 'current' => 0, 'total' => 2, 'status' => 'pending'],
         ];
         $state = [
             'status' => 'running',
@@ -464,6 +467,28 @@ class GtfsUpdateManager
             }
             $this->dropTableBackups($pdo, $backups);
             $this->setTask($state, 'publish', 'completed', 1);
+
+            $this->setTask($state, 'navigation', 'running');
+            try {
+                $this->setTaskDetail($state, 'navigation', 'Download e parsing feed navigazione');
+                $navParser = new GTFSParser(null, null, 'navigation');
+                $navParser->parseAll();
+                $this->advanceTask($state, 'navigation');
+
+                $this->setTaskDetail($state, 'navigation', 'Rigenerazione cache connessioni planner');
+                require_once BASE_PATH . '/app/services/ConnectionCacheBuilder.php';
+                $plannerCache = new ConnectionCacheBuilder();
+                $today = new DateTimeImmutable('today');
+                $plannerCache->ensure($today->format('Y-m-d'));
+                $plannerCache->ensure($today->modify('+1 day')->format('Y-m-d'));
+                $this->setTask($state, 'navigation', 'completed', 2);
+            } catch (Throwable $navError) {
+                // Il feed navigazione è indipendente: un suo errore non deve
+                // invalidare l'aggiornamento automobilistico già pubblicato.
+                $state['stats']['navigation_error'] = $navError->getMessage();
+                $this->setTask($state, 'navigation', 'failed');
+                $this->appendDiagnostic('NAV FAIL ' . $navError->getMessage());
+            }
 
             $state['status'] = 'completed';
             $state['finished_at'] = date(DATE_ATOM);
