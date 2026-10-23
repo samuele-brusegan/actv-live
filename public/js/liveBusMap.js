@@ -18,14 +18,22 @@ function positionAgeLabel(vehicle) {
         : 'Ora rilevamento non disponibile';
 }
 
-function matchesVehicleFilter(vehicle, query, params) {
-    const line = String(vehicle.route_short_name || '');
+function matchesVehicleFilter(vehicle, query, params = new URLSearchParams(), fields = { line: true, destination: true, tripId: true }) {
+    const line = String(vehicle.route_short_name || '').replace(/_(?:UN|EN|US|UM|UL|ES)$/i, '');
     const trip = String(vehicle.trip_id || '');
     const headsign = String(vehicle.trip_headsign || '');
     if (params.get('tripId') && trip !== params.get('tripId')) return false;
     if (params.get('line') && line !== params.get('line')) return false;
     if (params.get('destination') && !headsign.toLowerCase().includes(params.get('destination').toLowerCase())) return false;
-    return !query || `${line} ${trip} ${vehicle.route_id || ''} ${headsign}`.toLowerCase().includes(query.toLowerCase());
+    // I link alla mappa fissano una corsa o linea anche con campi di ricerca disattivati.
+    if (['line', 'destination', 'tripId'].some(key => params.has(key))) return true;
+    const terms = String(query || '').split(/[,;\n]+/).map(term => term.trim().toLowerCase()).filter(Boolean);
+    if (!terms.length) return true;
+    return terms.some(term =>
+        (fields.line && line.toLowerCase() === term) ||
+        (fields.destination && headsign.toLowerCase().includes(term)) ||
+        (fields.tripId && trip.toLowerCase().includes(term))
+    );
 }
 
 function timeToSec(t) {
@@ -240,7 +248,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnRefresh   = document.getElementById('btn-refresh');
     const btnSearchHistory = document.getElementById('btn-search-history');
     const searchHistoryPanel = document.getElementById('search-history-panel');
-    const searchHistoryList = document.getElementById('search-history-list');
+    const btnSettings = document.getElementById('btn-map-settings');
+    const settingsPanel = document.getElementById('map-settings-panel');
+    const fieldSwitches = document.querySelectorAll('[data-search-field]');
+    let searchFields = { line: true, destination: true, tripId: true };
+    try {
+        const saved = JSON.parse(localStorage.getItem('actv-live-map-search-fields') || '{}');
+        Object.keys(searchFields).forEach(key => { if (typeof saved?.[key] === 'boolean') searchFields[key] = saved[key]; });
+    } catch (_) { /* Usa i campi predefiniti se le preferenze non sono leggibili. */ }
     const btnMyPosition = document.getElementById('btn-my-position');
     const busDetailsPanel = document.getElementById('bus-details-panel');
     const busDetailsContent = document.getElementById('bus-details-content');
@@ -255,10 +270,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let ndHidden = localStorage.getItem('actv-live-map-hide-nd') !== 'false';
 
     function updateNdToggle() {
-        btnToggleNd.querySelector('.nd-toggle-label').textContent = ndHidden ? 'Mostra N/D' : 'Nascondi N/D';
-        btnToggleNd.title = ndHidden ? 'Mostra i mezzi senza linea' : 'Nascondi i mezzi senza linea';
-        btnToggleNd.classList.toggle('active', ndHidden);
-        btnToggleNd.setAttribute('aria-pressed', ndHidden ? 'true' : 'false');
+        btnToggleNd.checked = !ndHidden;
+    }
+
+    function updateSearchFields() {
+        fieldSwitches.forEach(input => { input.checked = searchFields[input.dataset.searchField]; });
+        document.getElementById('search-fields-warning').classList.toggle('hidden', Object.values(searchFields).some(Boolean));
+        filterInput.placeholder = searchFields.line ? 'Cerca: 5E, 21, …' : searchFields.destination ? 'Cerca destinazioni…' : searchFields.tripId ? 'Cerca ID corsa…' : 'Attiva un campo nelle impostazioni';
     }
 
     function clearBusMarkers() {
@@ -291,13 +309,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const sidePanelList = sidePanel.querySelector('.nr-list');
 
+    function updateServiceButtons() {
+        serviceButtons.forEach(button => {
+            const enabled = serviceMode === 'both' || button.dataset.service === serviceMode;
+            button.classList.toggle('active', enabled);
+            button.setAttribute('aria-pressed', String(enabled));
+        });
+    }
+    updateServiceButtons();
     serviceButtons.forEach(button => {
-        button.classList.toggle('active', button.dataset.service === serviceMode);
         button.addEventListener('click', () => {
-            if (serviceMode === button.dataset.service) return;
-            serviceMode = button.dataset.service;
+            // Almeno un servizio resta attivo; entrambi i pulsanti accesi mostrano tutta la rete.
+            serviceMode = serviceMode === 'both'
+                ? (button.dataset.service === 'navigation' ? 'automobilistico' : 'navigation')
+                : serviceMode === button.dataset.service ? serviceMode : 'both';
             localStorage.setItem('actv-live-map-service', serviceMode);
-            serviceButtons.forEach(item => item.classList.toggle('active', item.dataset.service === serviceMode));
+            updateServiceButtons();
             if (serviceMode === 'navigation') clearBusMarkers();
             if (serviceMode === 'automobilistico') clearNavigationMarkers();
             loadBuses();
@@ -389,6 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Stato ─────────────────────────────────────────────────
     let busMarkers = new Map(); // vehicle identity (GPS) or tripId (estimated) -> marker data
     let navigationMarkers = new Map();
+    let navigationLoadVersion = 0;
     let navigationColors = new Map();
     let navigationColorsPromise = null;
     let abortCtrl = null;       // Per annullare fetch in corso
@@ -407,16 +435,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSearchHistory() {
         try {
             const value = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]');
-            return Array.isArray(value) ? value.filter(Boolean).slice(0, 10) : [];
+            return Array.isArray(value) ? value.filter(item => typeof item === 'string' && item.trim()).slice(0, 10) : [];
         } catch (_) { return []; }
     }
 
     function renderSearchHistory() {
         const history = getSearchHistory();
-        searchHistoryList.innerHTML = history.map(value => `<option value="${escapeHtml(value)}"></option>`).join('');
-        searchHistoryPanel.innerHTML = history.length
-            ? history.map(value => `<button type="button" class="search-history-item" data-query="${escapeHtml(value)}">◷ <span>${escapeHtml(value)}</span></button>`).join('')
-            : '<div class="search-history-empty">Nessuna ricerca recente</div>';
+        searchHistoryPanel.innerHTML = `<div class="map-panel-heading"><h2>Ricerche recenti</h2>${history.length ? '<button type="button" class="history-clear" data-clear-history>Svuota</button>' : ''}</div>`
+            + (history.length
+                ? history.map((value, index) => `<div class="search-history-row"><button type="button" class="search-history-item" data-query="${escapeHtml(value)}"><span>${escapeHtml(value)}</span></button><button type="button" class="history-remove" data-remove-history="${index}" aria-label="Rimuovi ricerca ${escapeHtml(value)}">Rimuovi</button></div>`).join('')
+                : '<p class="search-history-empty">Le ricerche confermate con Invio compariranno qui. Puoi cercare più linee, ad esempio 5E, 21.</p>');
     }
 
     function rememberSearch(value) {
@@ -429,18 +457,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     map.on('zoomend moveend', updateMarkerSizes);
     // Also trigger after load
+    let busReloadPending = false;
     const originalLoadBuses = loadBuses;
     loadBuses = async function() {
         // Non avviare un nuovo ciclo mentre il precedente sta ancora
         // interrogando PHP: AbortController annulla il browser, ma le
         // richieste già arrivate a PHP-FPM continuano a occupare worker.
-        if (busLoadRunning) return;
+        if (busLoadRunning) { busReloadPending = true; return; }
         busLoadRunning = true;
         try {
             await originalLoadBuses.apply(this, arguments);
             updateMarkerSizes();
         } finally {
             busLoadRunning = false;
+            if (busReloadPending) { busReloadPending = false; void loadBuses(); }
         }
     };
 
@@ -448,40 +478,108 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Inizializza filtro da URL se presente
     const initParams = new URLSearchParams(window.location.search);
-    if (initParams.get('line')) filterInput.value = initParams.get('line');
-    else if (initParams.get('tripId')) filterInput.value = initParams.get('tripId');
+    // I filtri dei link restano vincoli esatti fino alla modifica della ricerca.
+    filterInput.value = [initParams.get('line'), initParams.get('destination'), initParams.get('tripId')].filter(Boolean).join(', ');
 
     let filterTimeout = null;
+    function applySearch() {
+        clearTimeout(filterTimeout);
+        loadBuses();
+        loadNavigationVehicles();
+    }
+    function clearUrlFilters() {
+        const url = new URLSearchParams(window.location.search);
+        ['line', 'destination', 'tripId'].forEach(key => url.delete(key));
+        window.history.replaceState({}, '', window.location.pathname + (url.size ? '?' + url : ''));
+    }
+    function setPanel(panel, button, open) {
+        panel.classList.toggle('hidden', !open);
+        button.setAttribute('aria-expanded', String(open));
+    }
+    function closePanels() {
+        setPanel(searchHistoryPanel, btnSearchHistory, false);
+        setPanel(settingsPanel, btnSettings, false);
+    }
     filterInput.addEventListener('input', () => {
         clearTimeout(filterTimeout);
-        filterTimeout = setTimeout(() => {
-            loadBuses();
-            loadNavigationVehicles();
-        }, 400);
+        clearUrlFilters();
+        closePanels();
+        filterTimeout = setTimeout(applySearch, 400);
     });
     filterInput.addEventListener('keydown', event => {
-        if (event.key === 'Enter') rememberSearch(filterInput.value);
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            rememberSearch(filterInput.value);
+            closePanels();
+            applySearch();
+        }
     });
-    filterInput.addEventListener('change', () => rememberSearch(filterInput.value));
-
     renderSearchHistory();
-    btnSearchHistory.addEventListener('click', () => searchHistoryPanel.classList.toggle('hidden'));
+    btnSearchHistory.addEventListener('click', () => {
+        const open = searchHistoryPanel.classList.contains('hidden');
+        closePanels();
+        setPanel(searchHistoryPanel, btnSearchHistory, open);
+    });
     searchHistoryPanel.addEventListener('click', event => {
+        if (event.target.closest('[data-clear-history]')) {
+            localStorage.removeItem(SEARCH_HISTORY_KEY);
+            renderSearchHistory();
+            btnSearchHistory.focus();
+            return;
+        }
+        const remove = event.target.closest('[data-remove-history]');
+        if (remove) {
+            const history = getSearchHistory();
+            history.splice(Number(remove.dataset.removeHistory), 1);
+            localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+            renderSearchHistory();
+            btnSearchHistory.focus();
+            return;
+        }
         const item = event.target.closest('[data-query]');
         if (!item) return;
         filterInput.value = item.dataset.query;
+        clearUrlFilters();
         rememberSearch(filterInput.value);
-        searchHistoryPanel.classList.add('hidden');
-        loadBuses();
-        loadNavigationVehicles();
+        closePanels();
+        filterInput.focus();
+        applySearch();
     });
+    btnSettings.addEventListener('click', () => {
+        const open = settingsPanel.classList.contains('hidden');
+        closePanels();
+        setPanel(settingsPanel, btnSettings, open);
+    });
+    settingsPanel.querySelector('[data-close-panel]').addEventListener('click', () => {
+        closePanels();
+        btnSettings.focus();
+    });
+    document.addEventListener('click', event => {
+        if (!event.target.closest('#map-toolbar')) closePanels();
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            if (settingsPanel.contains(document.activeElement)) btnSettings.focus();
+            if (searchHistoryPanel.contains(document.activeElement)) btnSearchHistory.focus();
+            closePanels();
+        }
+    });
+    updateSearchFields();
+    fieldSwitches.forEach(input => input.addEventListener('change', () => {
+        searchFields[input.dataset.searchField] = input.checked;
+        localStorage.setItem('actv-live-map-search-fields', JSON.stringify(searchFields));
+        updateSearchFields();
+        applySearch();
+    }));
     busDetailsClose.addEventListener('click', () => busDetailsPanel.classList.add('hidden'));
     btnMyPosition.addEventListener('click', showUserPosition);
 
     filterClear.addEventListener('click', () => {
         filterInput.value = '';
+        clearTimeout(filterTimeout);
+        filterInput.focus();
         // Pulisci anche parametri URL
-        window.history.replaceState({}, '', window.location.pathname);
+        clearUrlFilters();
         loadBuses();
         loadNavigationVehicles();
     });
@@ -493,8 +591,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     updateNdToggle();
-    btnToggleNd.addEventListener('click', () => {
-        ndHidden = !ndHidden;
+    btnToggleNd.addEventListener('change', () => {
+        ndHidden = !btnToggleNd.checked;
         localStorage.setItem('actv-live-map-hide-nd', ndHidden ? 'true' : 'false');
         updateNdToggle();
         loadBuses();
@@ -969,19 +1067,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Filtro ─────────────────────────────────────────────────
 
     function filterBuses(buses, query) {
-        if (!query) return buses;
-        const q = query.toLowerCase().trim();
-        return buses.filter(b =>
-            b.route_short_name.toLowerCase().includes(q) ||
-            b.trip_id.toLowerCase().includes(q) ||
-            (b.route_id + '').toLowerCase().includes(q) ||
-            b.trip_headsign.toLowerCase().includes(q)
-        );
+        return buses.filter(bus => matchesVehicleFilter(bus, query, new URLSearchParams(window.location.search), searchFields));
     }
 
     // ── Pool di fetch e Caricamento ───────────────────────────
 
     async function loadNavigationVehicles() {
+        const version = ++navigationLoadVersion;
         window.ACTVPerf?.mark('navigation-load-start');
         if (serviceMode === 'automobilistico') { clearNavigationMarkers(); return; }
         try {
@@ -989,6 +1081,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/navigation/vehicles', { cache: 'no-store' });
             if (!response.ok) throw new Error('Posizioni navigazione non disponibili');
             const vehicles = await response.json();
+            if (version !== navigationLoadVersion) return;
             if (serviceMode === 'automobilistico') { clearNavigationMarkers(); return; }
             const active = new Set();
             const query = filterInput.value.trim().toLowerCase();
@@ -999,7 +1092,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!id) return;
                 if (!validVehiclePosition(vehicle)) return;
                 if (!rawLine && ndHidden) return;
-                if (!matchesVehicleFilter(vehicle, query, new URLSearchParams(window.location.search))) return;
+                if (!matchesVehicleFilter(vehicle, query, new URLSearchParams(window.location.search), searchFields)) return;
                 active.add(id);
                 const lineName = navigationLineName(vehicle);
                 const color = navigationColors.get(String(vehicle.route_id || '')) || navigationColors.get(lineName) || '#5B5B5B';
@@ -1014,6 +1107,7 @@ document.addEventListener('DOMContentLoaded', () => {
             navigationMarkers.forEach((marker, id) => { if (!active.has(id)) { map.removeLayer(marker); navigationMarkers.delete(id); } });
             window.ACTVPerf?.mark('navigation-load-end', { vehicles: navigationMarkers.size });
         } catch (error) {
+            if (version !== navigationLoadVersion) return;
             clearNavigationMarkers();
             console.warn('Veicoli Navigazione non disponibili:', error);
         }
@@ -1053,7 +1147,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // un bollino N/D sulla mappa.
             if (!rawLine && !vehicle.route_guess && ndHidden) return;
             const lineName = (rawLine.replace(/_(?:UN|EN|US|UM|UL|ES)$/i, '') || 'N/D') + (vehicle.route_guess ? ' ?' : '');
-            if (!matchesVehicleFilter(vehicle, query, new URLSearchParams(window.location.search))) return;
+            if (!matchesVehicleFilter(vehicle, query, new URLSearchParams(window.location.search), searchFields)) return;
             const id = vehicleKey(vehicle);
             if (!id) return;
             active.add(id); shown++;
@@ -1101,17 +1195,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const allBuses = data.buses || [];
             
-            // Applica filtri da input e URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const lineFilter = urlParams.get('line');
-            const tripFilter = urlParams.get('tripId');
-            const destFilter = urlParams.get('destination');
-
-            let buses = filterBuses(allBuses, filterInput.value);
-
-            if (lineFilter) buses = buses.filter(b => b.route_short_name === lineFilter);
-            if (tripFilter) buses = buses.filter(b => b.trip_id === tripFilter);
-            if (destFilter) buses = buses.filter(b => b.trip_headsign.toLowerCase().includes(destFilter.toLowerCase()));
+            const buses = filterBuses(allBuses, filterInput.value);
 
             if (buses.length === 0) {
                 // Pulisci tutto se nessun bus trovato

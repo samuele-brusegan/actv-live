@@ -74,3 +74,80 @@ test('azzera i marker se falliscono sia il feed sia il fallback', async () => {
     expect(active.size).toBe(0);
     expect(document.getElementById('counter-text').textContent).toBe('Errore di caricamento');
 });
+
+test('ricerca multipla e switch filtrano i marker realtime e salvano le preferenze', async () => {
+    context.fetch.mockResolvedValue(response({vehicles:[gps('A',{route_short_name:'5E'}),gps('B',{route_short_name:'21'}),gps('C',{route_short_name:'121'})]}));
+    initialize(); await settle();
+    const input = document.getElementById('filter-input');
+    input.value = '5E, 21';
+    input.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter'})); await settle();
+    expect(active.size).toBe(2);
+    document.getElementById('search-field-line').click(); await settle();
+    expect(active.size).toBe(0);
+    expect(JSON.parse(localStorage.getItem('actv-live-map-search-fields')).line).toBe(false);
+});
+
+test('bus e vaporetto si attivano insieme e mantengono almeno un servizio', async () => {
+    context.fetch.mockResolvedValue(response({vehicles:[]}));
+    initialize(); await settle();
+    const bus = document.querySelector('[data-service="automobilistico"]');
+    const boat = document.querySelector('[data-service="navigation"]');
+    expect(bus.getAttribute('aria-pressed')).toBe('true');
+    expect(boat.getAttribute('aria-pressed')).toBe('false');
+    boat.click(); await settle();
+    expect(bus.getAttribute('aria-pressed')).toBe('true');
+    expect(boat.getAttribute('aria-pressed')).toBe('true');
+    bus.click(); await settle();
+    expect(localStorage.getItem('actv-live-map-service')).toBe('navigation');
+    boat.click(); await settle();
+    expect(boat.getAttribute('aria-pressed')).toBe('true');
+});
+
+test('cronologia confermata, richiamabile, rimovibile e svuotabile senza perdere la ricerca', async () => {
+    context.fetch.mockResolvedValue(response({vehicles:[gps('A')]}));
+    initialize(); await settle();
+    const input = document.getElementById('filter-input');
+    for (const query of ['5E, 21', '6']) {
+        input.value=query;
+        input.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter'})); await settle();
+    }
+    document.getElementById('btn-search-history').click();
+    expect(document.getElementById('btn-search-history').getAttribute('aria-expanded')).toBe('true');
+    document.querySelector('[data-query="5E, 21"]').click(); await settle();
+    expect(input.value).toBe('5E, 21');
+    document.querySelector('[data-remove-history="0"]').click();
+    expect(JSON.parse(localStorage.getItem('actv-live-map-search-history'))).toEqual(['6']);
+    document.querySelector('[data-clear-history]').click();
+    expect(document.querySelector('.search-history-empty')).not.toBeNull();
+    expect(input.value).toBe('5E, 21');
+});
+
+test('impostazioni e cronologia si escludono e N/D è un interruttore persistente', async () => {
+    context.fetch.mockResolvedValue(response({vehicles:[gps('A',{route_short_name:'',route_id:''})]}));
+    initialize(); await settle();
+    expect(active.size).toBe(0);
+    document.getElementById('btn-map-settings').click();
+    expect(document.getElementById('map-settings-panel').classList.contains('hidden')).toBe(false);
+    document.getElementById('btn-toggle-nd').click(); await settle();
+    expect(active.size).toBe(1);
+    expect(localStorage.getItem('actv-live-map-hide-nd')).toBe('false');
+    document.getElementById('btn-search-history').click();
+    expect(document.getElementById('map-settings-panel').classList.contains('hidden')).toBe(true);
+});
+
+test('la stessa ricerca multipla e i campi si applicano anche ai vaporetti', async () => {
+    localStorage.setItem('actv-live-map-service', 'navigation');
+    // Il valore del servizio viene letto quando si inizializza la pagina.
+    context.fetch.mockImplementation(async url => {
+        if (url === '/api/navigation/vehicles') return response([gps('boat-A',{route_short_name:'5E'}),gps('boat-B',{route_short_name:'21'}),gps('boat-C',{route_short_name:'121'})]);
+        if (url.includes('/api/realtime/vehicles')) return response({vehicles:[]});
+        return response([]);
+    });
+    initialize(); await settle();
+    const input=document.getElementById('filter-input');
+    input.value='5E, 21';
+    input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'})); await settle();
+    expect(active.size).toBe(2);
+    document.getElementById('search-field-line').click(); await settle();
+    expect(active.size).toBe(0);
+});

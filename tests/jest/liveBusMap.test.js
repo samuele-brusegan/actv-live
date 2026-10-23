@@ -52,3 +52,26 @@ describe('identità, freschezza e filtri dei veicoli', () => {
         expect(matchesVehicleFilter(vehicle, '', new URLSearchParams('destination=Mestre'))).toBe(false);
     });
 });
+
+describe('ricerca multipla e campi selezionabili', () => {
+    const fields = { line: true, destination: false, tripId: false };
+    test('cerca più linee esatte senza includere linee con numeri simili', () => {
+        for (const line of ['5E', '21', '5E_UN']) {
+            expect(matchesVehicleFilter({route_short_name: line}, '5e, 21', undefined, fields)).toBe(true);
+        }
+        expect(matchesVehicleFilter({route_short_name: '121'}, '5E, 21', undefined, fields)).toBe(false);
+    });
+    test('interroga soltanto i campi abilitati, con OR tra termini e campi', () => {
+        const bus = { route_short_name: '21', trip_headsign: 'Venezia Piazzale Roma', trip_id: 'corsa-123' };
+        expect(matchesVehicleFilter(bus, 'Roma', undefined, fields)).toBe(false);
+        expect(matchesVehicleFilter(bus, 'Mestre, roma', undefined, {destination: true})).toBe(true);
+        expect(matchesVehicleFilter(bus, '123', undefined, {tripId: true})).toBe(true);
+        expect(matchesVehicleFilter(bus, '21', undefined, {})).toBe(false);
+        expect(matchesVehicleFilter(bus, '', undefined, {})).toBe(true);
+        expect(matchesVehicleFilter({}, '21')).toBe(false);
+    });
+    test('mantiene i vincoli dei link con tutti i campi disattivati', () => {
+        expect(matchesVehicleFilter({trip_id:'t1'}, 't1', new URLSearchParams('tripId=t1'), {})).toBe(true);
+        expect(matchesVehicleFilter({trip_id:'t2'}, 't1', new URLSearchParams('tripId=t1'), {})).toBe(false);
+    });
+});
