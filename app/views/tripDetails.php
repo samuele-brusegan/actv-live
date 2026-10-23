@@ -10,6 +10,7 @@
         <link rel="stylesheet" href="/css/structure/structure-tripDetails.css">
         <link rel="stylesheet" href="/css/tripDetails.css?v=<?php echo filemtime(BASE_PATH . '/public/css/tripDetails.css'); ?>">
         <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        <script src="/js/tour.js"></script>
         <script type="text/javascript" src="/js/tripDetails.js?v=<?php echo filemtime(BASE_PATH . '/public/js/tripDetails.js'); ?>"></script>
         <script type="module" src="https://cdn.jsdelivr.net/npm/ldrs/dist/auto/hatch.js"></script>
     </head>

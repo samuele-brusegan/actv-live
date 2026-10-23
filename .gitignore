@@ -9,3 +9,9 @@ bak*
 node_modules/
 vendor/
 .phpunit.cache/
+.agents/
+.claude/
+.codex/
+.github/agents/
+.github/hooks/
+.github/skills/

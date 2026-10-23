@@ -26,6 +26,7 @@
 	<link rel="stylesheet" href="<?=URL_PATH?>/css/structure/structure-style.css">
 	<link rel="stylesheet" href="<?=URL_PATH?>/css/style.css">
 	<link rel="stylesheet" href="<?=URL_PATH?>/css/app-shell.css">
+	<link rel="stylesheet" href="<?=URL_PATH?>/css/tour.css">
 
 	<!--PWA-->
 	<link rel="icon" type="image/png" href="<?=URL_PATH?>/pwa/favicon-96x96.png" sizes="96x96" />

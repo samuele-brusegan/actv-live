@@ -113,10 +113,7 @@
                 </a>
             </div>
             <div id="important-info-btn" class="hidden">!</div>
-            <div id="important-info-toast" style="display: none;">
-                <h6>Attenzione!</h6>
-                
-            </div>
+            <div id="important-info-toast" style="display: none;"></div>
 
             <div class="mit-licence" id="footer-licence">
                 MIT License (2025–2026)
@@ -125,8 +122,8 @@
                 Grafica e design da <a href="https://github.com/andreadavanzo09-bit">Andrea Davanzo</a> <br>
                 <br>
                 <a href="https://github.com/samuele-brusegan/actv-live">GitHub</a> ·
-                <a href="/credits">Crediti e licenze</a>
-                <hr>
+                <a href="/credits">Crediti e licenze</a> <br>
+                <br>
                 <small>Progetto non ufficiale, non affiliato ad ACTV S.p.A.<br>Dati mappe © OpenStreetMap contributors</small>
             </div>
 

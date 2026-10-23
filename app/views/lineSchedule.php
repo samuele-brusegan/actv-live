@@ -3,64 +3,38 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Orari Linea - ACTV</title>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+        <title>Orari delle linee - ACTV</title>
         <?php require COMMON_HTML_HEAD; ?>
         <link rel="stylesheet" href="/css/lineSchedule.css">
-        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        <script src="/js/tour.js"></script>
         <script defer src="/js/lineSchedule.js"></script>
     </head>
-    <body>
-
-        <!-- Header -->
-        <div class="header-green">
-            <div style="height: 20px;">
-                <a href="/" style="color: white; text-decoration: none; font-size: 24px;">&larr;</a>
+    <body class="schedule-page">
+        <header class="header-green schedule-brand">
+            <div class="schedule-header">
+                <a href="/" class="schedule-back" aria-label="Torna alla home">&larr;</a>
+                <div><h1>Orari delle linee</h1><p>Tutti i percorsi e le corse, in un unico orario.</p></div>
             </div>
-            <div class="header-title">Orari<br>Linea</div>
-        </div>
-
-        <div class="main-content container py-3">
-
-            <div class="service-switch mb-3" role="group" aria-label="Servizio">
-                <button type="button" class="btn btn-outline-primary service-btn" data-service="automobilistico">Automobilistico</button>
-                <button type="button" class="btn btn-outline-primary service-btn" data-service="navigation">Navigazione</button>
+        </header>
+        <main class="schedule-main">
+            <section class="schedule-controls" aria-label="Scegli il servizio e la linea">
+                <div class="service-switch" role="group" aria-label="Servizio">
+                    <button type="button" class="service-switch-btn" data-service="automobilistico" aria-label="Autobus" title="Autobus" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="16" rx="3"/><path d="M5 11h14M9 3v8M7 19v2m10-2v2M8 15h1m6 0h1"/></svg></button>
+                    <button type="button" class="service-switch-btn" data-service="navigation" aria-label="Vaporetti" title="Vaporetti" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13V7h14v6M9 7V4h6v3M3 14l9-3 9 3-3 5H6zM2 21q2-2 4 0t4 0 4 0 4 0 4 0 4 0"/></svg></button>
+                </div>
+                <div class="line-picker">
+                    <div><label for="line-search">Cerca linea</label><input type="search" id="line-search" class="form-control" placeholder="Numero o destinazione" autocomplete="off" aria-controls="line-input"></div>
+                    <div><label for="line-input">Linea</label><select id="line-input" class="form-select" disabled><option value="">Caricamento linee…</option></select></div>
+                </div>
+            </section>
+            <div id="status" class="alert alert-info d-none" role="status" aria-live="polite"></div>
+            <div class="schedule-workspace">
+                <aside id="variants" aria-label="Direzione e percorso"></aside>
+                <section id="variant-detail" aria-label="Orario completo" aria-live="polite">
+                    <div class="schedule-empty"><h2>Da quale linea partiamo?</h2><p>Scegli una linea per consultare percorsi, fermate e tutti gli orari disponibili.</p></div>
+                </section>
             </div>
-
-            <!-- Selettori: linea, data, ora -->
-            <div class="row g-2 align-items-end mb-3">
-                <div class="col-12 col-sm-4">
-                    <label for="line-search" class="form-label">Cerca linea</label>
-                    <input type="search" id="line-search" class="form-control" placeholder="es. 5E" autocomplete="off">
-                    <select id="line-input" class="form-select mt-2" aria-label="Linea" disabled>
-                        <option value="">Seleziona una linea</option>
-                    </select>
-                </div>
-                <div class="col-6 col-sm-3">
-                    <label for="date-input" class="form-label">Giorno</label>
-                    <input type="date" id="date-input" class="form-control" value="<?= date('Y-m-d') ?>">
-                </div>
-                <div class="col-6 col-sm-3">
-                    <label for="time-input" class="form-label">Ora</label>
-                    <input type="time" id="time-input" class="form-control" value="<?= date('H:i') ?>">
-                </div>
-                <div class="col-12 col-sm-2">
-                    <button id="load-btn" class="btn btn-primary w-100" disabled>Mostra orari</button>
-                </div>
-            </div>
-
-            <div id="weekday-hint" class="text-muted small mb-3"></div>
-            <div id="feed-meta" class="small text-muted mb-3"></div>
-
-            <!-- Stato / errori -->
-            <div id="status" class="alert alert-info d-none" role="alert"></div>
-
-            <!-- Lista varianti di percorso -->
-            <div id="variants" class="mb-4"></div>
-
-            <!-- Dettaglio variante selezionata (fermate + orari) -->
-            <div id="variant-detail"></div>
-
-        </div>
+            <div id="feed-meta" class="schedule-feed"></div>
+        </main>
     </body>
 </html>

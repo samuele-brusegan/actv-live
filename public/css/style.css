@@ -292,6 +292,11 @@ body {
     background: #013d99;
 }
 
+/* Le utility di Bootstrap devono vincere sul radius imposto da .btn/.btn-primary */
+.btn.rounded-pill {
+    border-radius: var(--bs-border-radius-pill, 50rem);
+}
+
 .btn-outline-primary {
     background: var(--color-bg-gray);
     color: var(--color-primary-blue);

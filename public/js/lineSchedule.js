@@ -1,7 +1,6 @@
 /*
  * Pagina "Orari Linea": dato un route_short_name mostra le varianti di
- * percorso, e per la variante scelta gli orari del giorno per ogni fermata
- * piu i bus previsti nella prossima ora.
+ * percorso e tutti gli orari disponibili nel feed, con giorni di validità.
  */
 (function (root, factory) {
     const api = factory();
@@ -88,12 +87,23 @@
         return groups;
     }
 
+    /** A GTFS trip may be repeated for several service calendars. Keep one
+     * column per identical sequence of times, retaining every validity label. */
+    function groupIdenticalRuns(runs) {
+        const groups = new Map();
+        runs.forEach(run => {
+            const key = JSON.stringify(run.times);
+            if (!groups.has(key)) groups.set(key, { ...run, calendars: new Set() });
+            groups.get(key).calendars.add(run.calendar || 'Validità non disponibile');
+        });
+        return Array.from(groups.values(), ({ calendars, ...run }) => ({
+            ...run, calendar: Array.from(calendars).join(' / ')
+        }));
+    }
+
     function init(window) {
 (function () {
     'use strict';
-
-    const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const WEEKDAYS_IT = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
 
     let state = {
         line: '',
@@ -102,63 +112,54 @@
         selectedTrips: [], // trip_id rappresentativi del giro selezionato
     };
 
-    let pendingMinimaps = [];   // minimappe da inizializzare (lazy)
-    let minimapObserver = null; // IntersectionObserver condiviso
+    let catalogRequest = 0;
+    let variantsRequest = 0;
+    let scheduleRequest = 0;
+    let variants = [];
 
     function $(id) { return document.getElementById(id); }
 
-    function getDay() {
-        const d = $('date-input').value; // YYYY-MM-DD
-        if (!d) return WEEKDAYS[new Date().getDay()];
-        const date = new Date(d + 'T00:00:00');
-        return WEEKDAYS[date.getDay()];
-    }
-
-    function getDate() {
-        return $('date-input').value || '';
-    }
-
     function renderFeedMeta(updatedAt) {
-        const label = state.service === 'navigation' ? 'Navigazione' : 'Automobilistico';
-        const stale = updatedAt && (Date.now() - new Date(updatedAt).getTime() > 48 * 3600 * 1000);
-        $('feed-meta').className = 'small mb-3' + (stale ? ' feed-warning' : ' text-muted');
-        $('feed-meta').innerHTML = 'Servizio: <strong>' + esc(label) + '</strong> · Orari del ' + esc(getDate()) +
-            (updatedAt ? ' · Feed aggiornato: ' + esc(new Date(updatedAt).toLocaleString('it-IT')) + (stale ? ' · dati potenzialmente non aggiornati' : '') : ' · aggiornamento feed non disponibile');
+        $('feed-meta').textContent = 'Orari programmati del feed · Tutti i giorni di servizio' +
+            (updatedAt ? ' · Aggiornamento: ' + new Date(updatedAt).toLocaleDateString('it-IT') : ' · Aggiornamento non disponibile');
+    }
+
+    function filterCatalog() {
+        const needle = $('line-search').value.trim().toLocaleLowerCase('it');
+        const lines = state.catalog.filter(l => !needle || (l.line + ' ' + l.name).toLocaleLowerCase('it').includes(needle));
+        $('line-input').innerHTML = '<option value="">' + (lines.length ? 'Seleziona una linea' : 'Nessuna linea trovata') + '</option>' +
+            lines.map(l => '<option value="' + esc(l.line) + '">' + esc(l.line) + ' — ' + esc(l.name || 'Linea ' + l.line) + '</option>').join('');
+        if (lines.some(l => l.line === state.line)) $('line-input').value = state.line;
     }
 
     async function loadCatalog() {
-        const select = $('line-input'); select.disabled = true; $('load-btn').disabled = true;
+        const request = ++catalogRequest;
+        ++variantsRequest; ++scheduleRequest;
+        state.catalog = []; state.selectedTrips = [];
+        $('variants').innerHTML = ''; $('variant-detail').innerHTML = '';
+        $('line-input').disabled = true;
+        $('line-input').innerHTML = '<option>Caricamento linee…</option>';
+        setStatus('Caricamento linee…', 'info');
         try {
-            const data = await fetchJson('/api/line-catalog?service=' + encodeURIComponent(state.service) + '&date=' + encodeURIComponent(getDate()));
-            if (!data.success) throw new Error(data.error || 'catalog');
+            const data = await fetchJson('/api/line-catalog?all=1&service=' + encodeURIComponent(state.service));
+            if (request !== catalogRequest) return;
+            if (!data.success || data.feed_available === false) throw new Error('catalog');
             state.catalog = data.lines || []; renderFeedMeta(data.updated_at);
-            if (data.feed_available === false) {
-                select.innerHTML = '<option value="">Feed non disponibile</option>';
-                setStatus(data.error || 'Feed non disponibile per questo servizio.', 'warning');
-                return;
+            filterCatalog(); $('line-input').disabled = false;
+            if ($('line-input').value) loadVariants();
+            else {
+                setStatus(state.catalog.length ? '' : 'Nessuna linea disponibile per questo servizio.', 'info');
+                $('variant-detail').innerHTML = '<div class="schedule-empty"><h2>Da quale linea partiamo?</h2><p>Scegli una linea per vedere tutte le corse. Le indicazioni di validità distinguono i giorni di servizio.</p></div>';
             }
-            const needle = ($('line-search').value || '').trim().toLocaleLowerCase('it');
-            const lines = state.catalog.filter(l => !needle || (l.line + ' ' + l.name).toLocaleLowerCase('it').includes(needle));
-            select.innerHTML = '<option value="">Seleziona una linea</option>' + lines.map(l => '<option value="' + esc(l.line) + '">' + esc(l.line) + ' — ' + esc(l.name || 'senza descrizione') + ' (' + l.variants_count + ' varianti, ' + l.trips_count + ' corse)</option>').join('');
-            if (lines.some(l => l.line === state.line)) select.value = state.line;
-            else { state.line = ''; $('variants').innerHTML = ''; $('variant-detail').innerHTML = ''; }
-            select.disabled = false; $('load-btn').disabled = !select.value;
-            if (select.value) loadVariants(); else setStatus('Seleziona una linea del servizio attivo.', 'info');
         } catch (e) {
-            state.catalog = []; select.innerHTML = '<option value="">Catalogo non disponibile</option>';
-            setStatus('Catalogo linee non disponibile per questo servizio/data.', 'warning'); renderFeedMeta(null);
+            if (request !== catalogRequest) return;
+            $('line-input').innerHTML = '<option value="">Linee non disponibili</option>';
+            setStatus('Impossibile caricare le linee. Riprova oppure cambia servizio.', 'warning');
+            const retry = document.createElement('button');
+            retry.type = 'button'; retry.className = 'btn btn-outline-primary ms-2'; retry.textContent = 'Riprova';
+            retry.addEventListener('click', loadCatalog); $('status').appendChild(retry);
+            renderFeedMeta(null);
         }
-    }
-
-    function getTime() {
-        return $('time-input').value || '00:00';
-    }
-
-    function updateWeekdayHint() {
-        const d = $('date-input').value;
-        if (!d) { $('weekday-hint').textContent = ''; return; }
-        const date = new Date(d + 'T00:00:00');
-        $('weekday-hint').textContent = 'Giorno selezionato: ' + WEEKDAYS_IT[date.getDay()];
     }
 
     function setStatus(msg, type) {
@@ -182,244 +183,104 @@
 
     /** Carica e mostra le varianti di percorso della linea. */
     async function loadVariants() {
-        const line = $('line-input').value.trim();
-        if (!line) { setStatus('Inserisci una linea (es. 5E).', 'warning'); return; }
-
-        state.line = line;
-        state.selectedTrips = [];
-        $('variant-detail').innerHTML = '';
-        $('variants').innerHTML = '';
-        setStatus('Caricamento varianti...', 'info');
-
+        const line = $('line-input').value;
+        const request = ++variantsRequest; ++scheduleRequest;
+        state.line = line; state.selectedTrips = [];
+        $('variants').innerHTML = ''; $('variant-detail').innerHTML = '';
+        if (!line) { setStatus('Seleziona una linea.', 'info'); return; }
+        setStatus('Caricamento percorsi…', 'info');
         try {
-            const data = await fetchJson('/api/line-variants?line=' + encodeURIComponent(line) +
-                '&service=' + encodeURIComponent(state.service) +
-                '&day=' + encodeURIComponent(getDay()) +
-                '&date=' + encodeURIComponent(getDate()));
-            if (!data.success) { setStatus(data.error || 'Errore', 'danger'); return; }
-            if (!data.variants.length) { setStatus('Nessuna variante trovata.', 'warning'); return; }
-            setStatus('', null);
-            renderVariants(data.variants);
+            const data = await fetchJson('/api/line-variants?all=1&line=' + encodeURIComponent(line) + '&service=' + encodeURIComponent(state.service));
+            if (request !== variantsRequest) return;
+            if (!data.success) throw new Error('variants');
+            variants = data.variants || [];
+            if (!variants.length) { setStatus('Nessun percorso disponibile per questa linea.', 'warning'); return; }
+            setStatus(''); renderVariants();
         } catch (e) {
-            setStatus('Errore nel caricamento delle varianti.', 'danger');
+            if (request === variantsRequest) setStatus('Impossibile caricare i percorsi. Seleziona di nuovo la linea per riprovare.', 'danger');
         }
     }
 
-    function renderVariants(variants) {
+    function renderVariants() {
         const wrap = $('variants');
-        wrap.innerHTML = '';
-
-        // Reset minimappe in sospeso (e disconnetti l'observer precedente).
-        if (minimapObserver) { minimapObserver.disconnect(); minimapObserver = null; }
-        pendingMinimaps = [];
-
-        // 1. Raggruppa per capolinea (trip_headsign).
-        const groups = {};
-        variants.forEach(v => {
-            const key = v.headsign || v.terminus || '(senza capolinea)';
-            (groups[key] = groups[key] || []).push(v);
-        });
-
-        // 2. Ordina i capolinea in ordine alfabetico.
-        const headsigns = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'it'));
-
-        headsigns.forEach(headsign => {
-            const groupVariants = groups[headsign];
-            const routeGroups = groupVariantsByRoute(groupVariants);
-            const tripGroups = routeGroups.map((items, index) =>
-                (index + 1) + ':' + items.map(v => v.trip_id).join(',')
-            ).join('|');
-            const groupMapUrl = '/lines-map?tripGroups=' + encodeURIComponent(tripGroups);
-
-            // Intestazione del gruppo (capolinea).
-            const groupHeader = document.createElement('div');
-            groupHeader.className = 'variant-group-header mt-3 mb-2';
-            groupHeader.innerHTML = '<a class="variant-group-map-link fw-bold" href="' + esc(groupMapUrl) +
-                '" title="Mostra tutti i percorsi verso ' + esc(headsign) + ' sulla mappa">→ ' + esc(headsign) + '</a>' +
-                '<span class="text-muted small ms-2">' + routeGroups.length +
-                (routeGroups.length === 1 ? ' giro' : ' giri') + '</span>';
-            wrap.appendChild(groupHeader);
-
-            routeGroups.forEach((routeVariants, i) => {
-                const v = routeVariants.reduce((longest, item) =>
-                    (item.stops || []).length > (longest.stops || []).length ? item : longest
-                );
-                const tripIds = routeVariants.map(item => item.trip_id);
-                const origins = [...new Set([...routeVariants]
-                    .sort((a, b) => (b.stops || []).length - (a.stops || []).length)
-                    .map(item => item.origin)
-                    .filter(Boolean))];
-                const tripsCount = routeVariants.reduce((total, item) => total + item.trips_count, 0);
-                const comparableRoutes = routeGroups.map(items => items.reduce((longest, item) =>
-                    (item.stops || []).length > (longest.stops || []).length ? item : longest
-                ));
-                const card = document.createElement('div');
-                card.className = 'card variant-card mb-2';
-                const mapUrl = '/lines-map?tripGroups=' + encodeURIComponent((i + 1) + ':' + tripIds.join(','));
-
-                // "Passa per": solo le fermate che distinguono questo giro dagli altri.
-                let diffHtml = '';
-                if (comparableRoutes.length > 1) {
-                    const distinct = getDistinctiveStops(v, comparableRoutes);
-                    diffHtml = '<div class="text-muted small mt-1">Passa per: ' +
-                        (distinct.length ? esc(distinct.join(', ')) : '<em>percorso base</em>') + '</div>';
+        const headsigns = [...new Set(variants.map(v => v.headsign || v.terminus || 'Senza destinazione'))];
+        wrap.innerHTML = '<h2 class="schedule-section-title">Direzione</h2><div class="direction-list" role="group" aria-label="Direzione"></div><div id="route-options"></div>';
+        const chooseDirection = headsign => {
+            wrap.querySelectorAll('.direction-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === headsign);
+                btn.setAttribute('aria-pressed', String(btn.textContent === headsign));
+            });
+            const matching = variants.filter(v => (v.headsign || v.terminus || 'Senza destinazione') === headsign);
+            const routeGroups = groupVariantsByRoute(matching);
+            const routes = $('route-options');
+            routes.innerHTML = '<h3 class="schedule-section-title">' + (routeGroups.length > 1 ? 'Scegli il percorso' : 'Percorso') + '</h3>';
+            routeGroups.forEach((items, index) => {
+                const longest = items.reduce((a, b) => a.stops.length >= b.stops.length ? a : b);
+                const button = document.createElement('button');
+                button.type = 'button'; button.className = 'route-choice';
+                const origins = [...new Set(items.map(v => v.origin).filter(Boolean))];
+                button.innerHTML = '<span class="route-choice-name">' + esc(origins.join(' / ') || 'Partenza') + ' → ' + esc(longest.terminus || headsign) + '</span><span class="route-choice-meta">' + longest.stops.length + ' fermate · ' + items.reduce((sum,v) => sum + v.trips_count,0) + (items.reduce((sum,v) => sum + v.trips_count,0) === 1 ? ' corsa nel feed</span>' : ' corse nel feed</span>');
+                if (routeGroups.length > 1) {
+                    const distinct = getDistinctiveStops(longest, routeGroups.map(g => g[0]));
+                    if (distinct.length) button.innerHTML += '<span class="route-choice-via">Via ' + esc(distinct.join(', ')) + '</span>';
                 }
-
-                const clockSvg = '<svg viewBox="0 -960 960 960" width="16" height="16" fill="currentColor" aria-hidden="true">' +
-                    '<path d="M520-496v-144q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640v160q0 8 3 15.5t9 13.5l128 128q11 11 28 11t28-11q11-11 11-28t-11-28L520-496Zm-40 376q-75 0-140.5-28.5t-114-77q-48.5-48.5-77-114T120-480q0-75 28.5-140.5t77-114q48.5-48.5 114-77T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-120Z"/>' +
-                    '</svg>';
-
-                card.innerHTML =
-                    '<div class="card-body py-2">' +
-                        '<div class="d-flex align-items-center gap-2 flex-nowrap">' +
-                            '<div class="flex-grow-1" style="min-width:0">' +
-                                '<div class="fw-semibold text-truncate">' +
-                                    esc(origins.join(' / ') || '?') + ' → ' + esc(v.terminus || '?') +
-                                    (routeVariants.length > 1 ? ' <span class="badge text-bg-secondary ms-2">merged</span>' : '') +
-                                '</div>' +
-                                '<div class="text-muted small">' + v.stops_count + ' fermate max · ' + tripsCount + ' corse/giorno</div>' +
-                                diffHtml +
-                            '</div>' +
-                            '<div class="variant-minimap flex-shrink-0" role="button" tabindex="0" title="Apri sulla mappa"></div>' +
-                            '<button class="btn btn-sm btn-primary variant-orari-btn text-nowrap flex-shrink-0 d-inline-flex align-items-center gap-1">' +
-                                clockSvg +
-                            '</button>' +
-                        '</div>' +
-                    '</div>';
-
-                card.querySelector('.variant-orari-btn').addEventListener('click', () => {
-                    state.selectedTrips = tripIds;
-                    document.querySelectorAll('.variant-card').forEach(c => c.classList.remove('border-primary'));
-                    card.classList.add('border-primary');
-                    loadSchedule();
+                button.addEventListener('click', () => {
+                    routes.querySelectorAll('.route-choice').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
+                    button.classList.add('active'); button.setAttribute('aria-pressed', 'true');
+                    state.selectedTrips = items.map(v => v.trip_id); loadSchedule();
                 });
-
-                // Minimappa del percorso (frozen, cliccabile -> mappa grande).
-                const coords = (v.stops || [])
-                    .map(s => [parseFloat(s.lat), parseFloat(s.lng)])
-                    .filter(c => !isNaN(c[0]) && !isNaN(c[1]));
-                pendingMinimaps.push({ el: card.querySelector('.variant-minimap'), coords, url: mapUrl, tripId: v.trip_id });
-
-                wrap.appendChild(card);
+                routes.appendChild(button);
+                if (index === 0) button.click();
             });
+        };
+        headsigns.forEach(headsign => {
+            const button = document.createElement('button');
+            button.type = 'button'; button.className = 'direction-btn'; button.textContent = headsign;
+            button.addEventListener('click', () => chooseDirection(headsign));
+            wrap.querySelector('.direction-list').appendChild(button);
         });
-
-        initMinimaps();
+        chooseDirection(headsigns[0]);
     }
 
-    /**
-     * Inizializza le minimappe in modo lazy (solo quando entrano nel viewport)
-     * per non creare decine di mappe Leaflet tutte insieme.
-     */
-    function initMinimaps() {
-        if (typeof L === 'undefined') return; // Leaflet non disponibile
-        if (!('IntersectionObserver' in window)) {
-            pendingMinimaps.forEach(createMinimap);
-            return;
-        }
-        const byEl = new Map(pendingMinimaps.map(m => [m.el, m]));
-        minimapObserver = new IntersectionObserver((entries, obs) => {
-            entries.forEach(e => {
-                if (!e.isIntersecting) return;
-                const spec = byEl.get(e.target);
-                if (spec) createMinimap(spec);
-                obs.unobserve(e.target);
-            });
-        }, { rootMargin: '100px' });
-        pendingMinimaps.forEach(m => minimapObserver.observe(m.el));
-    }
-
-    /** Crea una minimappa frozen centrata sul percorso (shape snappata su strada). */
-    async function createMinimap(spec) {
-        const { el, coords, url, tripId } = spec;
-        if (!el || el.dataset.init === '1') return;
-        el.dataset.init = '1';
-
-        // Usa la shape snappata sulle strade; fallback ai segmenti tra fermate.
-        let path = coords;
-        try {
-            const res = await fetch('/api/lines-shapes?tripId=' + encodeURIComponent(tripId));
-            if (res.ok) {
-                const shapes = await res.json();
-                const sh = shapes && shapes[0] && shapes[0].shape;
-                if (Array.isArray(sh) && sh.length > 1) {
-                    const pts = sh.map(p => [parseFloat(p.lat), parseFloat(p.lng)])
-                        .filter(c => !isNaN(c[0]) && !isNaN(c[1]));
-                    if (pts.length > 1) path = pts;
-                }
-            }
-        } catch (e) { /* fallback alle fermate */ }
-
-        if (!path.length) { el.classList.add('minimap-empty'); return; }
-
-        const mini = L.map(el, {
-            zoomControl: false,
-            attributionControl: true,
-            dragging: false,
-            scrollWheelZoom: false,
-            doubleClickZoom: false,
-            boxZoom: false,
-            keyboard: false,
-            touchZoom: false,
-            tap: false,
-            zoomSnap: 0
-        });
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(mini);
-
-        const line = L.polyline(path, { color: '#0d6efd', weight: 3, opacity: 0.9 }).addTo(mini);
-        // Marker leggeri ai capolinea.
-        L.circleMarker(path[0], { radius: 3, color: '#198754', fillOpacity: 1 }).addTo(mini);
-        L.circleMarker(path[path.length - 1], { radius: 3, color: '#dc3545', fillOpacity: 1 }).addTo(mini);
-
-        // Centra sul percorso e blocca lo zoom/pan ai bounds correnti.
-        mini.fitBounds(line.getBounds(), { padding: [6, 6] });
-        setTimeout(() => mini.invalidateSize(), 0);
-
-        // Clic sulla minimappa -> mappa grande con questo percorso.
-        const go = () => { window.location.href = url; };
-        mini.on('click', go);
-        el.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') go(); });
-    }
-
-    /** Carica gli orari del giorno per la variante selezionata. */
+    /** Carica tutti gli orari per la variante selezionata. */
     async function loadSchedule() {
         if (!state.selectedTrips.length) return;
-        const day = getDay();
+        const request = ++scheduleRequest;
         const detail = $('variant-detail');
         detail.innerHTML = '<div class="text-muted">Caricamento orari...</div>';
 
         try {
-            const url = '/api/line-schedule?line=' + encodeURIComponent(state.line) +
+            const url = '/api/line-schedule?all=1&line=' + encodeURIComponent(state.line) +
                 '&service=' + encodeURIComponent(state.service) +
-                '&trips=' + encodeURIComponent(state.selectedTrips.join(',')) +
-                '&day=' + encodeURIComponent(day) +
-                '&date=' + encodeURIComponent(getDate());
+                '&trips=' + encodeURIComponent(state.selectedTrips.join(','));
             const data = await fetchJson(url);
+            if (request !== scheduleRequest) return;
             if (!data.success) { detail.innerHTML = '<div class="alert alert-danger">' + esc(data.error) + '</div>'; return; }
             renderSchedule(data);
         } catch (e) {
-            detail.innerHTML = '<div class="alert alert-danger">Errore nel caricamento degli orari.</div>';
+            if (request === scheduleRequest) detail.innerHTML = '<div class="alert alert-danger">Errore nel caricamento degli orari. Seleziona di nuovo il percorso per riprovare.</div>';
         }
     }
 
     /**
-     * Disegna la tabella orari: righe = fermate, colonne = corse del giorno.
+     * Disegna la tabella orari: righe = fermate, colonne = tutte le corse del feed.
      * Ogni cella contiene l'orario di passaggio della corsa a quella fermata.
      */
     function renderSchedule(data) {
         const detail = $('variant-detail');
         const stops = data.stops || [];
-        const runs = data.runs || [];
+        const runs = groupIdenticalRuns(data.runs || []);
 
-        detail.innerHTML =
-            '<h5 class="mb-1">Orari linea ' + esc(state.line) + ' → ' + esc(data.headsign || '') + '</h5>' +
-            '<div class="text-muted small mb-2">' + stops.length + ' fermate · ' + runs.length + ' corse · clicca una fermata per i bus della prossima ora</div>';
-
+        const calendars = [...new Set(runs.map(r => r.calendar || 'Validità non disponibile'))];
+        const mapUrl = '/lines-map?tripGroups=' + encodeURIComponent('1:' + state.selectedTrips.join(','));
+        detail.innerHTML = '<div class="schedule-result-heading"><div><h2>Linea ' + esc(state.line) + ' <span>→ ' + esc(data.headsign || '') + '</span></h2><p>' + stops.length + ' fermate · ' + runs.length + (runs.length === 1 ? ' partenza' : ' partenze') + ' · Orario completo</p></div><a class="schedule-map-link" href="' + esc(mapUrl) + '">Vedi percorso sulla mappa ↗</a></div>' +
+            '<details class="schedule-validity"><summary>Giorni e validità delle corse</summary><p>Le corse sono mostrate senza filtri. Il numero sotto ogni partenza rimanda alla sua validità.</p>' +
+            calendars.map((label,i) => '<div><strong>' + (i+1) + '</strong> ' + esc(label) + '</div>').join('') + '</details>';
         if (!runs.length) {
-            detail.innerHTML += '<div class="alert alert-warning">Nessuna corsa in questo giorno.</div>';
+            detail.innerHTML += '<div class="alert alert-warning">Nessuna corsa disponibile per questo percorso.</div>';
             return;
         }
+        detail.innerHTML += '<label class="schedule-stop-label" for="stop-picker">Consulta una fermata</label><select id="stop-picker" class="form-select"><option value="">Tutte le fermate</option>' + stops.map((s,i) => '<option value="' + i + '">' + esc(s.name) + '</option>').join('') + '</select><div id="stop-panel" class="stop-panel" aria-live="polite"></div><p class="schedule-table-hint">Scorri gli orari in orizzontale. Seleziona una partenza per aprire la corsa sulla mappa.</p>';
 
         // Raggruppa le fermate consecutive che condividono la "zona".
         // La zona è il prefisso di parole comune al gruppo: così
@@ -476,7 +337,7 @@
         runs.forEach((r, i) => {
             const mapUrl = '/lines-map?tripId=' + encodeURIComponent(r.trip_id) + '&showStops=1';
             head += '<th class="run-col" title="Apri la corsa sulla mappa">' +
-                '<a class="run-map-link" href="' + esc(mapUrl) + '">' + esc(r.start) + '</a></th>';
+                '<a class="run-map-link" href="' + esc(mapUrl) + '">' + esc(r.start) + '<small class="run-calendar" title="' + esc(r.calendar || 'Validità non disponibile') + '">' + (calendars.indexOf(r.calendar || 'Validità non disponibile') + 1) + '</small></a></th>';
         });
         head += '</tr>';
 
@@ -503,82 +364,43 @@
         });
 
         detail.innerHTML +=
-            '<div class="table-responsive timetable-wrap">' +
-                '<table class="table table-sm table-bordered timetable mb-0">' +
+            '<div class="table-responsive timetable-wrap" tabindex="0" role="region" aria-label="Tabella completa degli orari">' +
+                '<table class="table table-sm table-bordered timetable mb-0"><caption class="visually-hidden">Orario completo. Righe: fermate; colonne: corse. I numeri sotto le partenze indicano i giorni di validità.</caption>' +
                     '<thead>' + head + '</thead>' +
                     '<tbody>' + body + '</tbody>' +
                 '</table>' +
-            '</div>' +
-            '<div id="upcoming-panel" class="mt-2"></div>';
+            '</div>';
 
-        // Click sul nome fermata -> carica i bus della prossima ora nel pannello.
-        const panel = detail.querySelector('#upcoming-panel');
-        detail.querySelectorAll('.stop-name-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                detail.querySelectorAll('tr.row-active').forEach(tr => tr.classList.remove('row-active'));
-                btn.closest('tr').classList.add('row-active');
-                loadUpcoming(btn.dataset.stop, btn.dataset.name, panel);
-            });
-        });
-
-        // Porta la tabella in vista dopo il click su "Orari".
-        detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
-    /** Carica (lazy) i bus previsti nella prossima ora a una fermata. */
-    async function loadUpcoming(stopId, stopName, box) {
-        const header = '<div class="fw-semibold mb-1">' + esc(stopName) + ' — prossima ora dalle ' + esc(getTime()) + '</div>';
-        box.innerHTML = header + '<div class="text-muted small">Caricamento...</div>';
-
-        try {
-            const url = '/api/stop-upcoming?stop=' + encodeURIComponent(stopId) +
-                '&day=' + encodeURIComponent(getDay()) +
-                '&time=' + encodeURIComponent(getTime());
-            const data = await fetchJson(url);
-            if (!data.success) { box.innerHTML = header + '<div class="text-danger small">' + esc(data.error) + '</div>'; return; }
-
-            if (!data.buses.length) {
-                box.innerHTML = header + '<div class="text-muted small">Nessun bus previsto nella prossima ora.</div>';
-            } else {
-                box.innerHTML = header +
-                    data.buses.map(b =>
-                        '<div class="upcoming-row d-flex justify-content-between border-bottom py-1">' +
-                            '<span><span class="badge bg-success me-2">' + esc(b.route_short_name) + '</span>' + esc(b.trip_headsign || '') + '</span>' +
-                            '<span class="text-nowrap">' + esc(b.time) + ' <span class="text-muted">(+' + b.in_min + ' min)</span></span>' +
-                        '</div>'
-                    ).join('');
-            }
-        } catch (e) {
-            box.innerHTML = header + '<div class="text-danger small">Errore nel caricamento.</div>';
+        function selectStop(index) {
+            detail.querySelectorAll('tr.row-active').forEach(tr => tr.classList.remove('row-active'));
+            $('stop-picker').value = String(index);
+            if (index === '') { $('stop-panel').innerHTML = ''; return; }
+            const stop = stops[Number(index)];
+            detail.querySelector('tr[data-row="' + index + '"]').classList.add('row-active');
+            $('stop-panel').innerHTML = '<h3>' + esc(stop.name) + '</h3><p>Tutti i passaggi della linea ' + esc(state.line) + ' in questa direzione</p><div class="stop-times">' +
+                runs.filter(r => r.times[Number(index)]).map(r => '<a href="/lines-map?tripId=' + encodeURIComponent(r.trip_id) + '&amp;showStops=1" title="' + esc(r.calendar || '') + '">' + esc(r.times[Number(index)]) + '<small>' + (calendars.indexOf(r.calendar || 'Validità non disponibile')+1) + '</small></a>').join('') + '</div>';
         }
+        $('stop-picker').addEventListener('change', e => selectStop(e.target.value));
+        detail.querySelectorAll('.stop-name-btn').forEach((btn,index) => btn.addEventListener('click', () => {
+            selectStop(index); $('stop-panel').scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'nearest' });
+        }));
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        state.service = localStorage.getItem('actv-line-schedule-service') || 'automobilistico';
-        document.querySelectorAll('.service-btn').forEach(btn => {
+        state.service = localStorage.getItem('actv-line-schedule-service') === 'navigation' ? 'navigation' : 'automobilistico';
+        document.querySelectorAll('.service-switch-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.service === state.service);
+            btn.setAttribute('aria-pressed', String(btn.dataset.service === state.service));
             btn.addEventListener('click', () => {
                 if (state.service === btn.dataset.service) return;
                 state.service = btn.dataset.service;
                 localStorage.setItem('actv-line-schedule-service', state.service);
-                document.querySelectorAll('.service-btn').forEach(b => b.classList.toggle('active', b.dataset.service === state.service));
+                document.querySelectorAll('.service-switch-btn').forEach(b => { b.classList.toggle('active', b.dataset.service === state.service); b.setAttribute('aria-pressed', String(b.dataset.service === state.service)); });
                 state.line = ''; $('line-search').value = ''; loadCatalog();
             });
         });
-        updateWeekdayHint();
-        $('load-btn').addEventListener('click', loadVariants);
-        $('line-input').addEventListener('change', () => { state.line = $('line-input').value; $('load-btn').disabled = !state.line; if (state.line) loadVariants(); });
-        $('line-search').addEventListener('input', loadCatalog);
-        $('date-input').addEventListener('change', () => {
-            updateWeekdayHint();
-            loadCatalog();
-        });
-        $('time-input').addEventListener('change', () => {
-            // Svuota il pannello "prossima ora": va ricaricato con il nuovo orario.
-            const panel = document.getElementById('upcoming-panel');
-            if (panel) panel.innerHTML = '';
-            document.querySelectorAll('tr.row-active').forEach(tr => tr.classList.remove('row-active'));
-        });
+        $('line-input').addEventListener('change', loadVariants);
+        $('line-search').addEventListener('input', filterCatalog);
 
         // Pre-compila dalla querystring (?line=5E) se presente.
         const params = new URLSearchParams(window.location.search);
@@ -590,5 +412,5 @@
 })();
     }
 
-    return { init, getDistinctiveStops, groupVariantsByRoute };
+    return { init, getDistinctiveStops, groupVariantsByRoute, groupIdenticalRuns };
 });

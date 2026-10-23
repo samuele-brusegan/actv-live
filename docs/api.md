@@ -323,6 +323,18 @@ filtro include anche `shape`, contenente i punti di `shapes_refined`.
 
 ## Orari
 
+La pagina `/line-schedule` usa `all=1` su `/api/line-catalog`,
+`/api/line-variants` e `/api/line-schedule`: include tutte le corse presenti
+nel feed, senza selezionare un giorno o una fascia oraria. Senza `all=1`
+resta attiva la selezione per data usata dagli altri flussi.
+
+Nella risposta completa ogni corsa contiene `calendar`, una descrizione dei
+giorni settimanali, del periodo di validità e delle aggiunte/esclusioni di
+`calendar_dates`. La UI riunisce le sequenze di orari identiche in una sola
+colonna, conservando tutte le relative validità; il collegamento alla mappa
+usa una corsa rappresentativa. I numeri sotto le partenze rimandano alla
+legenda «Giorni e validità delle corse».
+
 ### `GET /api/line-variants`
 
 Restituisce le varianti attive di una linea, raggruppate per shape e

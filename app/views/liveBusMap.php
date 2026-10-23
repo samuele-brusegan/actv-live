@@ -12,6 +12,7 @@
 
     <?php require COMMON_HTML_HEAD; ?>
     <link rel="stylesheet" href="/css/liveBusMap.css">
+    <script src="/js/tour.js"></script>
 </head>
 <body>
 

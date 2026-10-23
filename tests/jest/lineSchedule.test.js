@@ -70,3 +70,55 @@ describe('groupVariantsByRoute', () => {
         ]);
     });
 });
+
+test('complete timetable loads automatically, searches locally and shows every passage at a stop', async () => {
+    const fs = require('fs');
+    const view = fs.readFileSync(require('path').join(__dirname, '../../app/views/lineSchedule.php'), 'utf8');
+    document.body.innerHTML = view.match(/<body[^>]*>([\s\S]*)<\/body>/)[1];
+    localStorage.clear();
+    const stops = [{ id: 'a', name: 'Partenza' }, { id: 'b', name: 'Arrivo' }];
+    global.fetch = jest.fn(async url => ({ ok: true, json: async () => {
+        if (url.includes('line-catalog')) return {success:true, lines:[{line:'1', name:'Centro'}]};
+        if (url.includes('line-variants')) return {success:true, variants:[{trip_id:'t1', headsign:'Arrivo', origin:'Partenza', terminus:'Arrivo', stops, trips_count:2}]};
+        return {success:true, headsign:'Arrivo', stops, runs:[
+            {trip_id:'t1', start:'06:00', times:['06:00','06:30'], calendar:'Lun · Ven'},
+            {trip_id:'t2', start:'25:10', times:['25:10','25:40'], calendar:'Dom'},
+        ]};
+    }}));
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    const settle = async () => { for (let i=0; i<12; i++) await Promise.resolve(); };
+    await settle();
+    const search = document.getElementById('line-search');
+    search.value = 'Centro'; search.dispatchEvent(new Event('input'));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const line = document.getElementById('line-input');
+    line.value = '1'; line.dispatchEvent(new Event('change'));
+    await settle();
+    expect(document.querySelectorAll('.timetable tbody tr')).toHaveLength(2);
+    expect(document.querySelectorAll('.run-map-link')).toHaveLength(2);
+    expect(document.querySelectorAll('.run-calendar')[1].title).toBe('Dom');
+    const stop = document.getElementById('stop-picker');
+    stop.value = '1'; stop.dispatchEvent(new Event('change'));
+    expect(document.getElementById('stop-panel').textContent).toContain('25:40');
+    expect(document.querySelectorAll('.stop-times a')).toHaveLength(2);
+    expect(document.querySelector('[type="date"], [type="time"]')).toBeNull();
+    for (const [url] of fetch.mock.calls) {
+        const params = new URL(url, 'http://localhost').searchParams;
+        expect(params.get('all')).toBe('1');
+        expect(params.has('date')).toBe(false);
+        expect(params.has('day')).toBe(false);
+        expect(params.has('time')).toBe(false);
+    }
+});
+
+test('identical departures share a column while retaining every service calendar', () => {
+    const { groupIdenticalRuns } = require('../../public/js/lineSchedule');
+    const runs = groupIdenticalRuns([
+        { trip_id:'weekday', start:'08:00', times:['08:00', '08:30'], calendar:'Lun · Ven' },
+        { trip_id:'sunday', start:'08:00', times:['08:00', '08:30'], calendar:'Dom' },
+        { trip_id:'short', start:'08:00', times:[null, '08:30'], calendar:'Dom' },
+    ]);
+    expect(runs).toHaveLength(2);
+    expect(runs[0].calendar).toBe('Lun · Ven / Dom');
+    expect(runs[1].times).toEqual([null, '08:30']);
+});

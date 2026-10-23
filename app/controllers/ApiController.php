@@ -1601,7 +1601,7 @@ class ApiController {
             if ($service === 'navigation') {
                 require_once BASE_PATH . '/app/services/LineScheduleProvider.php';
                 $provider = new LineScheduleProvider();
-                echo json_encode(['success'=>true, 'service'=>$service, 'updated_at'=>$provider->updatedAt(), 'lines'=>$provider->catalog($date)]);
+                echo json_encode(['success'=>true, 'service'=>$service, 'updated_at'=>$provider->updatedAt(), 'lines'=>$provider->catalog(($_GET['all'] ?? '') === '1' ? null : $date)]);
                 return;
             }
             $db = $this->getDb(); $dateDb = str_replace('-', '', $date); $day = strtolower(date('l', strtotime($date)));
@@ -1613,7 +1613,14 @@ class ApiController {
                        OR t.service_id IN (SELECT service_id FROM calendar_dates WHERE date=? AND exception_type=1))
                       AND t.service_id NOT IN (SELECT service_id FROM calendar_dates WHERE date=? AND exception_type=2)
                     GROUP BY r.route_short_name ORDER BY r.route_short_name";
-            $lines = array_map(fn($r)=>['line'=>$r['line'], 'name'=>$r['name'] ?? '', 'variants_count'=>(int)$r['variants_count'], 'trips_count'=>(int)$r['trips_count']], $db->query($sql, [$dateDb,$dateDb,$dateDb,$dateDb]));
+            if (($_GET['all'] ?? '') === '1') {
+                $sql = "SELECT r.route_short_name AS line, MAX(r.route_long_name) AS name,
+                    COUNT(DISTINCT t.trip_id) AS trips_count,
+                    COUNT(DISTINCT CONCAT(COALESCE(t.shape_id,''),'|',COALESCE(t.trip_headsign,''))) AS variants_count
+                    FROM routes r JOIN trips t ON t.route_id=r.route_id
+                    GROUP BY r.route_short_name ORDER BY r.route_short_name";
+            }
+            $lines = array_map(fn($r)=>['line'=>$r['line'], 'name'=>$r['name'] ?? '', 'variants_count'=>(int)$r['variants_count'], 'trips_count'=>(int)$r['trips_count']], $db->query($sql, ($_GET['all'] ?? '') === '1' ? [] : [$dateDb,$dateDb,$dateDb,$dateDb]));
             $mtime = @filemtime(BASE_PATH . '/data/gtfs/routes.txt');
             echo json_encode(['success'=>true, 'service'=>$service, 'updated_at'=>$mtime ? date(DATE_ATOM,$mtime) : null, 'lines'=>$lines]);
         } catch (Throwable $e) {
@@ -1649,7 +1656,7 @@ class ApiController {
             require_once BASE_PATH . '/app/services/LineScheduleProvider.php';
             $line = trim($_GET['line'] ?? '');
             if ($line === '') { echo json_encode(['success'=>false,'error'=>'Parametro line mancante']); return; }
-            $provider = new LineScheduleProvider(); $variants = $provider->variants($line, $this->lineDate());
+            $provider = new LineScheduleProvider(); $variants = $provider->variants($line, ($_GET['all'] ?? '') === '1' ? null : $this->lineDate());
             echo json_encode(['success'=>true,'service'=>$service,'line'=>$line,'updated_at'=>$provider->updatedAt(),'variants'=>$variants]); return;
         }
 
@@ -1697,7 +1704,13 @@ class ApiController {
                       WHERE cd.date = ? AND cd.exception_type = 2
                   )
                 GROUP BY t.trip_id, t.shape_id, t.trip_headsign, t.direction_id";
-        $trips = $db->query($sql, array_merge($routeIds, [$date, $date, $date, $date]));
+        if (($_GET['all'] ?? '') === '1') {
+            $sql = "SELECT t.trip_id, t.shape_id, t.trip_headsign, t.direction_id, COUNT(st.stop_id) AS nstops
+                FROM trips t JOIN stop_times st ON st.trip_id=t.trip_id
+                WHERE t.route_id IN ($placeholders)
+                GROUP BY t.trip_id, t.shape_id, t.trip_headsign, t.direction_id";
+        }
+        $trips = $db->query($sql, ($_GET['all'] ?? '') === '1' ? $routeIds : array_merge($routeIds, [$date, $date, $date, $date]));
 
         // Raggruppa per (shape_id + headsign): scegli il trip con più fermate
         // come rappresentativo e conta quante corse appartengono alla variante.
@@ -1867,7 +1880,7 @@ class ApiController {
             $line = trim($_GET['line'] ?? '');
             $ids = array_values(array_filter(array_map('trim', explode(',', (string)($_GET['trips'] ?? '')))));
             if ($line === '' || !$ids) { echo json_encode(['success'=>false,'error'=>'Parametri line/trips mancanti']); return; }
-            $provider = new LineScheduleProvider(); $result = $provider->schedule($line, $ids, $this->lineDate());
+            $provider = new LineScheduleProvider(); $result = $provider->schedule($line, $ids, ($_GET['all'] ?? '') === '1' ? null : $this->lineDate());
             echo json_encode(array_merge(['success'=>true,'service'=>$service,'line'=>$line,'updated_at'=>$provider->updatedAt()], $result)); return;
         }
 
@@ -2000,9 +2013,24 @@ class ApiController {
                            WHERE cd.date = ? AND cd.exception_type = 2
                        )";
         $params = array_merge($routeIds, $variantParams, [$date, $date, $date, $date]);
+        if (($_GET['all'] ?? '') === '1') {
+            $tripsSql = "SELECT DISTINCT t.trip_id FROM trips t WHERE t.route_id IN ($routePh)
+                AND (" . implode(' OR ', $variantClauses) . ")";
+            $params = array_merge($routeIds, $variantParams);
+        }
         $tripRows = $db->query($tripsSql, $params);
         $tripIds = array_map(fn($r) => $r['trip_id'], $tripRows);
 
+        $calendars = [];
+        if (!empty($tripIds) && ($_GET['all'] ?? '') === '1') {
+            require_once BASE_PATH . '/app/services/LineScheduleProvider.php';
+            $ph = implode(',', array_fill(0, count($tripIds), '?'));
+            $rows = $db->query("SELECT c.*, t.trip_id, t.service_id FROM trips t LEFT JOIN calendar c ON c.service_id=t.service_id WHERE t.trip_id IN ($ph)", $tripIds);
+            $exceptions = $db->query("SELECT cd.* FROM calendar_dates cd WHERE cd.service_id IN (SELECT service_id FROM trips WHERE trip_id IN ($ph)) ORDER BY cd.date", $tripIds);
+            foreach ($rows as $row) {
+                $calendars[$row['trip_id']] = LineScheduleProvider::describeCalendar($row, array_values(array_filter($exceptions, fn($e) => $e['service_id'] === $row['service_id'])));
+            }
+        }
         $runs = [];
         if (!empty($tripIds)) {
             $tripPh = implode(',', array_fill(0, count($tripIds), '?'));
@@ -2038,7 +2066,7 @@ class ApiController {
                 foreach ($times as $t) {
                     if ($t !== null) { $start = $t; break; }
                 }
-                $runs[] = ['trip_id' => $tid, 'start' => $start, 'times' => $times];
+                $runs[] = ['trip_id' => $tid, 'start' => $start, 'times' => $times, 'calendar' => $calendars[$tid] ?? ''];
             }
 
             // Ordina le colonne per orario di partenza.
