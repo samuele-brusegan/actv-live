@@ -3,7 +3,7 @@
  * Funzioni testate: getWidgetUrl, getEmbedCode
  */
 
-const { getWidgetUrl, getEmbedCode } = require('../../public/js/widget');
+const { getWidgetUrl, getEmbedCode, showQrDialog, closeQrDialog } = require('../../public/js/widget');
 
 describe('getWidgetUrl', () => {
     test('genera URL con stop e name', () => {
@@ -53,5 +53,47 @@ describe('getEmbedCode', () => {
         const code = getEmbedCode('4825', 'Test', { baseUrl: 'https://example.com' });
         expect(code).toContain('width="100%"');
         expect(code).toContain('height="400"');
+    });
+});
+
+describe('showQrDialog', () => {
+    afterEach(() => {
+        const modal = document.getElementById('qr-share-modal');
+        if (modal) modal.remove();
+    });
+
+    test('crea il modal con l\'URL', () => {
+        showQrDialog('https://example.com/stop?id=1');
+        expect(document.getElementById('qr-share-modal')).not.toBeNull();
+        expect(document.getElementById('qr-url').value).toBe('https://example.com/stop?id=1');
+    });
+
+    test('sostituisce un modal esistente', () => {
+        showQrDialog('https://a.example');
+        showQrDialog('https://b.example');
+        expect(document.querySelectorAll('#qr-share-modal').length).toBe(1);
+        expect(document.getElementById('qr-url').value).toBe('https://b.example');
+    });
+
+    test('escapa caratteri speciali nell\'attributo value', () => {
+        showQrDialog('https://example.com/?a="x"');
+        expect(document.getElementById('qr-url').value).toBe('https://example.com/?a="x"');
+    });
+
+    test('mostra fallback senza libreria qrcode', () => {
+        showQrDialog('https://example.com');
+        expect(document.getElementById('qr-code-container').textContent).toContain('non disponibile');
+    });
+});
+
+describe('closeQrDialog', () => {
+    test('rimuove il modal', () => {
+        showQrDialog('https://example.com');
+        closeQrDialog();
+        expect(document.getElementById('qr-share-modal')).toBeNull();
+    });
+
+    test('non fallisce se il modal non esiste', () => {
+        expect(() => closeQrDialog()).not.toThrow();
     });
 });

@@ -16,6 +16,8 @@
         <link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-fullscreen/v1.0.1/leaflet.fullscreen.css' rel='stylesheet' />
         <script src="/components/StopCard.js"></script>
         <script src="/js/tour.js"></script>
+        <script src="/js/widget.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js" integrity="sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k" crossorigin="anonymous"></script>
         <script src="/js/script-home.js"></script>
     </head>
     <body>
@@ -128,5 +130,7 @@
             </div>
 
         </div>
+
+        <button class="qr-fab" id="qr-btn" onclick="showQrDialog(window.location.href)" title="Mostra codice QR" aria-label="Mostra codice QR"><?= getIcon('qr_code', 26) ?></button>
     </body>
 </html>

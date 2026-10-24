@@ -90,6 +90,73 @@ function closeWidgetDialog() {
     if (modal) modal.remove();
 }
 
+/**
+ * Mostra il dialog con il codice QR di un URL
+ * @param {string} url - URL da codificare nel QR
+ */
+function showQrDialog(url) {
+    var existing = document.getElementById('qr-share-modal');
+    if (existing) existing.remove();
+
+    var safeUrl = String(url).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    var modal = document.createElement('div');
+    modal.id = 'qr-share-modal';
+    modal.className = 'widget-modal-overlay';
+    modal.innerHTML =
+        '<div class="widget-modal">' +
+            '<div class="widget-modal-header">' +
+                '<span>Codice QR</span>' +
+                '<button class="widget-modal-close" onclick="closeQrDialog()">&times;</button>' +
+            '</div>' +
+            '<div class="widget-modal-body">' +
+                '<p class="widget-modal-desc">Inquadra il codice per aprire questa pagina su un altro dispositivo.</p>' +
+                '<div class="qr-container" id="qr-code-container"></div>' +
+                '<label class="widget-label" style="margin-top:12px;">Link:</label>' +
+                '<input class="widget-url-input" id="qr-url" readonly value="' + safeUrl + '">' +
+                '<button class="widget-copy-btn widget-copy-link" onclick="copyQrLink()">Copia link</button>' +
+            '</div>' +
+        '</div>';
+
+    document.body.appendChild(modal);
+
+    var container = document.getElementById('qr-code-container');
+    if (container) {
+        if (typeof qrcode === 'function') {
+            try {
+                var qr = qrcode(0, 'M');
+                qr.addData(String(url));
+                qr.make();
+                container.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 8, scalable: true });
+            } catch (e) {
+                container.textContent = 'Impossibile generare il codice QR.';
+            }
+        } else {
+            container.textContent = 'Generatore QR non disponibile.';
+        }
+    }
+
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeQrDialog();
+    });
+}
+
+/** Chiude il dialog QR */
+function closeQrDialog() {
+    var modal = document.getElementById('qr-share-modal');
+    if (modal) modal.remove();
+}
+
+/** Copia il link mostrato nel dialog QR */
+function copyQrLink() {
+    var input = document.getElementById('qr-url');
+    if (!input) return;
+    navigator.clipboard.writeText(input.value).then(function() {
+        showCopyFeedback('Link copiato!');
+    });
+}
+
 /** Copia il codice embed */
 function copyWidgetCode() {
     var textarea = document.getElementById('widget-embed-code');
@@ -124,5 +191,5 @@ function showCopyFeedback(message) {
 
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { getWidgetUrl, getEmbedCode };
+    module.exports = { getWidgetUrl, getEmbedCode, showQrDialog, closeQrDialog, copyQrLink };
 }
