@@ -49,6 +49,9 @@ let tripMapVehicleSequence = null;
 let tripMapVehicleRefreshing = false;
 let tripMapVehicleObservedAt = null;
 let tripDetailsRefreshing = false;
+let tripMapGeometryPromise = null;
+let tripMapNearbyMarkers = new Map();
+const NEARBY_BUS_RADIUS_M = 500;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -327,11 +330,21 @@ async function refreshData(fetchRealtime = true) {
         // Try to get real time for previous stops
         getPreviousStopsRealTime();
 
+        // Le fermate GTFS possono arrivare dopo la shape: ricollega la
+        // proiezione usata per visitato/distanze.
+        if (tripMapGeometry.length && !tripMapStops.length && state.stopsGTFS.length) {
+            tripMapStops = state.stopsGTFS;
+            tripMapStopProgress = projectOrderedMapStops(tripMapStops, tripMapGeometry);
+        }
+
         // console.log(state.mergedStops);
 
 
         renderTimeline();
         if (tripMapStops.length) renderMapStops(tripMapStops);
+        // Posizione GTFS-RT della corsa: alimenta il pallino mappa, lo stato
+        // "superata" e la distanza bus-fermata mostrata nella timeline.
+        void refreshTripVehicle();
     } catch (error) {
         console.error("Refresh fallito:", error);
     } finally {
@@ -814,9 +827,13 @@ function renderMapStops(stops) {
     scrollMapToNextStopOnce(stops);
 }
 
-async function loadTripMap() {
-    const status = document.getElementById('trip-map-status');
-    try {
+/** Scarica (una sola volta) la shape refined della corsa e proietta le
+ *  fermate su di essa. Serve sia alla mappa sia al calcolo delle distanze
+ *  bus-fermata nella timeline. In caso di errore la promise viene azzerata
+ *  cosi' il tentativo successivo riprova il fetch. */
+function ensureTripGeometry() {
+    if (tripMapGeometryPromise) return tripMapGeometryPromise;
+    tripMapGeometryPromise = (async () => {
         // Prima chiediamo la geometria DB: per una corsa filtrata contiene la
         // shape_refined snapped alla strada. La cache JSON resta il fallback
         // per installazioni senza DB o durante un aggiornamento.
@@ -831,6 +848,23 @@ async function loadTripMap() {
         }
         tripMapShape = Array.isArray(shapes) ? shapes.find(item => String(item.trip_id) === String(state.tripId)) : null;
         if (!tripMapShape) throw new Error('Percorso non disponibile');
+        const geometry = Array.isArray(tripMapShape.shape) && tripMapShape.shape.length > 1 ? tripMapShape.shape : tripMapShape.path;
+        const points = (geometry || []).map(point => [Number(point.lat), Number(point.lng)]).filter(point => point.every(Number.isFinite));
+        if (points.length < 2) throw new Error('Traccia non disponibile');
+        tripMapGeometry = points;
+        const stops = Array.isArray(tripMapShape.path) ? tripMapShape.path : state.stopsGTFS;
+        tripMapStops = stops || [];
+        tripMapStopProgress = projectOrderedMapStops(tripMapStops, tripMapGeometry);
+        return tripMapGeometry;
+    })();
+    tripMapGeometryPromise.catch(() => { tripMapGeometryPromise = null; });
+    return tripMapGeometryPromise;
+}
+
+async function loadTripMap() {
+    const status = document.getElementById('trip-map-status');
+    try {
+        await ensureTripGeometry();
         const lineBadge = document.getElementById('trip-map-line');
         if (lineBadge) {
             const routeColor = normalizeMapColor(tripMapShape.route_color);
@@ -838,19 +872,13 @@ async function loadTripMap() {
             lineBadge.style.color = getContrastTextColor(routeColor);
             lineBadge.style.borderColor = getContrastTextColor(routeColor);
         }
-        const geometry = Array.isArray(tripMapShape.shape) && tripMapShape.shape.length > 1 ? tripMapShape.shape : tripMapShape.path;
-        const points = (geometry || []).map(point => [Number(point.lat), Number(point.lng)]).filter(point => point.every(Number.isFinite));
-        if (points.length < 2) throw new Error('Traccia non disponibile');
-        tripMapGeometry = points;
-        tripMapRemainingRoute = L.polyline(points, { color: '#087f5b', weight: 7, opacity: 0.9 }).addTo(tripMap);
+        tripMapRemainingRoute = L.polyline(tripMapGeometry, { color: '#087f5b', weight: 7, opacity: 0.9 }).addTo(tripMap);
         tripMapCompletedRoute = null;
         tripMap.fitBounds(tripMapRemainingRoute.getBounds(), {
             paddingTopLeft: [40, 125],
             paddingBottomRight: [40, 220]
         });
-        const stops = Array.isArray(tripMapShape.path) ? tripMapShape.path : state.stopsGTFS;
-        tripMapStops = stops || [];
-        tripMapStopProgress = projectOrderedMapStops(tripMapStops, tripMapGeometry);
+        const stops = tripMapStops;
         tripMapProgress = null;
         tripMapNextStopScrolled = false;
         const selectedStop = state.stopsGTFS.find(stop =>
@@ -1053,6 +1081,8 @@ function selectTripVehicle(vehicles, tripId, now = Date.now() / 1000) {
 function clearTripVehicle() {
     if (tripMapVehicleMarker) tripMap?.removeLayer(tripMapVehicleMarker);
     tripMapVehicleMarker = null;
+    tripMapNearbyMarkers.forEach(marker => tripMap?.removeLayer(marker));
+    tripMapNearbyMarkers.clear();
     tripMapVehiclePosition = null;
     tripMapVehicleSequence = null;
     tripMapVehicleObservedAt = null;
@@ -1135,18 +1165,25 @@ function findMapProgress(position, minimum = 0, maximum = Infinity) {
     return best;
 }
 
+function formatDistanceMeters(meters) {
+    if (!Number.isFinite(meters)) return '';
+    if (meters < 950) return `${Math.max(10, Math.round(meters / 10) * 10)} m`;
+    return `${(meters / 1000).toFixed(1).replace('.', ',')} km`;
+}
+
+/** Il progresso GPS e' aggiornato anche a mappa chiusa: la timeline lo usa
+ *  per segnare le fermate superate e mostrare la distanza residua del bus. */
 function updateTripMapProgress(position) {
     const sequenceIndex = tripMapVehicleSequence == null ? -1 : state.stopsGTFS.findIndex(stop => Number(stop.stop_sequence) === Number(tripMapVehicleSequence));
     const lower = sequenceIndex > 0 ? tripMapStopProgress[sequenceIndex - 1] : null;
     const upper = sequenceIndex >= 0 ? tripMapStopProgress[sequenceIndex] : null;
     const progress = findMapProgress(position, lower ? lower.index + lower.ratio : 0,
         upper ? upper.index + upper.ratio : Infinity);
-    if (!tripMap) return;
     if (!progress || progress.distanceSquared > 250 ** 2) {
         tripMapProgress = null;
-        if (tripMapCompletedRoute) tripMap.removeLayer(tripMapCompletedRoute);
+        if (tripMapCompletedRoute && tripMap) tripMap.removeLayer(tripMapCompletedRoute);
         tripMapCompletedRoute = null;
-        tripMapRemainingRoute?.setLatLngs(tripMapGeometry);
+        if (tripMap) tripMapRemainingRoute?.setLatLngs(tripMapGeometry);
         updateMapStopMarkers();
         renderMapStops(tripMapStops);
         renderTimeline();
@@ -1157,9 +1194,11 @@ function updateTripMapProgress(position) {
     passed.push(progress.point);
     const remaining = [progress.point, ...tripMapGeometry.slice(progress.index + 1)];
 
-    if (tripMapCompletedRoute) tripMapCompletedRoute.setLatLngs(passed);
-    else tripMapCompletedRoute = L.polyline(passed, { color: '#8b949e', weight: 7, opacity: 0.95 }).addTo(tripMap);
-    if (tripMapRemainingRoute) tripMapRemainingRoute.setLatLngs(remaining);
+    if (tripMap) {
+        if (tripMapCompletedRoute) tripMapCompletedRoute.setLatLngs(passed);
+        else tripMapCompletedRoute = L.polyline(passed, { color: '#8b949e', weight: 7, opacity: 0.95 }).addTo(tripMap);
+        if (tripMapRemainingRoute) tripMapRemainingRoute.setLatLngs(remaining);
+    }
     updateMapStopMarkers();
     renderMapStops(tripMapStops);
     renderTimeline();
@@ -1199,13 +1238,55 @@ function startTripMapUserLocation() {
     }
 }
 
+/** Disegna/aggiorna i marker dei mezzi vicini al bus seguito (flag nearby
+ *  impostato dall'API entro NEARBY_BUS_RADIUS_M metri). */
+function updateNearbyVehicleMarkers(nearby) {
+    if (!tripMap) return;
+    const seen = new Set();
+    (nearby || []).forEach(vehicle => {
+        const lat = Number(vehicle.vehicle_position?.lat), lng = Number(vehicle.vehicle_position?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        const key = String(vehicle.vehicle_id || vehicle.entity_id || vehicle.trip_id || `${lat},${lng}`);
+        seen.add(key);
+        const lineName = String(vehicle.route_short_name || '').trim();
+        const headsign = String(vehicle.trip_headsign || vehicle.route_long_name || '').replace(/\\/g, '').trim();
+        const distanceLabel = vehicle.nearby_distance_m != null ? formatDistanceMeters(Number(vehicle.nearby_distance_m)) : '';
+        const color = normalizeMapColor(vehicle.route_color) || '#5f6b7a';
+        const icon = L.divIcon({
+            className: 'trip-map-nearby-icon',
+            html: `<span class="trip-map-nearby-badge" style="--nearby-color:${color}">${busMarkerSvg()}</span>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
+        const popup = `<strong>${lineName ? 'Linea ' + escapeMapHtml(lineName) : 'Mezzo ACTV'}</strong>`
+            + (headsign ? `<br>${escapeMapHtml(headsign)}` : '')
+            + `<br>${distanceLabel ? 'a ' + distanceLabel + ' dal bus' : 'nelle vicinanze'}`;
+        const existing = tripMapNearbyMarkers.get(key);
+        if (existing) {
+            existing.setLatLng([lat, lng]);
+            existing.setIcon(icon);
+            existing.setPopupContent(popup);
+        } else {
+            tripMapNearbyMarkers.set(key, L.marker([lat, lng], { icon, zIndexOffset: 500 }).addTo(tripMap).bindPopup(popup));
+        }
+    });
+    tripMapNearbyMarkers.forEach((marker, key) => {
+        if (!seen.has(key)) {
+            tripMap.removeLayer(marker);
+            tripMapNearbyMarkers.delete(key);
+        }
+    });
+}
+
+/** Anche senza mappa aperta aggiorna posizione e progresso del mezzo: la
+ *  timeline mostra la distanza bus-fermata lungo la shape refined. */
 async function refreshTripVehicle() {
-    if (!tripMap || !state.tripId || tripMapVehicleRefreshing) return;
+    if (!state.tripId || tripMapVehicleRefreshing) return;
     tripMapVehicleRefreshing = true;
     const status = document.getElementById('trip-map-status');
     if (status) status.innerHTML = '<span class="trip-map-live-dot"></span>Ricerca del mezzo in corso…';
     try {
-        const params = new URLSearchParams({ service: 'automobilistico', tripId: state.tripId });
+        const params = new URLSearchParams({ service: 'automobilistico', tripId: state.tripId, nearby: NEARBY_BUS_RADIUS_M });
         const response = await fetch(`/api/realtime/vehicles?${params.toString()}`, { cache: 'no-store' });
         if (!response.ok) throw new Error('Posizione non disponibile');
         const payload = await response.json();
@@ -1217,15 +1298,21 @@ async function refreshTripVehicle() {
             if (status) status.innerHTML = '<span class="trip-map-live-dot offline"></span>Nessun mezzo attivo rilevato su questa corsa';
             return;
         }
+        updateNearbyVehicleMarkers(vehicles.filter(item => item.nearby === true));
         tripMapVehicleObservedAt = vehicle.position_timestamp ?? Date.now() / 1000;
         tripMapVehicleSequence = vehicle.current_stop_sequence;
         tripMapVehiclePosition = { lat, lng };
+        // La shape puo' non essere ancora stata caricata se la mappa non e'
+        // mai stata aperta: serve per proiettare posizione e fermate.
+        if (!tripMapGeometry.length) await ensureTripGeometry().catch(() => null);
         updateTripMapProgress(tripMapVehiclePosition);
-        if (!tripMapVehicleMarker) {
-            const icon = L.divIcon({ className: 'trip-map-bus-icon', html: busMarkerSvg(), iconSize: [42, 42], iconAnchor: [21, 21] });
-            tripMapVehicleMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(tripMap).bindPopup(`<strong>Linea ${state.line || ''}</strong><br>Posizione rilevata in tempo reale`);
-        } else {
-            tripMapVehicleMarker.setLatLng([lat, lng]);
+        if (tripMap) {
+            if (!tripMapVehicleMarker) {
+                const icon = L.divIcon({ className: 'trip-map-bus-icon', html: busMarkerSvg(), iconSize: [42, 42], iconAnchor: [21, 21] });
+                tripMapVehicleMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(tripMap).bindPopup(`<strong>Linea ${state.line || ''}</strong><br>Posizione rilevata in tempo reale`);
+            } else {
+                tripMapVehicleMarker.setLatLng([lat, lng]);
+            }
         }
         if (status) status.innerHTML = `<span class="trip-map-live-dot"></span>Posizione GPS · ${vehicle.position_timestamp ? 'rilevata ' + new Date(vehicle.position_timestamp * 1000).toLocaleTimeString('it-IT') : 'ora rilevamento non disponibile'}`;
     } catch (error) {
@@ -1646,7 +1733,9 @@ function updateSingleStopInTimeline(stop, selectedStopIdx, domEl = null) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         formatMinutesRemaining,
+        formatDistanceMeters,
         selectTripVehicle,
+        updateNearbyVehicleMarkers,
         projectOrderedMapStops,
         updateSingleStopInTimeline,
         getContrastTextColor,

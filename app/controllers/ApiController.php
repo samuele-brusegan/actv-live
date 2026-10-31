@@ -268,6 +268,7 @@ class ApiController {
             $db = $this->getDb();
             $stops = $db->query("SELECT * FROM stops");
             $stops = $this->mergeNavigationStops($stops);
+            $stops = $this->filterStopsByParam($stops);
             echo json_encode($stops, JSON_INVALID_UTF8_SUBSTITUTE);
         } catch (Throwable $e) {
             // La cache GTFS è sufficiente per la ricerca fermate e mantiene
@@ -288,6 +289,7 @@ class ApiController {
                     ];
                 }
                 $stops = $this->mergeNavigationStops($stops);
+                $stops = $this->filterStopsByParam($stops);
                 echo json_encode($stops, JSON_INVALID_UTF8_SUBSTITUTE);
                 return;
             }
@@ -309,6 +311,27 @@ class ApiController {
             if (!isset($stop['service'])) { $stop['service'] = 'automobilistico'; $stop['mode'] = 'bus'; }
         }
         return $stops;
+    }
+
+    /**
+     * ?stop=4586-4587 restringe l'elenco alle fermate i cui token data_url
+     * (o lo stop_id esatto) compaiono nel parametro. Stesso criterio di
+     * gtfs-passages: serve alla pagina fermata per le coordinate delle
+     * sotto-fermate senza scaricare tutto il dataset.
+     */
+    private function filterStopsByParam(array $stops): array {
+        $param = trim((string)($_GET['stop'] ?? ''));
+        if ($param === '') return $stops;
+        $tokens = array_values(array_filter(explode('-', $param), fn($t) => $t !== ''));
+        $wanted = [];
+        foreach ($stops as $stop) {
+            $id = (string)($stop['stop_id'] ?? $stop['id'] ?? '');
+            $dataUrlTokens = array_filter(explode('-', (string)($stop['data_url'] ?? '')), fn($t) => $t !== '');
+            if ($id === $param || in_array($id, $tokens, true) || array_intersect($tokens, $dataUrlTokens)) {
+                $wanted[] = $stop;
+            }
+        }
+        return array_values($wanted);
     }
 
     /**
@@ -646,8 +669,12 @@ class ApiController {
             $items = $this->enrichRealtimeVehicleTrips($items, $service);
             return $service === 'automobilistico' ? $this->guessBusRoutes($items) : $items;
         });
-        $vehicles = $this->filterRequestedVehicles($vehicles);
-        echo json_encode(['success'=>true, 'service'=>$service, 'vehicles'=>$vehicles], JSON_INVALID_UTF8_SUBSTITUTE);
+        $selected = $this->filterRequestedVehicles($vehicles);
+        // ?nearby=<metri>: oltre ai mezzi richiesti, restituisce anche quelli
+        // entro il raggio da essi (es. i bus vicini alla corsa seguita).
+        $nearbyRadius = min(2000.0, max(0.0, (float) ($_GET['nearby'] ?? 0)));
+        if ($nearbyRadius > 0) $selected = $this->appendNearbyVehicles($selected, $vehicles, $nearbyRadius);
+        echo json_encode(['success'=>true, 'service'=>$service, 'vehicles'=>$selected], JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     private function enrichRealtimeVehicleTrips(array $vehicles, string $service): array {
@@ -732,6 +759,51 @@ class ApiController {
             return isset($wantedTrips[(string)($vehicle['trip_id'] ?? '')])
                 || isset($wantedRoutes[(string)($vehicle['route_id'] ?? '')]);
         }));
+    }
+
+    /**
+     * Aggiunge a $selected i veicoli di $all entro $radius metri da uno dei
+     * veicoli gia' selezionati, marcati con nearby=true e la distanza minima.
+     * Senza posizione dei selezionati non c'e' un riferimento: nessun extra.
+     */
+    private function appendNearbyVehicles(array $selected, array $all, float $radius): array {
+        $anchors = [];
+        $seen = [];
+        foreach ($selected as $vehicle) {
+            $seen[$this->vehicleIdentityKey($vehicle)] = true;
+            $lat = $vehicle['vehicle_position']['lat'] ?? null;
+            $lon = $vehicle['vehicle_position']['lon'] ?? null;
+            if (is_numeric($lat) && is_numeric($lon)) $anchors[] = [(float) $lat, (float) $lon];
+        }
+        if (!$anchors) return $selected;
+        foreach ($all as $vehicle) {
+            $key = $this->vehicleIdentityKey($vehicle);
+            if (isset($seen[$key])) continue;
+            $lat = $vehicle['vehicle_position']['lat'] ?? null;
+            $lon = $vehicle['vehicle_position']['lon'] ?? null;
+            if (!is_numeric($lat) || !is_numeric($lon)) continue;
+            $lat = (float) $lat;
+            $lon = (float) $lon;
+            $best = null;
+            foreach ($anchors as [$anchorLat, $anchorLon]) {
+                $distance = hypot(($lat - $anchorLat) * 111320, ($lon - $anchorLon) * 111320 * cos(deg2rad($lat)));
+                if ($best === null || $distance < $best) $best = $distance;
+            }
+            if ($best === null || $best > $radius) continue;
+            $vehicle['nearby'] = true;
+            $vehicle['nearby_distance_m'] = (int) round($best);
+            $selected[] = $vehicle;
+            $seen[$key] = true;
+        }
+        return $selected;
+    }
+
+    private function vehicleIdentityKey(array $vehicle): string {
+        return implode('|', [
+            (string) ($vehicle['entity_id'] ?? ''),
+            (string) ($vehicle['vehicle_id'] ?? ''),
+            (string) ($vehicle['trip_id'] ?? ''),
+        ]);
     }
 
     private function guessBusRoutes(array $vehicles): array {

@@ -223,12 +223,13 @@ function showStatusBanner(text) {
 
 /**
  * Gestione Avvisi Importanti
- * Il pallino rosso compare solo quando il rilevamento sciopero e' attivo:
- * almeno 3 fermate campionate rispondono OK ma senza passaggi in tempo reale.
+ * Il pallino rosso compare quando il rilevamento sciopero e' attivo:
+ * nessuna fermata campionata ha passaggi in tempo reale, oppure una delle
+ * fermate riporta la parola "sciopero" nel campo text della sua pagina
+ * (in quel caso il testo ACTV viene mostrato nel modale).
  */
 
 const STRIKE_SAMPLE_SIZE = 15;
-const STRIKE_MIN_EMPTY_STOPS = 3;
 
 async function checkImportantNotices() {
     // Fra le 00:00 e le 05:00 il realtime ACTV smette di trasmettere anche
@@ -254,34 +255,46 @@ async function checkImportantNotices() {
             sample.push(stops[i]);
         }
 
-        const emptyStops = [];
-        await Promise.all(sample.map(async stop => {
+        const checks = await Promise.all(sample.map(async stop => {
             try {
                 const ctrl = new AbortController();
                 const timeoutId = setTimeout(() => ctrl.abort(), 3000);
-                const r = await fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stop.rawId}`, {
-                    cache: 'no-cache', signal: ctrl.signal
-                });
+                const [passagesRes, pageRes] = await Promise.all([
+                    fetch(`https://oraritemporeale.actv.it/aut/backend/passages/${stop.rawId}`, { cache: 'no-cache', signal: ctrl.signal }),
+                    fetch(`https://oraritemporeale.actv.it/aut/backend/page/${stop.rawId}`, { cache: 'no-cache', signal: ctrl.signal })
+                ]);
                 clearTimeout(timeoutId);
-                if (!r.ok) return;
-                const passages = await r.json();
-                if (Array.isArray(passages) && passages.length === 0) emptyStops.push(stop);
-            } catch (e) { /* errori di rete: fermata ignorata */ }
+                const passages = passagesRes.ok ? await passagesRes.json() : null;
+                const page = pageRes.ok ? await pageRes.json() : null;
+                return {
+                    stop,
+                    hasPassages: Array.isArray(passages) ? passages.length > 0 : null,
+                    text: String(page?.text || '')
+                };
+            } catch (e) { return null; /* errori di rete: fermata ignorata */ }
         }));
 
-        if (emptyStops.length < STRIKE_MIN_EMPTY_STOPS) return;
+        const valid = checks.filter(Boolean);
+        // Sciopero dichiarato: una fermata campionata riporta "sciopero" nel
+        // campo text della sua pagina.
+        const strikeNotice = valid.map(r => r.text).find(t => /sciopero/i.test(t)) || '';
+        // Altrimenti sciopero solo se NESSUNA fermata campionata ha passaggi:
+        // una fermata irraggiungibile rende il test inconclusivo (come prima).
+        const noneHasPassages = valid.length === sample.length && valid.every(r => r.hasPassages === false);
+        if (!strikeNotice && !noneHasPassages) return;
 
+        const emptyStops = valid.filter(r => r.hasPassages === false).map(r => r.stop);
         const btn = document.getElementById('important-info-btn');
         if (btn) {
             btn.classList.remove('hidden');
-            btn.onclick = () => showStrikeModal(emptyStops);
+            btn.onclick = () => showStrikeModal(emptyStops, strikeNotice);
         }
     } catch (e) {
         console.error("Errore rilevamento sciopero:", e);
     }
 }
 
-function showStrikeModal(stops) {
+function showStrikeModal(stops, noticeText = '') {
     const toast = document.getElementById('important-info-toast');
     if (!toast) return;
     toast.style.display = 'flex';
@@ -292,16 +305,22 @@ function showStrikeModal(stops) {
         return `<a class="strike-stop-link" href="${href}"><span class="strike-stop-name">${label}</span><span class="strike-stop-id">#${s.id}</span></a>`;
     }).join('');
 
+    const noticeBlock = noticeText
+        ? `<p class="strike-text strike-notice">${noticeText}</p>`
+        : '';
+    const listBlock = stops.length
+        ? `<p class="strike-subtitle">Fermate senza passaggi rilevati:</p><div class="strike-stop-list">${stopLinks}</div>`
+        : '';
+
     toast.innerHTML = `
         <div class="strike-card" role="alertdialog" aria-modal="true" aria-labelledby="strike-title">
             <div class="strike-head">
                 <span class="strike-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 19.5h19L12 3Zm0 7v4m0 3.5h.01"/></svg></span>
-                <h5 class="strike-title" id="strike-title">Possibile sciopero in corso</h5>
+                <h5 class="strike-title" id="strike-title">${noticeText ? 'Sciopero' : 'Possibile sciopero in corso'}</h5>
             </div>
-            <p class="strike-text">Il servizio in tempo reale non risponde su <strong>${stops.length} fermate</strong> controllate:
-                è probabile uno sciopero o un'interruzione del servizio. Gli orari previsti potrebbero non essere rispettati.</p>
-            <p class="strike-subtitle">Fermate senza passaggi rilevati:</p>
-            <div class="strike-stop-list">${stopLinks}</div>
+            ${noticeBlock || `<p class="strike-text">Il servizio in tempo reale non risponde su <strong>${stops.length} fermate</strong> controllate:
+                è probabile uno sciopero o un'interruzione del servizio. Gli orari previsti potrebbero non essere rispettati.</p>`}
+            ${listBlock}
             <button class="btn btn-primary strike-ok" onclick="document.getElementById('important-info-toast').style.display='none'">Ho capito</button>
         </div>
     `;

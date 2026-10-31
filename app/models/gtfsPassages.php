@@ -103,7 +103,7 @@ if (isset($_GET["return"]) || isset($_GET["rtable"])) {
                   AND t.service_id IN ($servicePlaceholders)
                   AND st.departure_time >= ?
                 ORDER BY st.departure_time ASC
-                LIMIT 40";
+                LIMIT 160";
 
         $rows = $db->query($sql, array_merge($stopIds, $serviceIds, [$lookback]));
 

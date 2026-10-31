@@ -103,6 +103,14 @@
     line-height: 1.5;
 }
 
+.strike-notice {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border-left: 3px solid var(--color-primary-red);
+    background: rgba(220, 53, 69, .08);
+    font-weight: 600;
+}
+
 .strike-subtitle {
     margin: 0 0 8px;
     font-size: .85rem;

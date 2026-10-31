@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 
 // 3. Carichiamo il modulo (ora stationId sarà "4825")
-const { getFavorites, isFavorite, createPassageCard, switchTab, renderStopLines, mergePassages, isLikelyStrike, lineDestKey, passageDistanceMeters, passageVehicleLabel, attachVehiclesToPassages, passageVehicleProgress } = require('../../public/js/stop');
+const { getFavorites, isFavorite, createPassageCard, switchTab, renderStopLines, mergePassages, isLikelyStrike, lineDestKey, passageDistanceMeters, passageVehicleLabel, stationDistanceMeters, attachVehiclesToPassages, passageVehicleProgress } = require('../../public/js/stop');
 
 describe('mezzi realtime alla fermata', () => {
     test('associa il mezzo solo alla stessa corsa', () => {
@@ -34,10 +34,21 @@ describe('mezzi realtime alla fermata', () => {
         expect(passages[1].vehicle_info).toBeUndefined();
     });
 
-    test('produce etichette di prossimità non predittive', () => {
-        expect(passageVehicleLabel(80)).toBe('In prossimità della fermata');
-        expect(passageVehicleLabel(1550)).toBe('A circa 1,6 km');
+    test('produce etichette di distanza per ogni mezzo con GPS', () => {
+        expect(passageVehicleLabel(80)).toBe('a 80 m');
+        expect(passageVehicleLabel(1550)).toBe('a 1,6 km');
+        expect(passageVehicleLabel(NaN)).toBe('Posizione rilevata');
         expect(passageDistanceMeters({ vehicle_position: { lat: 45, lon: 12 } }, {})).toBeNull();
+    });
+
+    test('usa le coordinate della fermata quando il passaggio non le ha', () => {
+        const vehicle = { trip_id: 't', vehicle_position: { lat: 45.4393, lon: 12.3359 } };
+        const coords = [{ lat: 45.4384, lon: 12.3359 }];
+        expect(stationDistanceMeters(vehicle, coords)).toBeGreaterThan(90);
+        expect(stationDistanceMeters(vehicle, [])).toBeNull();
+        const passages = [{ trip_id: 't' }];
+        attachVehiclesToPassages(passages, [vehicle]);
+        expect(passages[0].vehicle_info).toEqual({ lat: 45.4393, lon: 12.3359 });
     });
 
     test('calcola quante fermate mancano', () => {

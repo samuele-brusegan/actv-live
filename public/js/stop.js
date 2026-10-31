@@ -163,7 +163,7 @@ function createNavigationPassageCard(p) {
     if (p.gtfs_stop_id != null) card.dataset.stopId = String(p.gtfs_stop_id);
     const color = /^#?[0-9a-f]{6}$/i.test(String(p.route_color || '')) ? 'background-color:#' + String(p.route_color).replace('#', '') + ';' : '';
     const textColor = /^#?[0-9a-f]{6}$/i.test(String(p.route_text_color || '')) ? 'color:#' + String(p.route_text_color).replace('#', '') + ';' : '';
-    card.innerHTML = '<div class="d-flex align-items-center"><div class="line-badge" style="' + color + textColor + '">⛴ ' + p.line + '</div><div class="passage-info"><span class="passage-dest"><b>' + p.destination + '</b></span><br><span class="passage-meta">Navigazione</span>' + vehicleInfoHtml(p) + '</div></div><div class="passage-time-column"><span class="time-badge scheduled">' + p.time + '</span>' + vehicleMapLinkHtml(p) + '</div>';
+    card.innerHTML = '<div class="d-flex align-items-center"><div class="line-badge" style="' + color + textColor + '">⛴ ' + p.line + '</div><div class="passage-info"><span class="passage-dest"><b>' + p.destination + '</b></span><br><span class="passage-meta">Navigazione</span>' + vehicleInfoHtml(p) + '</div></div><div class="passage-time-column"><span class="time-badge scheduled">' + p.time + '</span></div>';
     return card;
 }
 
@@ -177,9 +177,19 @@ function passageDistanceMeters(vehicle, passage) {
 
 function passageVehicleLabel(meters) {
     if (!Number.isFinite(meters)) return 'Posizione rilevata';
-    if (meters < 150) return 'In prossimità della fermata';
-    if (meters < 1000) return `A circa ${Math.max(100, Math.round(meters / 100) * 100)} m`;
-    return `A circa ${(meters / 1000).toFixed(meters < 10000 ? 1 : 0).replace('.', ',')} km`;
+    if (meters < 950) return `a ${Math.max(10, Math.round(meters / 10) * 10)} m`;
+    return `a ${(meters / 1000).toFixed(1).replace('.', ',')} km`;
+}
+
+/** Distanza in linea d'aria del mezzo dalla sotto-fermata piu' vicina della
+ *  pagina: fallback quando il passaggio non ha coordinate proprie. */
+function stationDistanceMeters(vehicle, coords = pageStopCoords) {
+    let best = null;
+    (coords || []).forEach(point => {
+        const d = passageDistanceMeters(vehicle, { stop_lat: point.lat, stop_lon: point.lon });
+        if (d != null && (best === null || d < best)) best = d;
+    });
+    return best;
 }
 
 function vehicleInfoHtml(p) {
@@ -191,10 +201,20 @@ function vehicleInfoHtml(p) {
     return `<span class="passage-vehicle-info"><span class="passage-vehicle-dot"></span>${detail}</span>`;
 }
 
-function vehicleMapLinkHtml(p) {
-    if (!p.vehicle_info || !p.trip_id) return '';
-    const href = `/live-bus-map?tripId=${encodeURIComponent(p.trip_id)}`;
-    return `<a class="passage-map-link" href="${href}" onclick="event.stopPropagation()" aria-label="Mostra il mezzo sulla mappa">Mappa</a>`;
+/** Coordinate delle sotto-fermate della pagina: servono da fallback per i
+ *  passaggi real-time privi di stop_lat/stop_lon (distanza mezzo-fermata). */
+let pageStopCoords = [];
+let pageStopCoordsPromise = null;
+function fetchPageStopCoords() {
+    if (!pageStopCoordsPromise) {
+        pageStopCoordsPromise = fetch(`/api/stops?stop=${encodeURIComponent(stationId)}`, { cache: 'no-cache' })
+            .then(r => r.ok ? r.json() : [])
+            .then(stops => (Array.isArray(stops) ? stops : [])
+                .map(s => ({ lat: Number(s.stop_lat ?? s.lat), lon: Number(s.stop_lon ?? s.lng ?? s.lon) }))
+                .filter(c => Number.isFinite(c.lat) && Number.isFinite(c.lon)))
+            .catch(() => { pageStopCoordsPromise = null; return []; });
+    }
+    return pageStopCoordsPromise;
 }
 
 async function fetchStopVehicles(tripIds = []) {
@@ -220,7 +240,7 @@ function attachVehiclesToPassages(passages, vehicles) {
         const vehicle = byTrip.get(String(passage.trip_id || ''));
         if (!vehicle) return;
         passage.vehicle_info = vehicle.vehicle_position;
-        passage.vehicle_distance_m = passageDistanceMeters(vehicle, passage);
+        passage.vehicle_distance_m = passageDistanceMeters(vehicle, passage) ?? stationDistanceMeters(vehicle);
     });
     return passages;
 }
@@ -288,12 +308,16 @@ function lineDestKey(p) {
     return `${line}|${normalizeDestination(p.destination)}`;
 }
 
-/** Minuti del giorno (0-1439): uniforma "24:15" GTFS a 75 e "8'" a now+8. */
+/** Minuti del giorno (0-1439): uniforma "24:15" GTFS a 75, "8'" a now+8 e
+ *  "departure" a now: senza orario confrontabile il match ±10 min con i
+ *  previsti scartava sempre tutti i candidati e il mezzo restava senza
+ *  trip_id (niente distanza né stato fermate). */
 function passageMinutes(p) {
     const time = String(p.time || '');
-    if (/^\s*\d+\s*'\s*$/.test(time)) {
+    const relative = time === 'departure' ? 0 : (/^\s*\d+\s*'\s*$/.test(time) ? parseInt(time, 10) : null);
+    if (relative !== null) {
         const target = new Date();
-        target.setMinutes(target.getMinutes() + parseInt(time, 10));
+        target.setMinutes(target.getMinutes() + relative);
         return target.getHours() * 60 + target.getMinutes();
     }
     const parts = time.split(':').map(Number);
@@ -547,7 +571,8 @@ async function loadPassages() {
     noticePromise.then(noticeText => {
         if (loadToken !== passagesLoadToken) return;
         const updatedNotes = notes.slice();
-        if (noticeText) updatedNotes.push({ type: 'notice', html: noticeText });
+        // Un avviso che nomina lo sciopero merita lo stile di allerta.
+        if (noticeText) updatedNotes.push({ type: /sciopero/i.test(noticeText) ? 'strike' : 'notice', html: noticeText });
         renderBoard(updatedNotes);
     });
 
@@ -583,8 +608,8 @@ async function loadPassages() {
 
     updateFilter();
 
-    // Arricchimento progressivo: quando arrivano i mezzi, aggiorna distanza,
-    // fermate mancanti e link mappa senza trattenere i dati fondamentali.
+    // Arricchimento progressivo: quando arrivano i mezzi, aggiorna distanza
+    // e fermate mancanti senza trattenere i dati fondamentali.
     vehiclesPromise.then(async vehicles => {
         if (loadToken !== passagesLoadToken) return;
         const activeTripIds = new Set((vehicles || []).map(vehicle => String(vehicle.trip_id || '')).filter(Boolean));
@@ -592,6 +617,7 @@ async function loadPassages() {
             const exactPassages = mergePassages(realtime, scheduled, activeTripIds);
             passages.splice(0, passages.length, ...exactPassages);
         }
+        pageStopCoords = await fetchPageStopCoords();
         attachVehiclesToPassages(passages, vehicles);
         attachVehiclesToPassages(navigationPassages, vehicles);
         await enrichPassageProgress(passages.concat(navigationPassages));
@@ -810,7 +836,7 @@ function createPassageCard(p) {
                 ${vehicleInfoHtml(p)}
             </div>
         </div>
-        <div class="passage-time-column">${timeHtml}${vehicleMapLinkHtml(p)}</div>
+        <div class="passage-time-column">${timeHtml}</div>
     `;
 
     return div;
@@ -1164,5 +1190,5 @@ else init();
 
 // Export per Jest
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { getFavorites, isFavorite, toggleFavorite, updateFavoriteButton, createPassageCard, updateNotifyButton, switchTab, renderStopLines, mergePassages, isLikelyStrike, lineDestKey, passageDistanceMeters, passageVehicleLabel, attachVehiclesToPassages, passageVehicleProgress };
+    module.exports = { getFavorites, isFavorite, toggleFavorite, updateFavoriteButton, createPassageCard, updateNotifyButton, switchTab, renderStopLines, mergePassages, isLikelyStrike, lineDestKey, passageDistanceMeters, passageVehicleLabel, stationDistanceMeters, attachVehiclesToPassages, passageVehicleProgress };
 }
