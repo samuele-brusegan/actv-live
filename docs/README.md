@@ -1,5 +1,9 @@
 # Documentazione tecnica di ACTV Live
 
+> **Novità**: la [`spec/`](spec/) contiene la **specifica completa
+> dell'applicazione** (architettura, API, database, design system, ogni pagina
+> con screenshot mobile, diagrammi UML) sufficiente a ricreare l'app da zero.
+
 Questa directory raccoglie la documentazione per sviluppo, manutenzione e
 deploy di ACTV Live. Il codice resta la fonte di verità per le rotte e per i
 contratti API: le rotte registrate sono in [`public/routes.php`](../public/routes.php),
