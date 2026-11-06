@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Privacy e dati - ACTV Live</title>
+    <title>Privacy e dati - Bussol&agrave; / ACTV Live</title>
     <?php require COMMON_HTML_HEAD; ?>
     <link rel="stylesheet" href="/css/privacy.css">
 </head>
@@ -10,12 +10,12 @@
     <header class="header-green compact">
         <a href="/" class="back-button" aria-label="Torna alla home">←</a>
         <h1 class="header-title">Privacy e dati</h1>
-        <p class="header-subtitle">Cosa salviamo, dove, e come eliminarlo.</p>
+        <p class="header-subtitle">Cosa salviamo, dove, e come eliminarlo. Vale per il sito e per l'app Android &laquo;Bussol&agrave;&raquo;.</p>
     </header>
     <main class="privacy-page">
 
         <section class="privacy-card">
-            <h2>Dati salvati sul tuo dispositivo</h2>
+            <h2>Dati salvati sul tuo dispositivo (web)</h2>
             <p>Tutto ciò che l'app memorizza resta nel tuo browser (localStorage), non viene inviato ai nostri server:</p>
             <ul class="privacy-list">
                 <li><strong>favorite_stops</strong> — le tue fermate preferite</li>
@@ -32,8 +32,21 @@
             </div>
         </section>
 
+
         <section class="privacy-card">
-            <h2>Cookie</h2>
+            <h2>App Android &laquo;Bussol&agrave;&raquo;</h2>
+            <p>Nell'app valgono le stesse regole del sito, con queste differenze:</p>
+            <ul class="privacy-list">
+                <li><strong>Dati locali</strong> — preferiti, recenti, tragitti, storico ritardi, fermate monitorate, tema e indirizzo del server API restano sul dispositivo (SharedPreferences) e si eliminano da <em>Privacy e dati &rarr; Elimina tutti i dati</em> nell'app.</li>
+                <li><strong>Posizione</strong> — richiesta solo per mostrare le fermate vicine e usare &laquo;la mia posizione&raquo; nei percorsi. Le coordinate del GPS restano sul dispositivo; se pianifichi un percorso da un indirizzo o dalla tua posizione, quelle coordinate vengono inviate al nostro server API per calcolare il tragitto.</li>
+                <li><strong>Notifiche</strong> — solo notifiche locali per i ritardi delle fermate monitorate; nessun servizio di push esterno.</li>
+                <li><strong>Niente account, niente pubblicit&agrave;, niente analytics</strong> — nell'app Android non c'&egrave; Google Analytics n&eacute; tracciamento.</li>
+                <li><strong>Terze parti</strong> — tile e geocoding OpenStreetMap/Nominatim, font Inter da Google Fonts, dati ACTV tramite il nostro server.</li>
+            </ul>
+        </section>
+
+        <section class="privacy-card">
+            <h2>Cookie (solo web)</h2>
             <p>
                 L'app usa il cookie di sessione PHP (tecnico, necessario) e, previo consenso,
                 i cookie di <strong>Google Analytics</strong> per statistiche di utilizzo anonime.
@@ -55,9 +68,11 @@
 
         <section class="privacy-card">
             <h2>Feedback</h2>
-            <p>I messaggi inviati da <a href="/feedback">/feedback</a> sono salvati nel database dell'app. Non lasciare dati personali se non necessario.</p>
+            <p>I messaggi inviati da <a href="/feedback">/feedback</a> (sito o app) sono salvati nel database dell'app. Non lasciare dati personali se non necessario.</p>
+            <p>Per domande o richieste sui tuoi dati scrivici tramite la pagina <a href="/feedback">feedback</a>.</p>
         </section>
 
+        <p style="text-align:center;color:#888;font-size:13px;">Ultimo aggiornamento: 6 novembre 2026</p>
     </main>
 
 <script>
