@@ -1,3 +1,57 @@
+<?php
+// === SEO / i18n head block ===
+// Le view possono impostare $SEO = ['title'=>..., 'desc'=>..., 'robots'=>..., 'canonical'=>..., 'jsonld'=>...]
+// prima di includere questo file.
+$SEO = $SEO ?? [];
+$seoPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+$seoTitle = $SEO['title'] ?? t('meta.defaultTitle');
+$seoDesc = $SEO['desc'] ?? t('meta.defaultDesc');
+$seoRobots = $SEO['robots'] ?? (str_starts_with($seoPath, '/admin') ? 'noindex,nofollow' : 'index,follow');
+
+$seoScheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_SCHEME'] ?? '') === 'https') ? 'https' : 'http';
+$seoHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$seoBase = URL_PATH !== '' ? URL_PATH : $seoScheme . '://' . $seoHost;
+
+$seoQuery = $_GET;
+unset($seoQuery['lang']);
+$seoQueryStr = http_build_query($seoQuery);
+
+$seoCanonical = $SEO['canonical']
+    ?? $seoBase . ($SEO['canonicalPath'] ?? $seoPath) . (I18n::isDefault() ? '' : '?lang=' . I18n::lang());
+$seoHrefIt = $seoBase . $seoPath . ($seoQueryStr ? '?' . $seoQueryStr : '');
+$seoHrefEn = $seoBase . $seoPath . '?' . ($seoQueryStr ? $seoQueryStr . '&' : '') . 'lang=en';
+$seoImage = $seoBase . '/pwa/web-app-manifest-512x512.png';
+$seoLocale = I18n::lang() === 'en' ? 'en_US' : 'it_IT';
+$seoLocaleAlt = I18n::lang() === 'en' ? 'it_IT' : 'en_US';
+?>
+	<title><?= htmlspecialchars($seoTitle, ENT_QUOTES, 'UTF-8') ?></title>
+	<meta name="description" content="<?= htmlspecialchars($seoDesc, ENT_QUOTES, 'UTF-8') ?>">
+	<meta name="robots" content="<?= htmlspecialchars($seoRobots, ENT_QUOTES, 'UTF-8') ?>">
+	<link rel="canonical" href="<?= htmlspecialchars($seoCanonical, ENT_QUOTES, 'UTF-8') ?>">
+	<link rel="alternate" hreflang="it" href="<?= htmlspecialchars($seoHrefIt, ENT_QUOTES, 'UTF-8') ?>">
+	<link rel="alternate" hreflang="en" href="<?= htmlspecialchars($seoHrefEn, ENT_QUOTES, 'UTF-8') ?>">
+	<link rel="alternate" hreflang="x-default" href="<?= htmlspecialchars($seoHrefIt, ENT_QUOTES, 'UTF-8') ?>">
+	<meta name="theme-color" content="#009E61">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="ACTV Live">
+	<meta property="og:locale" content="<?= $seoLocale ?>">
+	<meta property="og:locale:alternate" content="<?= $seoLocaleAlt ?>">
+	<meta property="og:title" content="<?= htmlspecialchars($seoTitle, ENT_QUOTES, 'UTF-8') ?>">
+	<meta property="og:description" content="<?= htmlspecialchars($seoDesc, ENT_QUOTES, 'UTF-8') ?>">
+	<meta property="og:url" content="<?= htmlspecialchars($seoCanonical, ENT_QUOTES, 'UTF-8') ?>">
+	<meta property="og:image" content="<?= htmlspecialchars($seoImage, ENT_QUOTES, 'UTF-8') ?>">
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="<?= htmlspecialchars($seoTitle, ENT_QUOTES, 'UTF-8') ?>">
+	<meta name="twitter:description" content="<?= htmlspecialchars($seoDesc, ENT_QUOTES, 'UTF-8') ?>">
+	<meta name="twitter:image" content="<?= htmlspecialchars($seoImage, ENT_QUOTES, 'UTF-8') ?>">
+<?php if (!empty($SEO['jsonld'])): ?>
+	<script type="application/ld+json"><?= json_encode($SEO['jsonld'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
+<?php endif; ?>
+	<script>window.ACTV_LANG = <?= json_encode(I18n::lang()) ?>;</script>
+	<script src="/js/i18n-dict.js"></script>
+	<script src="/js/i18n.js"></script>
+	<script src="/js/lang-switcher.js" defer></script>
+
 	<!-- Google tag (gtag.js) — caricato solo dopo consenso cookie -->
 	<script>
 	window.dataLayer = window.dataLayer || [];

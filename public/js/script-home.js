@@ -98,7 +98,7 @@ async function initHomeMap() {
 
         userMarker = L.circleMarker(e.latlng, {
             color: '#009E61', fillColor: '#009E61', fillOpacity: 0.9, radius: 8
-        }).addTo(map).bindPopup("La tua posizione").openPopup();
+        }).addTo(map).bindPopup(actvT('js.home.myPos','La tua posizione')).openPopup();
 
         // Trova le 3 più vicine
         const near = stations.map(s => ({
@@ -116,10 +116,10 @@ async function initHomeMap() {
         updateMarkerRadii();
 
         // Mostra banner successo temporaneo
-        showStatusBanner("Posizione trovata. Ecco le stazioni più vicine.");
+        showStatusBanner(actvT('js.home.posFound','Posizione trovata. Ecco le stazioni più vicine.'));
     });
 
-    map.on('locationerror', (e) => console.warn("Errore localizzazione:", e.message));
+    map.on('locationerror', (e) => console.warn(actvT('js.home.geoErr','Errore localizzazione:'), e.message));
 }
 
 /** Carica l'elenco fermate dal backend ACTV */
@@ -300,7 +300,7 @@ function showStrikeModal(stops, noticeText = '') {
     toast.style.display = 'flex';
 
     const stopLinks = stops.map(s => {
-        const label = s.name || `Fermata ${s.id}`;
+        const label = s.name || `${actvT('js.home.stop','Fermata')} ${s.id}`;
         const href = `/aut/stops/stop?id=${encodeURIComponent(s.id)}&name=${encodeURIComponent(label)}`;
         return `<a class="strike-stop-link" href="${href}"><span class="strike-stop-name">${label}</span><span class="strike-stop-id">#${s.id}</span></a>`;
     }).join('');
@@ -309,19 +309,19 @@ function showStrikeModal(stops, noticeText = '') {
         ? `<p class="strike-text strike-notice">${noticeText}</p>`
         : '';
     const listBlock = stops.length
-        ? `<p class="strike-subtitle">Fermate senza passaggi rilevati:</p><div class="strike-stop-list">${stopLinks}</div>`
+        ? `<p class="strike-subtitle">${actvT('js.home.strikeStops','Fermate senza passaggi rilevati:')}</p><div class="strike-stop-list">${stopLinks}</div>`
         : '';
 
     toast.innerHTML = `
         <div class="strike-card" role="alertdialog" aria-modal="true" aria-labelledby="strike-title">
             <div class="strike-head">
                 <span class="strike-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 19.5h19L12 3Zm0 7v4m0 3.5h.01"/></svg></span>
-                <h5 class="strike-title" id="strike-title">${noticeText ? 'Sciopero' : 'Possibile sciopero in corso'}</h5>
+                <h5 class="strike-title" id="strike-title">${noticeText ? actvT('js.home.strike','Sciopero') : actvT('js.home.strikeMaybe','Possibile sciopero in corso')}</h5>
             </div>
-            ${noticeBlock || `<p class="strike-text">Il servizio in tempo reale non risponde su <strong>${stops.length} fermate</strong> controllate:
-                è probabile uno sciopero o un'interruzione del servizio. Gli orari previsti potrebbero non essere rispettati.</p>`}
+            ${noticeBlock || `<p class="strike-text">${actvT('js.home.strikeText','Il servizio in tempo reale non risponde su {n} fermate controllate:',{n:'<strong>'+stops.length+'</strong>'})}
+${actvT('js.home.strikeText2',"è probabile uno sciopero o un'interruzione del servizio. Gli orari previsti potrebbero non essere rispettati.")}</p>`}
             ${listBlock}
-            <button class="btn btn-primary strike-ok" onclick="document.getElementById('important-info-toast').style.display='none'">Ho capito</button>
+            <button class="btn btn-primary strike-ok" onclick="document.getElementById('important-info-toast').style.display='none'">${actvT('js.home.gotIt','Ho capito')}</button>
         </div>
     `;
 }

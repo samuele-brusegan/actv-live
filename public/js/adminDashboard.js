@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadDashboard() {
         if (isLoading) return; // un ciclo è già in corso: evita di sovraccaricare il server
         isLoading = true;
-        els.lastUpdate.textContent = 'Aggiornamento in corso...';
+        els.lastUpdate.textContent = actvT('js.adm.updating','Aggiornamento in corso...');
         
         try {
             // 1. Get Active Trips
@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Run pool
             await parallelPool(tasks, MAX_CONCURRENT, showProgress ? (d, tot) => {
                 if (els.progressFill) els.progressFill.style.width = Math.round((d / tot) * 100) + '%';
-                if (els.progressLabel) els.progressLabel.textContent = `Caricamento bus ${d}/${tot}\u2026`;
+                if (els.progressLabel) els.progressLabel.textContent = `${actvT('js.adm.loadBus','Caricamento bus')} ${d}/${tot}\u2026`;
             } : null);
 
             if (showProgress) els.progress.style.display = 'none';
@@ -327,8 +327,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderEmpty() {
         els.totalBuses.textContent = '0';
-        els.tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Nessun bus in servizio</td></tr>';
-        els.lastUpdate.textContent = 'Aggiornato: ' + new Date().toLocaleTimeString();
+        els.tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center;">${actvT('js.adm.noBuses','Nessun bus in servizio')}</td></tr>`;
+        els.lastUpdate.textContent = actvT('js.adm.updated','Aggiornato: ') + new Date().toLocaleTimeString();
     }
 
     function renderDashboard() {
@@ -433,7 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
             els.tableBody.appendChild(tr);
         });
 
-        els.lastUpdate.textContent = 'Aggiornato: ' + new Date().toLocaleTimeString();
+        els.lastUpdate.textContent = actvT('js.adm.updated','Aggiornato: ') + new Date().toLocaleTimeString();
     }
 
 

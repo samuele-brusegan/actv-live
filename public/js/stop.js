@@ -56,7 +56,7 @@ function toggleFavorite() {
         favorites.push({
             id: stationId.split('-')[0],
             ids: stationId.split('-'),
-            name: stationName || `Fermata ${stationId}`
+            name: stationName || `${actvT('js.stop.stop','Fermata')} ${stationId}`
         });
     }
 
@@ -71,7 +71,7 @@ function updateFavoriteButton() {
 
     const favorited = isFavorite();
     favoriteBtn.classList.toggle('favorited', favorited);
-    favoriteBtn.title = favorited ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
+    favoriteBtn.title = favorited ? actvT('js.stop.unfav','Rimuovi dai preferiti') : actvT('js.stop.fav','Aggiungi ai preferiti');
 }
 
 /**
@@ -176,7 +176,7 @@ function passageDistanceMeters(vehicle, passage) {
 }
 
 function passageVehicleLabel(meters) {
-    if (!Number.isFinite(meters)) return 'Posizione rilevata';
+    if (!Number.isFinite(meters)) return actvT('js.stop.posOk','Posizione rilevata');
     if (meters < 950) return `a ${Math.max(10, Math.round(meters / 10) * 10)} m`;
     return `a ${(meters / 1000).toFixed(1).replace('.', ',')} km`;
 }
@@ -196,8 +196,8 @@ function vehicleInfoHtml(p) {
     if (!p.vehicle_info) return '';
     const progress = p.vehicle_progress;
     const detail = progress?.boardingPassed
-        ? 'Il mezzo ha già superato questa fermata'
-        : `${passageVehicleLabel(p.vehicle_distance_m)}${progress?.stopsToBoarding > 0 ? ` · ${progress.stopsToBoarding} fermat${progress.stopsToBoarding === 1 ? 'a' : 'e'}` : ''}`;
+        ? actvT('js.stop.passed','Il mezzo ha già superato questa fermata')
+        : `${passageVehicleLabel(p.vehicle_distance_m)}${progress?.stopsToBoarding > 0 ? ` · ${progress.stopsToBoarding} ${progress.stopsToBoarding === 1 ? actvT('js.stop.stop1','fermata') : actvT('js.stop.stopN','fermate')}` : ''}`;
     return `<span class="passage-vehicle-info"><span class="passage-vehicle-dot"></span>${detail}</span>`;
 }
 
@@ -561,8 +561,8 @@ async function loadPassages() {
     if (strike) {
         notes.push({
             type: 'strike',
-            html: '<strong>Possibile sciopero o servizio non monitorato.</strong><br>' +
-                  'I passaggi in tempo reale non sono disponibili: gli orari mostrati sono quelli <em>previsti</em> ' +
+            html: `<strong>${actvT('js.stop.strike','Possibile sciopero o servizio non monitorato.')}</strong><br>` +
+                  `${actvT('js.stop.noRt','I passaggi in tempo reale non sono disponibili: gli orari mostrati sono quelli previsti ')}` +
                   'e i bus potrebbero non passare.'
         });
     }
@@ -580,7 +580,7 @@ async function loadPassages() {
 
     // Errore di rete reale (real-time null) e nessun dato previsto
     if (realtime === null && (!scheduled || scheduled.length === 0) && navigationPassages.length === 0) {
-        listContainer.innerHTML = "<p class='text-center text-danger'>Errore nel caricamento dei dati.</p>";
+        listContainer.innerHTML = "<p class='text-center text-danger'>${actvT('js.stop.errData','Errore nel caricamento dei dati.')}</p>";
         return;
     }
 
@@ -593,8 +593,8 @@ async function loadPassages() {
 
     if (passages.length === 0 && navigationPassages.length === 0) {
         const message = strike
-            ? "Nessun passaggio in tempo reale (possibile sciopero). Vedi la bacheca."
-            : "Nessun passaggio previsto.";
+            ? "${actvT('js.stop.noPassRt','Nessun passaggio in tempo reale (possibile sciopero). Vedi la bacheca.')}"
+            : "${actvT('js.stop.noPass','Nessun passaggio previsto.')}";
         listContainer.innerHTML = `<p class='text-center text-muted'>${message}</p>`;
         return;
     }
@@ -651,11 +651,11 @@ function ensureBoardBubble() {
         bubble.id = 'board-bubble';
         bubble.className = 'board-bubble';
         bubble.style.display = 'none';
-        bubble.setAttribute('title', 'Apri bacheca');
+        bubble.setAttribute('title', actvT('js.stop.board','Apri bacheca'));
         bubble.onclick = expandBoard;
         bubble.innerHTML = '<span class="board-bubble-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4a3 3 0 0 1 6 0M9 10h6M9 14h6"/></svg></span><span class="board-bubble-count"></span>';
         bubble.setAttribute('role', 'button');
-        bubble.setAttribute('aria-label', 'Apri bacheca avvisi');
+        bubble.setAttribute('aria-label', actvT('js.stop.boardOpen','Apri bacheca avvisi'));
         document.body.appendChild(bubble);
     }
     return bubble;
@@ -685,7 +685,7 @@ function renderBoard(notes) {
     ).join('');
 
     container.innerHTML = `
-        <div class="board-card" id="board-card" role="region" aria-label="Bacheca avvisi">
+        <div class="board-card" id="board-card" role="region" aria-label="${actvT('js.stop.boardTitle','Bacheca avvisi')}">
             <div class="board-header">
                 <span class="board-title">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4a3 3 0 0 1 6 0M9 10h6M9 14h6"/></svg>
@@ -730,7 +730,7 @@ function expandBoard() {
 /** Crea l'elemento DOM per un singolo passaggio */
 function createPassageCard(p) {
     const lineNameRaw = p.line || "";
-    const destination = p.destination || "Destinazione ignota";
+    const destination = p.destination || "${actvT('js.stop.destUnk','Destinazione ignota')}";
     const time = p.time;
     const isReal = p.real;
     const stop = p.stop || stationId;
@@ -810,7 +810,7 @@ function createPassageCard(p) {
         );
 
         if (!tripId) {
-            errorPopup('Impossibile identificare con certezza questa corsa.');
+            errorPopup(actvT('js.stop.tripUnk','Impossibile identificare con certezza questa corsa.'));
             return;
         }
 
@@ -965,7 +965,7 @@ function updateFilter() {
             const btn = document.createElement('div');
             btn.className = `filter-box box-stop ${stopFilter.includes(stopId) ? 'selected' : ''}`;
             btn.innerText = `#${stopId}`;
-            btn.title = `Fermata ${stopId}`;
+            btn.title = `${actvT('js.stop.stop','Fermata')} ${stopId}`;
             btn.setAttribute('role', 'checkbox');
             btn.setAttribute('aria-checked', stopFilter.includes(stopId) ? 'true' : 'false');
             btn.onclick = () => toggle('stop_filter', stopId, getFilterSelection('stop_filter'));
@@ -1027,7 +1027,7 @@ async function enableStopNotifications() {
         return;
     }
 
-    addMonitoredStop(stationId, stationName || `Fermata ${stationId}`);
+    addMonitoredStop(stationId, stationName || `${actvT('js.stop.stop','Fermata')} ${stationId}`);
     updateNotifyButton();
     updateThresholdButtons();
 }
@@ -1050,7 +1050,7 @@ function updateNotifyButton() {
 
     const monitored = typeof isStopMonitored !== 'undefined' && isStopMonitored(stationId);
     btn.classList.toggle('notify-active', monitored);
-    btn.title = monitored ? 'Disattiva notifiche' : 'Attiva notifiche ritardi';
+    btn.title = monitored ? actvT('js.notifOff','Disattiva notifiche') : actvT('js.notifOn','Attiva notifiche ritardi');
 }
 
 function updateThresholdButtons() {
@@ -1109,7 +1109,7 @@ async function loadStopLines() {
     } catch (error) {
         console.error('Errore caricamento linee:', error);
         if (loadingEl) loadingEl.style.display = 'none';
-        if (listEl) listEl.innerHTML = "<p class='text-center text-danger'>Errore nel caricamento delle linee.</p>";
+        if (listEl) listEl.innerHTML = "<p class='text-center text-danger'>${actvT('js.stop.errLines','Errore nel caricamento delle linee.')}</p>";
     }
 }
 
@@ -1159,7 +1159,7 @@ function shareWidget() {
 async function init() {
     if (!stationId) {
         const nameEl = document.getElementById('station-name');
-        if (nameEl) nameEl.innerText = "Errore: ID mancante";
+        if (nameEl) nameEl.innerText = "${actvT('js.stop.errId','Errore: ID mancante')}";
         const loadingEl = document.getElementById('loading');
         if (loadingEl) loadingEl.style.display = 'none';
         return;
@@ -1170,7 +1170,7 @@ async function init() {
     // interrompere il caricamento delle funzioni della fermata.
     const stationNameEl = document.getElementById('station-name');
     const stationIdEl = document.getElementById('station-id');
-    if (stationNameEl) stationNameEl.innerText = stationName || `Fermata ${stationId}`;
+    if (stationNameEl) stationNameEl.innerText = stationName || `${actvT('js.stop.stop','Fermata')} ${stationId}`;
     if (stationIdEl) stationIdEl.innerText = stationId;
 
     updateFavoriteButton();

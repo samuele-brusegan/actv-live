@@ -20,7 +20,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const dateStr = localStorage.getItem('route_departure_date');
 
         if (!routeData) {
-            console.warn("Nessun percorso in cache. Ritorno al cercapercorsi.");
+            console.warn("${actvT('js.rd.noCache','Nessun percorso in cache. Ritorno al cercapercorsi.')}");
             window.location.href = '/route-finder';
             return;
         }
@@ -50,7 +50,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     } catch (e) {
         console.error("Errore init routeDetails:", e);
-        if (window.actvAlert) actvAlert('Si è verificato un errore nel caricamento del percorso.', 'Impossibile caricare il percorso');
+        if (window.actvAlert) actvAlert(actvT('js.rd.err','Si è verificato un errore nel caricamento del percorso.'), actvT('js.rd.cant','Impossibile caricare il percorso'));
     }
 });
 
@@ -89,7 +89,7 @@ function routeDurationText(minutes) {
     const hours = Math.floor((minutes % 1440) / 60);
     const rest = minutes % 60;
     const parts = [];
-    if (days) parts.push(`${days} ${days === 1 ? 'giorno' : 'giorni'}`);
+    if (days) parts.push(`${days} ${days === 1 ? actvT('js.rr.day1','giorno') : actvT('js.rr.dayN','giorni')}`);
     if (hours) parts.push(`${hours} h`);
     if (rest || !parts.length) parts.push(`${rest} min`);
     return parts.join(' ');
@@ -192,8 +192,8 @@ function renderLeg(leg, index, total, finalDest) {
     }
 
     const connectorInfo = isWalking
-        ? `Cammina per ${Math.round(leg.duration || 0)} min${leg.distance ? ` (${leg.distance} m)` : ''}`
-        : `Linea <strong>${badge.name}</strong> &middot; ${leg.stops_count} fermate`;
+        ? `${actvT('js.rd.walk','Cammina per')} ${Math.round(leg.duration || 0)} min${leg.distance ? ` (${leg.distance} m)` : ''}`
+        : `${actvT('linesMap.byLine','Linea')} <strong>${badge.name}</strong> &middot; ${leg.stops_count} ${actvT('js.stop.stopN','fermate')}`;
 
     html += `
         <div class="timeline-connector">
@@ -335,7 +335,7 @@ function updateSaveRouteBtn() {
     if (!btn || typeof isFavoriteRoute === 'undefined') return;
     const saved = isFavoriteRoute(FAV_ORIGIN, FAV_DESTINATION);
     btn.classList.toggle('saved', saved);
-    btn.innerHTML = saved ? '\u2605 Tragitto salvato' : '\u2606 Salva tragitto';
+    btn.innerHTML = saved ? `\u2605 ${actvT('js.rd.saved','Tragitto salvato')}` : `\u2606 ${actvT('routeDetails.save','Salva tragitto')}`;
 }
 
 /* ============================  Mappa  ============================ */
@@ -424,7 +424,7 @@ async function initMap() {
     if (USER_COORDS) {
         L.circleMarker([USER_COORDS.lat, USER_COORDS.lng], {
             radius: 7, color: '#0152BB', fillColor: '#0152BB', fillOpacity: 1
-        }).addTo(mapInstance).bindPopup('La tua posizione');
+        }).addTo(mapInstance).bindPopup(actvT('js.home.myPos','La tua posizione'));
         points.push([USER_COORDS.lat, USER_COORDS.lng]);
 
         if (ORIGIN_COORDS) {

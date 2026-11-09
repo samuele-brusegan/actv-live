@@ -41,7 +41,7 @@
             ['Feed', data.kind === 'vehicles' ? 'Vehicle Positions' : 'Trip Updates'],
             ['Ricevuto', data.fetched_at ? new Date(data.fetched_at).toLocaleString('it-IT') : '--'],
             ['Dimensione', formatBytes(data.bytes)],
-            ['Record decodificati', records],
+            [actvT('js.rt.records','Record decodificati'), records],
             ['SHA-256', data.sha256]
         ].map(([title, value]) =>
             `<div class="stat-card"><div class="stat-title">${escapeHtml(title)}</div>` +
@@ -75,7 +75,7 @@
             render(data.data);
         } catch (error) {
             setStatus(`Errore: ${error.message}`, true);
-            decoded.textContent = 'Nessun dato disponibile.';
+            decoded.textContent = actvT('delay.noData','Nessun dato disponibile.');
         } finally {
             loading = false;
             refresh.disabled = false;
@@ -95,11 +95,11 @@
         if (!raw.value) return;
         try {
             await navigator.clipboard.writeText(raw.value);
-            setStatus('Payload Base64 copiato negli appunti.');
+            setStatus(actvT('js.rt.copied','Payload Base64 copiato negli appunti.'));
         } catch (error) {
             raw.select();
             document.execCommand('copy');
-            setStatus('Payload Base64 copiato negli appunti.');
+            setStatus(actvT('js.rt.copied','Payload Base64 copiato negli appunti.'));
         }
     });
 

@@ -15,44 +15,44 @@
         {
             page: /^\/$/,
             selector: '#nearby-section',
-            title: 'Fermate vicine',
-            text: 'Con la geolocalizzazione attiva, qui compaiono le fermate più vicine a te.',
+            title: actvT('js.tour.t1','Fermate vicine'),
+            text: actvT('js.tour.t1b','Con la geolocalizzazione attiva, qui compaiono le fermate più vicine a te.'),
             action: 'next'
         },
         {
             page: /^\/$/,
             selector: '#favorites-section',
-            title: 'Le tue fermate',
-            text: 'Le fermate che salvi con la stella le ritrovi sempre qui.',
+            title: actvT('js.tour.t2','Le tue fermate'),
+            text: actvT('js.tour.t2b','Le fermate che salvi con la stella le ritrovi sempre qui.'),
             action: 'next',
             optional: true
         },
         {
             page: /^\/$/,
             selector: '#map',
-            title: 'La mappa',
-            text: 'Ogni pallino è una fermata: toccalo per aprire i passaggi in tempo reale.',
+            title: actvT('js.tour.t3','La mappa'),
+            text: actvT('js.tour.t3b','Ogni pallino è una fermata: toccalo per aprire i passaggi in tempo reale.'),
             action: 'next'
         },
         {
             page: /^\/$/,
             selector: '.home-actions',
             title: 'Tutto il resto',
-            text: 'Da qui: percorsi con cambio, orari delle linee, statistiche sui ritardi e ricerca di una corsa. Le altre funzioni sono nel menu "Altro" in basso.',
+            text: actvT('js.tour.t4','Da qui: percorsi con cambio, orari delle linee, statistiche sui ritardi e ricerca di una corsa. Le altre funzioni sono nel menu "Altro" in basso.'),
             action: 'next'
         },
         {
             page: /^\/$/,
             selector: '.home-primary-action',
-            title: 'Cerca una fermata',
+            title: actvT('js.tour.t5','Cerca una fermata'),
             text: 'Tutto parte da qui: tocca il pulsante per aprire l\'elenco delle fermate.',
             action: 'click'
         },
         {
             page: /^\/stopList$/,
             selector: '#search-input',
-            title: 'Trova la tua fermata',
-            text: 'Digita il nome della fermata per filtrare l\'elenco in tempo reale.',
+            title: actvT('js.tour.t6','Trova la tua fermata'),
+            text: actvT('js.tour.t6b','Digita il nome della fermata per filtrare l\'elenco in tempo reale.'),
             action: 'next',
             glow: true,
             demoText: ['Piazzale Roma', 'Mestre Centro', 'Bissuola Cadorna']
@@ -60,113 +60,113 @@
         {
             page: /^\/stopList$/,
             selector: '#stations-list .station-item',
-            title: 'Apri una fermata',
-            text: 'Tocca una fermata: si apre la pagina con i prossimi passaggi.',
+            title: actvT('js.tour.t7','Apri una fermata'),
+            text: actvT('js.tour.t7b','Tocca una fermata: si apre la pagina con i prossimi passaggi.'),
             action: 'click'
         },
         {
             page: /^\/aut\/stops\/stop$/,
             selector: ['#passages-list > *', '#passages-list', '.section-title'],
-            title: 'Passaggi in tempo reale',
-            text: 'Qui vedi i prossimi mezzi: orario, linea, destinazione e posizione quando disponibile.',
+            title: actvT('js.tour.t8','Passaggi in tempo reale'),
+            text: actvT('js.tour.t8b','Qui vedi i prossimi mezzi: orario, linea, destinazione e posizione quando disponibile.'),
             action: 'next'
         },
         {
             page: /^\/aut\/stops\/stop$/,
             selector: '#favorite-btn',
-            title: 'Salvala nei preferiti',
-            text: 'Tocca la stella: la fermata comparirà in cima alla home.',
+            title: actvT('js.tour.t9','Salvala nei preferiti'),
+            text: actvT('js.tour.t9b','Tocca la stella: la fermata comparirà in cima alla home.'),
             action: 'click'
         },
         {
             page: /^\/aut\/stops\/stop$/,
             selector: '.header-actions',
-            title: 'Notifiche e condivisione',
-            text: 'Da qui puoi attivare le notifiche sui ritardi e condividere la fermata.',
+            title: actvT('js.tour.t10','Notifiche e condivisione'),
+            text: actvT('js.tour.t10b','Da qui puoi attivare le notifiche sui ritardi e condividere la fermata.'),
             action: 'next'
         },
         {
             page: /^\/aut\/stops\/stop$/,
             selector: ['#passages-list .passage-card:not(.hidden)', '#passages-list .passage-card'],
-            title: 'Dettaglio della corsa',
-            text: 'Tocca un passaggio: si apre la pagina con tutte le fermate della corsa.',
+            title: actvT('js.tour.t11','Dettaglio della corsa'),
+            text: actvT('js.tour.t11b','Tocca un passaggio: si apre la pagina con tutte le fermate della corsa.'),
             action: 'click'
         },
         {
             page: /^\/trip-details$/,
             selector: '#stops-container',
-            title: 'Le fermate della corsa',
-            text: 'Tutte le fermate in ordine, con gli orari: quelle già passate e le prossime.',
+            title: actvT('js.tour.t12','Le fermate della corsa'),
+            text: actvT('js.tour.t12b','Tutte le fermate in ordine, con gli orari: quelle già passate e le prossime.'),
             action: 'next'
         },
         {
             page: /^\/trip-details$/,
             selector: '.map-fab',
-            title: 'La corsa sulla mappa',
-            text: 'Con questo pulsante vedi il percorso sulla mappa e la posizione del mezzo.',
+            title: actvT('js.tour.t13','La corsa sulla mappa'),
+            text: actvT('js.tour.t13b','Con questo pulsante vedi il percorso sulla mappa e la posizione del mezzo.'),
             action: 'next'
         },
         {
             page: /^\/trip-details$/,
             selector: '#actv-more-toggle',
             title: 'Menu "Altro"',
-            text: 'Le funzioni secondarie vivono qui: tocca per aprire il menu.',
+            text: actvT('js.tour.t14','Le funzioni secondarie vivono qui: tocca per aprire il menu.'),
             action: 'click'
         },
         {
             page: /^\/trip-details$/,
             selector: '.actv-more-menu a[href="/live-map"]',
-            title: 'Bus in servizio',
-            text: 'Apri la mappa live di tutti i mezzi ACTV in circolazione.',
+            title: actvT('js.tour.t15','Bus in servizio'),
+            text: actvT('js.tour.t15b','Apri la mappa live di tutti i mezzi ACTV in circolazione.'),
             action: 'click'
         },
         {
             page: /^\/live-map$/,
             selector: '#map',
             title: 'I mezzi in tempo reale',
-            text: 'Ogni icona è un bus o un vaporetto in servizio: toccala per linea, destinazione e dettagli della corsa.',
+            text: actvT('js.tour.t16','Ogni icona è un bus o un vaporetto in servizio: toccala per linea, destinazione e dettagli della corsa.'),
             action: 'next'
         },
         {
             page: /^\/live-map$/,
             selector: '#service-switch',
-            title: 'Bus o vaporetti',
-            text: 'Filtra i mezzi sulla mappa per tipo di servizio.',
+            title: actvT('js.tour.t17','Bus o vaporetti'),
+            text: actvT('js.tour.t17b','Filtra i mezzi sulla mappa per tipo di servizio.'),
             action: 'next'
         },
         {
             page: /^\/live-map$/,
             selector: '.map-search',
             title: 'Cerca tra i mezzi',
-            text: 'Filtra per linea, destinazione o ID corsa: puoi separare più ricerche con una virgola.',
+            text: actvT('js.tour.t18','Filtra per linea, destinazione o ID corsa: puoi separare più ricerche con una virgola.'),
             action: 'next'
         },
         {
             page: /^\/live-map$/,
             selector: '#actv-more-toggle',
             title: 'Ancora "Altro"',
-            text: 'Ultima tappa: gli orari delle linee. Riapri il menu.',
+            text: actvT('js.tour.t19','Ultima tappa: gli orari delle linee. Riapri il menu.'),
             action: 'click'
         },
         {
             page: /^\/live-map$/,
             selector: '.actv-more-menu a[href="/line-schedule"]',
-            title: 'Orari delle linee',
-            text: 'Apri l\'orario completo di tutte le linee.',
+            title: actvT('js.tour.t20','Orari delle linee'),
+            text: actvT('js.tour.t20b','Apri l\'orario completo di tutte le linee.'),
             action: 'click'
         },
         {
             page: /^\/line-schedule$/,
             selector: '.schedule-controls',
-            title: 'Scegli la linea',
-            text: 'Seleziona autobus o vaporetti, poi cerca la linea per numero o destinazione.',
+            title: actvT('js.tour.t21','Scegli la linea'),
+            text: actvT('js.tour.t21b','Seleziona autobus o vaporetti, poi cerca la linea per numero o destinazione.'),
             action: 'next'
         },
         {
             page: /^\/line-schedule$/,
             selector: '.schedule-workspace',
-            title: 'Percorsi e orari',
-            text: 'A sinistra le varianti del percorso, a destra tutte le corse con fermate e orari. Tour finito!',
+            title: actvT('js.tour.t22','Percorsi e orari'),
+            text: actvT('js.tour.t22b','A sinistra le varianti del percorso, a destra tutte le corse con fermate e orari. Tour finito!'),
             action: 'next'
         }
     ];
@@ -281,7 +281,7 @@
             <div class="tour-actions">
                 <button type="button" class="tour-skip" data-tour-end>Salta</button>
                 ${isClick
-                    ? '<span class="tour-hint">Tocca il pulsante</span>'
+                    ? `<span class="tour-hint">${actvT('js.tour.t23','Tocca il pulsante')}</span>`
                     : '<button type="button" class="tour-next" data-tour-next>' +
                       (tour.index === STEPS.length - 1 ? 'Fine' : 'Avanti') + '</button>'}
             </div>`;

@@ -36,11 +36,13 @@ class Router {
             $controller->$actionName($params);
         } else {
             // Gestione errore 404
-            header("HTTP/1.0 404 Not Found");
-            echo "<pre>";
-            echo "Pagina non trovata!";
-            echo "</pre>";
-            
+            http_response_code(404);
+            $notFound = defined('BASE_PATH') ? BASE_PATH . '/app/views/404.php' : null;
+            if ($notFound && is_file($notFound)) {
+                require $notFound;
+            } else {
+                echo "<pre>Pagina non trovata!</pre>";
+            }
         }
     }
 

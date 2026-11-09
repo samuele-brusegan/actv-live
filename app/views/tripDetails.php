@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?= I18n::lang() ?>">
 
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Dettaglio Corsa - ACTV</title>
-        <?php require COMMON_HTML_HEAD; ?>
+        <?php
+        $SEO = ['title' => t('meta.tripDetails.title'), 'desc' => t('meta.tripDetails.desc'), 'robots' => 'noindex,follow'];
+        require COMMON_HTML_HEAD;
+        ?>
         <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
         <link rel="stylesheet" href="/css/structure/structure-tripDetails.css">
         <link rel="stylesheet" href="/css/tripDetails.css?v=<?php echo filemtime(BASE_PATH . '/public/css/tripDetails.css'); ?>">
@@ -20,18 +22,19 @@
     <!-- Header -->
     <div class="header-green">
         <div style="height: 20px;">
-            <a href="javascript:history.back()" style="color: white; text-decoration: none; font-size: 24px;">
+            <a href="javascript:history.back()" style="color: white; text-decoration: none; font-size: 24px;" aria-label="<?= te('ui.back') ?>">
                 <?= getIcon('arrow_back', 24) ?>
             </a>
         </div>
+        <h1 class="visually-hidden"><?= te('meta.tripDetails.title') ?></h1>
 
             <div class="trip-header-info">
                 <div class="line-info">
                     <div class="line-box line-badge" id="line-number">--</div>
                 </div>
                 <div class="direction-info">
-                    <div class="direction-label">DIREZIONE</div>
-                    <div class="direction-name" id="direction-name">Caricamento...</div>
+                    <div class="direction-label"><?= te('tripDetails.direction') ?></div>
+                    <div class="direction-name" id="direction-name"><?= te('ui.loading') ?></div>
                 </div>
             </div>
 
@@ -58,35 +61,35 @@
                         ></l-hatch>
                         <br>
 
-                        Caricamento fermate...
+                        <?= te('tripDetails.loadingStops') ?>
                     </div>
                 </div>
             </div>
         </div>
 
-        <button class="map-fab" onclick="openMap()" title="Vedi sulla mappa" aria-controls="trip-map-dialog">
+        <button class="map-fab" onclick="openMap()" title="<?= te('tripDetails.seeMap') ?>" aria-controls="trip-map-dialog">
             <?= getIcon('bus', 24) ?>
         </button>
 
-        <div id="trip-map-dialog" class="trip-map-dialog" hidden aria-label="Mappa della corsa">
+        <div id="trip-map-dialog" class="trip-map-dialog" hidden aria-label="<?= te('tripDetails.mapAria') ?>">
             <div id="trip-map"></div>
             <header class="trip-map-header">
-                <button class="trip-map-close" type="button" onclick="closeMap()" aria-label="Chiudi mappa">&larr;</button>
+                <button class="trip-map-close" type="button" onclick="closeMap()" aria-label="<?= te('tripDetails.closeMap') ?>">&larr;</button>
                 <div class="trip-map-heading">
                     <span id="trip-map-line" class="trip-map-line-badge">--</span>
-                    <div><strong id="trip-map-title">Mappa corsa</strong><small id="trip-map-direction">Caricamento...</small></div>
+                    <div><strong id="trip-map-title"><?= te('tripDetails.mapTitle') ?></strong><small id="trip-map-direction"><?= te('ui.loading') ?></small></div>
                 </div>
-                <div id="trip-map-status" class="trip-map-status"><span class="trip-map-live-dot"></span>Caricamento percorso...</div>
+                <div id="trip-map-status" class="trip-map-status"><span class="trip-map-live-dot"></span><?= te('tripDetails.loadingRoute') ?></div>
             </header>
             <section id="trip-map-stops" class="trip-map-stops">
                 <button class="trip-map-stops-header" type="button" onclick="toggleMapStops()" aria-expanded="true">
-                    <span>Fermate della corsa</span>
+                    <span><?= te('tripDetails.tripStops') ?></span>
                     <span class="trip-map-stops-head-right">
                         <span id="trip-map-stops-count" class="trip-map-stops-count"></span>
                         <span class="trip-map-chevron">⌄</span>
                     </span>
                 </button>
-                <div class="trip-map-stops-legend"><span class="trip-map-legend-dot visited"></span> Già passata <span class="trip-map-legend-dot upcoming"></span> Da raggiungere</div>
+                <div class="trip-map-stops-legend"><span class="trip-map-legend-dot visited"></span> <?= te('tripDetails.passed') ?> <span class="trip-map-legend-dot upcoming"></span> <?= te('tripDetails.upcoming') ?></div>
                 <div id="trip-map-stops-list" class="trip-map-stops-list"></div>
             </section>
         </div>

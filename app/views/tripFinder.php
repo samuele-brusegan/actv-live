@@ -1,58 +1,60 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?= I18n::lang() ?>">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Cerca corsa - ACTV</title>
-        <?php require COMMON_HTML_HEAD; ?>
+        <?php
+        $SEO = ['title' => t('meta.tripFinder.title'), 'desc' => t('meta.tripFinder.desc')];
+        require COMMON_HTML_HEAD;
+        ?>
         <link rel="stylesheet" href="/css/tripFinder.css">
         <script defer src="/js/tripFinder.js"></script>
     </head>
     <body>
         <header class="header-green">
             <div>
-                <a class="back-button" href="/" aria-label="Torna alla home">&larr;</a>
+                <a class="back-button" href="/" aria-label="<?= te('ui.backHome') ?>">&larr;</a>
             </div>
-            <h1 class="header-title">Cerca una corsa</h1>
-            <p class="header-subtitle">Seleziona linea, fermate e la corsa da aprire.</p>
+            <h1 class="header-title"><?= te('tripFinder.title') ?></h1>
+            <p class="header-subtitle"><?= te('tripFinder.subtitle') ?></p>
         </header>
 
         <main class="trip-finder-content" id="trip-finder">
             <section class="finder-card" aria-labelledby="finder-title">
                 <div class="finder-card-heading">
                     <div>
-                        <p class="eyebrow">Servizio automobilistico</p>
-                        <h2 id="finder-title">Trova il viaggio</h2>
+                        <p class="eyebrow"><?= te('tripFinder.busService') ?></p>
+                        <h2 id="finder-title"><?= te('tripFinder.findTrip') ?></h2>
                     </div>
                 </div>
 
                 <div class="finder-grid">
                     <div class="finder-field">
-                        <label for="line-input">Linea</label>
+                        <label for="line-input"><?= te('lineSchedule.lineLabel') ?></label>
                         <select id="line-input" class="form-select" autocomplete="off">
-                            <option value="">Caricamento linee...</option>
+                            <option value=""><?= te('lineSchedule.loading') ?></option>
                         </select>
-                        <small class="field-help">Scegli una linea per caricare i capolinea disponibili.</small>
+                        <small class="field-help"><?= te('tripFinder.lineHelp') ?></small>
                     </div>
                     <div class="finder-field">
-                        <label for="date-input">Data servizio</label>
+                        <label for="date-input"><?= te('tripFinder.dateLabel') ?></label>
                         <input id="date-input" class="form-control" type="date" value="<?= date('Y-m-d') ?>">
                     </div>
                 </div>
 
                 <div class="finder-field">
-                    <label for="origin-input">Partenza</label>
+                    <label for="origin-input"><?= te('routeFinder.departureCap') ?></label>
                     <select id="origin-input" class="form-select" disabled>
-                        <option value="">Prima scegli una linea</option>
+                        <option value=""><?= te('tripFinder.pickLineFirst') ?></option>
                     </select>
                 </div>
 
                 <div class="direction-arrow" aria-hidden="true">↓</div>
 
                 <div class="finder-field">
-                    <label for="destination-input">Destinazione</label>
+                    <label for="destination-input"><?= te('routeFinder.destinationCap') ?></label>
                     <select id="destination-input" class="form-select" disabled>
-                        <option value="">Prima scegli la partenza</option>
+                        <option value=""><?= te('tripFinder.pickOriginFirst') ?></option>
                     </select>
                 </div>
 
@@ -62,40 +64,40 @@
             <section class="finder-card trips-card" aria-labelledby="trips-title">
                 <div class="finder-card-heading">
                     <div>
-                        <p class="eyebrow">Risultato della tratta</p>
-                        <h2 id="trips-title">Seleziona la tratta</h2>
+                        <p class="eyebrow"><?= te('tripFinder.resultEyebrow') ?></p>
+                        <h2 id="trips-title"><?= te('tripFinder.selectLeg') ?></h2>
                     </div>
                     <span id="trip-count" class="trip-count" hidden></span>
                 </div>
                 <div id="trips-list" class="trips-list">
-                    <p class="empty-state">Dopo aver scelto partenza e destinazione compariranno qui le corse.</p>
+                    <p class="empty-state"><?= te('tripFinder.emptyState') ?></p>
                 </div>
                 <div id="trips-navigation" class="trips-navigation" hidden>
                     <div class="pagination-row">
-                        <button id="previous-page" class="pagination-button" type="button" aria-label="Pagina precedente">‹</button>
+                        <button id="previous-page" class="pagination-button" type="button" aria-label="<?= te('tripFinder.prevPage') ?>">‹</button>
                         <span id="page-label" class="page-label"></span>
-                        <button id="next-page" class="pagination-button" type="button" aria-label="Pagina successiva">›</button>
+                        <button id="next-page" class="pagination-button" type="button" aria-label="<?= te('tripFinder.nextPage') ?>">›</button>
                     </div>
                     <div class="jump-row">
                         <div class="jump-control">
-                            <label for="page-input">Vai alla pagina</label>
+                            <label for="page-input"><?= te('tripFinder.goToPage') ?></label>
                             <div class="jump-input-group">
-                                <input id="page-input" class="jump-input" type="number" min="1" step="1" inputmode="numeric" aria-label="Numero pagina">
-                                <button id="page-jump-button" class="jump-button" type="button">Vai</button>
+                                <input id="page-input" class="jump-input" type="number" min="1" step="1" inputmode="numeric" aria-label="<?= te('tripFinder.pageNum') ?>">
+                                <button id="page-jump-button" class="jump-button" type="button"><?= te('tripFinder.go') ?></button>
                             </div>
                         </div>
-                        <span class="jump-or">oppure</span>
+                        <span class="jump-or"><?= te('tripFinder.or') ?></span>
                         <div class="jump-control">
-                            <label for="time-input">Vai all’orario</label>
+                            <label for="time-input"><?= te('tripFinder.goToTime') ?></label>
                             <div class="jump-input-group">
-                                <input id="time-input" class="jump-input time-input" type="time" aria-label="Orario di partenza">
-                                <button id="time-jump-button" class="jump-button" type="button">Vai</button>
+                                <input id="time-input" class="jump-input time-input" type="time" aria-label="<?= te('tripFinder.departureTime') ?>">
+                                <button id="time-jump-button" class="jump-button" type="button"><?= te('tripFinder.go') ?></button>
                             </div>
                         </div>
                     </div>
                 </div>
                 <button id="open-trip-button" class="btn-primary open-trip-button" type="button" disabled>
-                    Apri dettagli della corsa
+                    <?= te('tripFinder.openTrip') ?>
                 </button>
             </section>
         </main>

@@ -97,10 +97,10 @@
         $('gtfs-stats').innerHTML = [
             ['Stato', status],
             ['Automatico', config.enabled ? 'Attivo' : 'Disattivato'],
-            ['Ultimo avvio', state.started_at ? new Date(state.started_at).toLocaleString('it-IT') : '--'],
-            ['Cache aggiornata', cacheUpdatedAt ? new Date(cacheUpdatedAt).toLocaleString('it-IT') : '--'],
-            ['Cache navigazione', navCacheUpdatedAt ? new Date(navCacheUpdatedAt).toLocaleString('it-IT') : '--'],
-            ['Fermate / Corse', `${database.stops ?? '--'} / ${database.trips ?? '--'}`]
+            [actvT('js.gu.lastRun','Ultimo avvio'), state.started_at ? new Date(state.started_at).toLocaleString('it-IT') : '--'],
+            [actvT('js.gu.cacheUpd','Cache aggiornata'), cacheUpdatedAt ? new Date(cacheUpdatedAt).toLocaleString('it-IT') : '--'],
+            [actvT('js.gu.cacheNav','Cache navigazione'), navCacheUpdatedAt ? new Date(navCacheUpdatedAt).toLocaleString('it-IT') : '--'],
+            [actvT('js.gu.stopsTrips','Fermate / Corse'), `${database.stops ?? '--'} / ${database.trips ?? '--'}`]
         ].map(([title, value]) =>
             `<div class="stat-card"><div class="stat-title">${esc(title)}</div>` +
             `<div class="gtfs-stat-value">${esc(value)}</div></div>`
@@ -115,7 +115,7 @@
             ? `Errore: ${state.error}${failureSuffix}`
             : `${status}${state.feed_url ? ' · ' + state.feed_url : ''}`;
         $('start-update').disabled = !!state.running;
-        $('start-update').textContent = state.running ? 'Aggiornamento in corso' : 'Avvia aggiornamento';
+        $('start-update').textContent = state.running ? actvT('js.adm.updating','Aggiornamento in corso...') : actvT('js.gu.start','Avvia aggiornamento');
 
         $('task-list').innerHTML = (state.tasks || []).map(task => {
             const total = Math.max(1, Number(task.total) || 1);
@@ -132,7 +132,7 @@
                 `</div>`;
         }).join('') || '<div class="gtfs-muted">Nessuna esecuzione registrata.</div>';
 
-        $('gtfs-log').textContent = (logTail || []).join('\n') || 'Nessun log disponibile.';
+        $('gtfs-log').textContent = (logTail || []).join('\n') || actvT('js.gu.noLogs','Nessun log disponibile.');
     }
 
     async function loadStatus() {
@@ -170,12 +170,12 @@
 
     $('schedule-enabled').addEventListener('change', () => {
         saveSchedule($('schedule-enabled').checked
-            ? 'Aggiornamento automatico attivato.'
-            : 'Aggiornamento automatico disattivato.');
+            ? actvT('js.gu.autoOn','Aggiornamento automatico attivato.')
+            : actvT('js.gu.autoOff','Aggiornamento automatico disattivato.'));
     });
 
     $('save-schedule').addEventListener('click', () => {
-        saveSchedule('Pianificazione salvata.');
+        saveSchedule(actvT('js.gu.saved','Pianificazione salvata.'));
     });
 
     $('start-update').addEventListener('click', async () => {
@@ -185,7 +185,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ csrf })
             });
-            showMessage('Aggiornamento avviato.', false);
+            showMessage(actvT('js.gu.started','Aggiornamento avviato.'), false);
             loadStatus();
         } catch (error) {
             showMessage(error.message, true);

@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?= I18n::lang() ?>">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Seleziona Fermata - ACTV</title>
-        <?php require COMMON_HTML_HEAD; ?>
+        <?php
+        $SEO = ['title' => t('meta.stationSelector.title'), 'desc' => t('meta.stationSelector.desc'), 'robots' => 'noindex,follow'];
+        require COMMON_HTML_HEAD;
+        ?>
 
         <link rel="stylesheet" href="/css/structure/structure-stopList.css">
         <link rel="stylesheet" href="/css/structure/structure-stationSelector.css">
@@ -21,12 +23,12 @@
             <div style="height: 20px;">
                 <a href="/route-finder" class="back-button">&larr;</a>
             </div>
-            <div class="header-title">
-                <?php 
+            <h1 class="header-title">
+                <?php
                 $type = $_GET['type'] ?? 'origin';
-                echo $type === 'origin' ? 'Dove vuoi<br>andare?' : 'Seleziona<br>destinazione';
+                echo $type === 'origin' ? t('stationSelector.origin') : t('stationSelector.destination');
                 ?>
-            </div>
+            </h1>
         </div>
 
         <!-- Main Content -->
@@ -34,24 +36,24 @@
             
             <!-- Search Bar -->
             <div class="search-container">
-                <input type="text" id="search-input" class="search-input" placeholder="🔍 Cerca fermata..." oninput="filterStops()">
+                <input type="text" id="search-input" class="search-input" placeholder="🔍 <?= te('stops.searchPh') ?>" oninput="filterStops()">
             </div>
 
             <!-- Recent Section -->
             <div id="recent-section" style="display: none;">
-                <div class="picker-section-title">Recenti</div>
+                <div class="picker-section-title"><?= te('stationSelector.recent') ?></div>
                 <div id="recent-list"></div>
             </div>
 
             <!-- Favorites Section -->
             <div id="favorites-section" style="display: none;">
-                <div class="picker-section-title">Preferite</div>
+                <div class="picker-section-title"><?= te('stationSelector.favorites') ?></div>
                 <div id="favorites-list"></div>
             </div>
 
             <!-- All Stops Section -->
             <div id="all-stops-section" style="display: none;">
-                <div class="section-title">Tutte le fermate</div>
+                <div class="section-title"><?= te('stationSelector.all') ?></div>
                 <div id="all-stops-list" style="margin-bottom: 10px;"></div>
             </div>
 
@@ -59,8 +61,8 @@
 
         <!-- Action Buttons -->
         <div class="action-buttons">
-            <button class="mb-1 btn-secondary" onclick="cancelSelection()">annulla</button>
-            <button class="mt-1 btn-primary" onclick="confirmSelection()">fatto</button>
+            <button class="mb-1 btn-secondary" onclick="cancelSelection()"><?= te('stationSelector.cancel') ?></button>
+            <button class="mt-1 btn-primary" onclick="confirmSelection()"><?= te('stationSelector.done') ?></button>
         </div>
     </body>
 </html>

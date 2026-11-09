@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?= I18n::lang() ?>">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Dettagli Viaggio - ACTV</title>
         <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-        <?php require COMMON_HTML_HEAD; ?>
+        <?php
+        $SEO = ['title' => t('meta.routeDetails.title'), 'desc' => t('meta.routeDetails.desc'), 'robots' => 'noindex,follow'];
+        require COMMON_HTML_HEAD;
+        ?>
         <link rel="stylesheet" href="/css/structure/structure-routeDetails.css">
         <link rel="stylesheet" href="/css/routeDetails.css">
         <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -17,8 +19,9 @@
         <!-- Header -->
         <div class="header-green">
             <div style="height: 20px;">
-                <a href="javascript:history.back()" class="back-button">&larr;</a>
+                <a href="javascript:history.back()" class="back-button" aria-label="<?= te('ui.back') ?>">&larr;</a>
             </div>
+            <h1 class="visually-hidden"><?= te('routeResults.details') ?></h1>
         </div>
 
         <!-- Main Content -->
@@ -43,9 +46,9 @@
 
             </div>
 
-            <button id="save-route-btn" class="btn-save-route" onclick="toggleSaveRoute()">&#9734; Salva tragitto</button>
+            <button id="save-route-btn" class="btn-save-route" onclick="toggleSaveRoute()">&#9734; <?= te('routeDetails.save') ?></button>
 
-            <button class="btn-map" onclick="showMap()">visualizza sulla mappa</button>
+            <button class="btn-map" onclick="showMap()"><?= te('routeDetails.showMap') ?></button>
 
         </div>
 
@@ -53,7 +56,7 @@
         <div id="map-modal" class="map-modal-overlay" onclick="closeMap(event)">
             <div class="map-modal-content" onclick="event.stopPropagation()">
                 <div class="map-modal-header">
-                    <span>Mappa percorso</span>
+                    <span><?= te('routeDetails.mapTitle') ?></span>
                     <button class="map-modal-close" onclick="closeMap()">&times;</button>
                 </div>
                 <div id="route-map"></div>

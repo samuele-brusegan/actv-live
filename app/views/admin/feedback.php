@@ -1,6 +1,6 @@
 <!doctype html>
-<html lang="it">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Feedback - ACTV Live</title><?php require COMMON_HTML_HEAD; ?><link rel="stylesheet" href="/css/admin.css"><link rel="stylesheet" href="/css/admin-shell.css"></head>
+<html lang="<?= I18n::lang() ?>">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><?php $SEO = ['title' => 'Feedback - ACTV Live', 'robots' => 'noindex,nofollow']; ?><?php require COMMON_HTML_HEAD; ?><link rel="stylesheet" href="/css/admin.css"><link rel="stylesheet" href="/css/admin-shell.css"></head>
 <body class="admin-page">
 <main class="admin-container">
     <div class="admin-header"><div><h1>Feedback utenti</h1><p class="text-muted mb-0">Segnalazioni e proposte ricevute da ACTV Live.</p></div><nav class="admin-actions" aria-label="Navigazione amministrazione"><a href="/admin/dashboard" class="admin-action">Dashboard</a><a href="/admin/logout" class="admin-action">Logout</a></nav></div>

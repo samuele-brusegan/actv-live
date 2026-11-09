@@ -39,3 +39,17 @@ function associativeArrayToTable(array $array) {
     $tableStr .= "</table>";
     return $tableStr;
 }
+
+/**
+ * Translates a key using the active language (see I18n).
+ */
+function t(string $key, array $replace = []): string {
+    return I18n::t($key, $replace);
+}
+
+/**
+ * Escapes a translated string for HTML attribute/text contexts.
+ */
+function te(string $key, array $replace = []): string {
+    return htmlspecialchars(I18n::t($key, $replace), ENT_QUOTES, 'UTF-8');
+}

@@ -1,51 +1,35 @@
 <!doctype html>
-<html lang="it">
+<html lang="<?= I18n::lang() ?>">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Crediti e licenze - ACTV Live</title>
-    <?php require COMMON_HTML_HEAD; ?>
+    <?php
+    $SEO = ['title' => t('meta.credits.title'), 'desc' => t('meta.credits.desc')];
+    require COMMON_HTML_HEAD;
+    ?>
     <link rel="stylesheet" href="/css/credits.css">
 </head>
 <body>
     <header class="header-green compact">
-        <a href="/" class="back-button" aria-label="Torna alla home">←</a>
-        <h1 class="header-title">Crediti e licenze</h1>
-        <p class="header-subtitle">Attribuzioni, dati e software di terze parti.</p>
+        <a href="/" class="back-button" aria-label="<?= te('ui.backHome') ?>">←</a>
+        <h1 class="header-title"><?= te('credits.title') ?></h1>
+        <p class="header-subtitle"><?= te('credits.subtitle') ?></p>
     </header>
     <main class="credits-page">
 
         <section class="credits-card">
-            <h2>Mappe e dati geografici</h2>
-            <p>
-                Le mappe utilizzano le tile di
-                <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>,
-                &copy; OpenStreetMap contributors, dati distribuiti con licenza
-                <a href="https://opendatacommons.org/licenses/odbl/" target="_blank" rel="noopener">ODbL</a>.
-            </p>
-            <p>
-                La ricerca dei luoghi usa
-                <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener">Nominatim</a>,
-                servizio di geocoding di OpenStreetMap.
-            </p>
+            <h2><?= te('credits.maps') ?></h2>
+            <p><?= t('credits.mapsP1') ?></p>
+            <p><?= t('credits.mapsP2') ?></p>
         </section>
 
         <section class="credits-card">
-            <h2>Dati del trasporto pubblico</h2>
-            <p>
-                Orari, linee, fermate e posizioni dei mezzi derivano dai dati open data (GTFS/GTFS-RT)
-                pubblicati da <strong>ACTV S.p.A.</strong> sul portale
-                <a href="https://actv.avmspa.it" target="_blank" rel="noopener">actv.avmspa.it</a>.
-            </p>
-            <p class="credits-disclaimer">
-                Questo è un progetto <strong>non ufficiale</strong> e <strong>non affiliato ad ACTV S.p.A.</strong>
-                "ACTV Live" è un nome provvisorio; il marchio ACTV appartiene ai rispettivi titolari.
-                Gli orari mostrati possono differire dalle fonti ufficiali: per informazioni vincolanti
-                fare sempre riferimento ai canali ACTV.
-            </p>
+            <h2><?= te('credits.transport') ?></h2>
+            <p><?= t('credits.transportP1') ?></p>
+            <p class="credits-disclaimer"><?= t('credits.disclaimer') ?></p>
         </section>
 
         <section class="credits-card">
-            <h2>Librerie open source</h2>
+            <h2><?= te('credits.libraries') ?></h2>
             <ul class="credits-list">
                 <li><a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a> — BSD 2-Clause</li>
                 <li><a href="https://github.com/Leaflet/Leaflet.fullscreen" target="_blank" rel="noopener">Leaflet.fullscreen</a> — BSD 2-Clause</li>
@@ -58,13 +42,8 @@
         </section>
 
         <section class="credits-card">
-            <h2>Questo progetto</h2>
-            <p>
-                ACTV Live è distribuito con
-                <a href="https://github.com/samuele-brusegan/actv-live/blob/main/LICENSE.md" target="_blank" rel="noopener">licenza MIT</a>.
-                Sviluppato da <a href="https://github.com/samuele-brusegan" target="_blank" rel="noopener">Samuele Brusegan</a>,
-                grafica e design di <a href="https://github.com/andreadavanzo09-bit" target="_blank" rel="noopener">Andrea Davanzo</a>.
-            </p>
+            <h2><?= te('credits.project') ?></h2>
+            <p><?= t('credits.projectP1') ?></p>
         </section>
 
     </main>

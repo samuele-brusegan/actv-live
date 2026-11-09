@@ -8,7 +8,7 @@ beforeEach(() => {
     const layer = () => ({ addTo() { return this; }, bindPopup() { return this; }, setLatLng: jest.fn(), setLatLngs: jest.fn() });
     context = vm.createContext({
         document: { addEventListener() {}, getElementById: document.getElementById.bind(document), createElement: document.createElement.bind(document), querySelector: document.querySelector.bind(document) },
-        Date, URLSearchParams, console, setTimeout: jest.fn(), fetch: jest.fn(),
+        Date, URLSearchParams, console, actvT, setTimeout: jest.fn(), fetch: jest.fn(),
         L: { polyline: layer, marker: layer, divIcon: () => ({}) }
     });
     vm.runInContext(source, context);

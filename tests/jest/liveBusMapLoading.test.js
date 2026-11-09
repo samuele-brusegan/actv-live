@@ -15,7 +15,7 @@ beforeEach(() => {
             if (key === 'addEventListener') return (event, callback) => { if (event === 'DOMContentLoaded') initialize = callback; };
             const value = target[key]; return typeof value === 'function' ? value.bind(target) : value;
         } }),
-        window, localStorage, URLSearchParams, Date, AbortController, console,
+        window, localStorage, URLSearchParams, Date, AbortController, console, actvT,
         setInterval: jest.fn(), clearInterval: jest.fn(), setTimeout, clearTimeout,
         fetch: jest.fn(),
         L: {

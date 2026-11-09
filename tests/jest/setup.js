@@ -3,6 +3,18 @@
  * Provides mocks for browser APIs not available in jsdom.
  */
 
+// Mock i18n: actvT(key, fallback, vars) ritorna il fallback con le sostituzioni {var}
+global.actvT = (key, fallback, vars) => {
+    let s = typeof fallback === 'string' ? fallback : key;
+    if (vars && typeof vars === 'object') {
+        for (const k in vars) s = String(s).split('{' + k + '}').join(String(vars[k]));
+    }
+    return s;
+};
+window.actvT = global.actvT;
+window.ACTV_T = {};
+window.ACTV_LANG = 'it';
+
 // Mock global fetch
 global.fetch = jest.fn(() =>
     Promise.resolve({

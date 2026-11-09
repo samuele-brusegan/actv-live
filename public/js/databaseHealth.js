@@ -35,9 +35,9 @@
     }
 
     function render(data) {
-        const labels = { ok: 'Database raggiungibile', warning: 'Database raggiungibile con elementi da verificare', error: 'Problema di connessione o verifica SQL' };
+        const labels = { ok: actvT('js.db.ok','Database raggiungibile'), warning: actvT('js.db.warn','Database raggiungibile con elementi da verificare'), error: actvT('js.db.err','Problema di connessione o verifica SQL') };
         banner.className = `db-health-banner ${data.status || 'error'}`;
-        banner.textContent = labels[data.status] || 'Stato non disponibile';
+        banner.textContent = labels[data.status] || actvT('js.db.na','Stato non disponibile');
 
         const messages = Array.isArray(data.messages) ? data.messages : [];
         if (messages.length) {
@@ -48,9 +48,9 @@
             ['Database', data.database || '--'],
             ['Server', data.server_version || '--'],
             ['Test SELECT 1', data.select_1 ? 'Riuscito' : 'Fallito'],
-            ['Tempo risposta', data.response_ms == null ? '--' : `${data.response_ms} ms`],
-            ['Tabelle mancanti', data.missing_tables?.length ?? '--'],
-            ['Ultimo log applicativo', formatDate(data.latest_log_at)]
+            [actvT('js.db.resp','Tempo risposta'), data.response_ms == null ? '--' : `${data.response_ms} ms`],
+            [actvT('js.db.missing','Tabelle mancanti'), data.missing_tables?.length ?? '--'],
+            [actvT('js.db.lastLog','Ultimo log applicativo'), formatDate(data.latest_log_at)]
         ].map(([label, value]) => `<div class="stat-card"><div class="stat-title">${escapeHtml(label)}</div><div class="db-health-stat-value">${escapeHtml(value)}</div></div>`).join('');
 
         const missing = new Set(data.missing_tables || []);
@@ -58,7 +58,7 @@
             const isStaging = /_gtfs_\d+_\d+$/.test(table.name);
             const status = isStaging ? 'Temporanea' : (missing.has(table.name) ? 'Mancante' : 'Presente');
             return `<tr><td>${escapeHtml(table.name)}</td><td>${escapeHtml(status)}</td><td>${table.rows_estimate == null ? '--' : Number(table.rows_estimate).toLocaleString('it-IT')}</td><td>${formatSize(table.size_bytes)}</td><td>${formatDate(table.updated_at)}</td></tr>`;
-        }).join('') || '<tr><td colspan="5">Nessuna tabella leggibile.</td></tr>';
+        }).join('') || `<tr><td colspan="5">${actvT('js.db.noTables','Nessuna tabella leggibile.')}</td></tr>`;
 
         const staging = data.staging_tables || [];
         stagingPanel.hidden = staging.length === 0;
@@ -91,7 +91,7 @@
             render(result.data);
         } catch (error) {
             banner.className = 'db-health-banner error';
-            banner.textContent = 'Impossibile leggere lo stato del database';
+            banner.textContent = actvT('js.db.cant','Impossibile leggere lo stato del database');
             errorPanel.hidden = false;
             errorText.textContent = error.message;
         } finally {

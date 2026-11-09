@@ -179,6 +179,80 @@ class Controller {
         require_once BASE_PATH . '/app/views/homeAlt.php';
     }
 
+    private function siteBaseUrl(): string {
+        if (URL_PATH !== '') {
+            return URL_PATH;
+        }
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (($_SERVER['HTTP_X_FORWARDED_SCHEME'] ?? '') === 'https') ? 'https' : 'http';
+        return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    }
+
+    function robotsTxt() {
+        header('Content-Type: text/plain; charset=utf-8');
+        $base = $this->siteBaseUrl();
+        echo "User-agent: *\n";
+        echo "Disallow: /admin\n";
+        echo "Disallow: /api\n";
+        echo "Disallow: /widget\n\n";
+        echo "Sitemap: {$base}/sitemap.xml\n";
+    }
+
+    function i18nJs() {
+        header('Content-Type: application/javascript; charset=utf-8');
+        header('Cache-Control: public, max-age=3600');
+        echo 'window.ACTV_LANG = ' . json_encode(I18n::lang()) . ";\n";
+        echo 'window.ACTV_T = ' . json_encode(I18n::all(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ";\n";
+    }
+
+    function sitemap() {
+        header('Content-Type: application/xml; charset=utf-8');
+        $base = $this->siteBaseUrl();
+
+        $urls = [
+            ['loc' => '/', 'priority' => '1.0'],
+            ['loc' => '/stopList', 'priority' => '0.9'],
+            ['loc' => '/route-finder', 'priority' => '0.8'],
+            ['loc' => '/live-map', 'priority' => '0.8'],
+            ['loc' => '/lines-map', 'priority' => '0.7'],
+            ['loc' => '/line-schedule', 'priority' => '0.7'],
+            ['loc' => '/trip-finder', 'priority' => '0.5'],
+            ['loc' => '/delay-stats', 'priority' => '0.4'],
+            ['loc' => '/feedback', 'priority' => '0.3'],
+            ['loc' => '/credits', 'priority' => '0.2'],
+            ['loc' => '/privacy', 'priority' => '0.2'],
+        ];
+
+        // Tutte le fermate dal feed GTFS
+        $stopsFile = BASE_PATH . '/data/gtfs/stops.txt';
+        if (is_file($stopsFile)) {
+            $fh = fopen($stopsFile, 'r');
+            $header = fgetcsv($fh);
+            if ($header) {
+                $iId = array_search('stop_id', $header);
+                $iName = array_search('stop_name', $header);
+                while (($row = fgetcsv($fh)) !== false) {
+                    $id = $row[$iId] ?? '';
+                    $name = $row[$iName] ?? '';
+                    if ($id === '' || $name === '') continue;
+                    $urls[] = [
+                        'loc' => '/aut/stops/stop?id=' . rawurlencode($id) . '&name=' . rawurlencode($name),
+                        'priority' => '0.6',
+                    ];
+                }
+            }
+            fclose($fh);
+        }
+
+        echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+        foreach ($urls as $u) {
+            echo "  <url><loc>" . htmlspecialchars($base . $u['loc'], ENT_XML1, 'UTF-8')
+                . "</loc><changefreq>weekly</changefreq><priority>{$u['priority']}</priority></url>\n";
+        }
+        echo '</urlset>';
+    }
+
     function adminFeedback() {
         AdminAuth::requireAuth();
         if (!class_exists('databaseConnector')) require_once BASE_PATH . '/app/models/databaseConnector.php';

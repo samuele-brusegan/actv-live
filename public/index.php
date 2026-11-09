@@ -19,6 +19,9 @@ if (str_starts_with($requestPath, '/api/') && !str_starts_with($requestPath, '/a
 }
 
 
+// Lingua attiva: va risolta prima di qualsiasi output (può impostare un cookie)
+I18n::init();
+
 // Inizializza il router
 $router = new Router();
 

@@ -1,12 +1,26 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?= I18n::lang() ?>">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Mappa Stazioni ACTV</title>
         <!-- CSS di Leaflet -->
         <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-        <?php require COMMON_HTML_HEAD; ?>
+        <?php
+        $SEO = [
+            'title' => t('meta.home.title'),
+            'desc' => t('meta.home.desc'),
+            'jsonld' => [
+                '@context' => 'https://schema.org',
+                '@type' => 'WebApplication',
+                'name' => 'ACTV Live',
+                'applicationCategory' => 'TravelApplication',
+                'operatingSystem' => 'Web',
+                'inLanguage' => ['it', 'en'],
+                'description' => t('meta.home.desc'),
+            ],
+        ];
+        require COMMON_HTML_HEAD;
+        ?>
         <link rel="stylesheet" href="/css/structure/structure-home.css">
         <link rel="stylesheet" href="/css/home.css">
 
@@ -25,10 +39,10 @@
         <!-- Header -->
         <div class="header-green">
             <div class="brand-lockup"><span>ACTV Live</span></div>
-            <h1 class="header-title">Il tuo viaggio,<br>in tempo reale.</h1>
-            <h3 class="header-subtitle">Orari, fermate e percorsi ACTV a Venezia</h3>
+            <h1 class="header-title"><?= t('home.title') ?></h1>
+            <p class="header-subtitle"><?= te('home.subtitle') ?></p>
             <div class="theme-toggle" style="position: absolute; top: 20px; right: 20px;">
-                <button class="theme-button" onclick="toggleTheme()" aria-label="Cambia tema">
+                <button class="theme-button" onclick="toggleTheme()" aria-label="<?= te('ui.changeTheme') ?>">
                     <img src="/svg/light_mode.svg" alt="" id="theme-icon">
                 </button>
             </div>
@@ -38,33 +52,33 @@
         <div class="main-content /*pb-5*/ pb-2">
             
             <section id="home-tutorial" class="home-welcome" aria-labelledby="home-actions-title" style="display:none;">
-                <div class="eyebrow">Benvenuto</div>
-                <h2 id="home-actions-title">Vuoi fare un giro?</h2>
-                <p class="home-tutorial-text">Ti mostro in pochi secondi dove sono fermate, mappa, preferiti e tutte le altre funzioni dell'app.</p>
+                <div class="eyebrow"><?= te('home.welcome') ?></div>
+                <h2 id="home-actions-title"><?= te('home.tourTitle') ?></h2>
+                <p class="home-tutorial-text"><?= te('home.tourText') ?></p>
                 <div class="home-tutorial-actions">
-                    <button type="button" class="btn btn-primary rounded-pill px-4 py-2" onclick="ACTVTour.start()">Inizia il tour</button>
-                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4 py-2" onclick="dismissHomeTutorial()">Salta</button>
+                    <button type="button" class="btn btn-primary rounded-pill px-4 py-2" onclick="ACTVTour.start()"><?= te('home.tourStart') ?></button>
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4 py-2" onclick="dismissHomeTutorial()"><?= te('home.tourSkip') ?></button>
                 </div>
             </section>
 
             <section class="home-welcome" aria-labelledby="home-stops-title">
-                <div class="eyebrow">Servizio ACTV</div>
-                <h2 id="home-stops-title">Dove passa il tuo bus?</h2>
-                <a class="home-primary-action" href="/stopList"><span class="action-symbol">◉</span><span><strong>Cerca una fermata</strong><small>Passaggi in tempo reale per ogni fermata</small></span><span aria-hidden="true">›</span></a>
+                <div class="eyebrow"><?= te('home.serviceEyebrow') ?></div>
+                <h2 id="home-stops-title"><?= te('home.stopsTitle') ?></h2>
+                <a class="home-primary-action" href="/stopList"><span class="action-symbol">◉</span><span><strong><?= te('home.searchStop') ?></strong><small><?= te('home.searchStopSub') ?></small></span><span aria-hidden="true">›</span></a>
             </section>
 
             <section id="journey-resume" class="journey-resume" aria-labelledby="journey-resume-title">
-                <div class="journey-resume-label">Il tuo ultimo viaggio</div>
+                <div class="journey-resume-label"><?= te('home.lastJourney') ?></div>
                 <h2 id="journey-resume-title" class="journey-resume-route"></h2>
                 <div class="journey-resume-actions">
-                    <a href="/route-results" class="resume-primary" id="resume-journey">Riprendi viaggio</a>
-                    <a href="/route-finder" class="resume-secondary">Modifica</a>
+                    <a href="/route-results" class="resume-primary" id="resume-journey"><?= te('home.resume') ?></a>
+                    <a href="/route-finder" class="resume-secondary"><?= te('home.edit') ?></a>
                 </div>
             </section>
 
             <!-- Sezione Fermate Preferite -->
             <div id="favorites-section" style="display: none;">
-                <h2 class="section-title">Le tue fermate</h2>
+                <h2 class="section-title"><?= te('home.favStops') ?></h2>
                 <div id="favorites-list"></div>
             </div>
             
@@ -72,18 +86,18 @@
             
             <!-- Sezione Fermate Vicine (Dinamica) -->
             <div id="nearby-section">
-                <h2 class="section-title">Fermate vicine</h2>
+                <h2 class="section-title"><?= te('home.nearby') ?></h2>
                 <div id="nearby-list"></div>
             </div>
 
             <hr id="hr_nearby">
             
-            <h2 class="section-title">Mappa</h2>
+            <h2 class="section-title"><?= te('home.map') ?></h2>
             <!-- Status Geolocation -->
             <div id="status" class="alert alert-info d-flex align-items-center" role="alert">
                 <svg class="bi flex-shrink-0 me-2" width="24" height="24" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>
                 <div>
-                    In attesa di geolocalizzazione...
+                    <?= te('home.waitingGeo') ?>
                 </div>
             </div>
         
@@ -96,22 +110,22 @@
             <!-- Pulsanti di navigazione -->
             <div class="home-actions">
                 <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/stopList'">
-                    Cerca una fermata
+                    <?= te('home.searchStop') ?>
                 </button>
                 <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/route-finder'">
-                    Percorsi
+                    <?= te('home.btnRoutes') ?>
                 </button>
                 <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/delay-stats'">
-                    Statistiche ritardi
+                    <?= te('home.btnDelays') ?>
                 </button>
                 <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/line-schedule'">
-                    Orari delle linee
+                    <?= te('home.btnSchedules') ?>
                 </button>
                 <button class="btn rounded-pill px-4 py-2 home-action-btn" onclick="window.location.href='/trip-finder'">
-                    Cerca una corsa
+                    <?= te('home.btnTrip') ?>
                 </button>
                 <a class="btn rounded-pill px-4 py-2 home-action-btn feedback-home-btn" href="/feedback">
-                    ✎ Invia feedback
+                    ✎ <?= te('feedback.title') ?>
                 </a>
             </div>
             <div id="important-info-btn" class="hidden">!</div>
@@ -120,17 +134,17 @@
             <div class="mit-licence" id="footer-licence">
                 MIT License (2025–2026)
                 <hr>
-                App sviluppata da <a href="https://github.com/samuele-brusegan">Samuele Brusegan</a> <br>
-                Grafica e design da <a href="https://github.com/andreadavanzo09-bit">Andrea Davanzo</a> <br>
+                <?= te('home.devBy') ?> <a href="https://github.com/samuele-brusegan">Samuele Brusegan</a> <br>
+                <?= te('home.designBy') ?> <a href="https://github.com/andreadavanzo09-bit">Andrea Davanzo</a> <br>
                 <br>
                 <a href="https://github.com/samuele-brusegan/actv-live">GitHub</a> ·
-                <a href="/credits">Crediti e licenze</a> <br>
+                <a href="/credits"><?= te('credits.title') ?></a> <br>
                 <br>
-                <small>Progetto non ufficiale, non affiliato ad ACTV S.p.A.<br>Dati mappe © OpenStreetMap contributors</small>
+                <small><?= t('home.unofficial') ?></small>
             </div>
 
         </div>
 
-        <button class="qr-fab" id="qr-btn" onclick="showQrDialog(window.location.href)" title="Mostra codice QR" aria-label="Mostra codice QR"><?= getIcon('qr_code', 26) ?></button>
+        <button class="qr-fab" id="qr-btn" onclick="showQrDialog(window.location.href)" title="<?= te('home.qr') ?>" aria-label="<?= te('home.qr') ?>"><?= getIcon('qr_code', 26) ?></button>
     </body>
 </html>

@@ -38,7 +38,7 @@ function updateOfflineIndicator() {
             indicator = document.createElement('div');
             indicator.id = OFFLINE_INDICATOR_ID;
             indicator.className = 'offline-indicator';
-            indicator.innerHTML = '<span class="offline-dot"></span> Offline - dati dalla cache';
+            indicator.innerHTML = `<span class="offline-dot"></span> ${actvT('js.offline.text','Offline - dati dalla cache')}`;
             document.body.prepend(indicator);
         }
         indicator.style.display = 'flex';

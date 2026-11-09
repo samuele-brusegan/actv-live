@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?= I18n::lang() ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ACTV Live Widget</title>
+    <?php
+    $SEO = ['title' => t('meta.widget.title'), 'desc' => t('meta.defaultDesc'), 'robots' => 'noindex,nofollow'];
+    require COMMON_HTML_HEAD;
+    ?>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -125,7 +128,7 @@
     <div class="widget" id="widget">
         <div class="widget-header">
             <div>
-                <h3 id="widget-stop-name">Caricamento...</h3>
+                <h3 id="widget-stop-name"><?= te('ui.loading') ?></h3>
                 <div class="widget-stop-id" id="widget-stop-id"></div>
             </div>
             <a class="widget-brand" href="/" target="_blank">ACTV Live</a>
@@ -133,11 +136,11 @@
         <div class="widget-body" id="widget-body">
             <div class="widget-loading">
                 <div class="spinner"></div>
-                <div>Caricamento passaggi...</div>
+                <div><?= te('stop.loadingPassages') ?></div>
             </div>
         </div>
         <div class="widget-footer">
-            <a id="widget-link" href="/" target="_blank">Apri su ACTV Live &rarr;</a>
+            <a id="widget-link" href="/" target="_blank"><?= te('widget.open') ?> &rarr;</a>
         </div>
     </div>
 
@@ -157,7 +160,7 @@
             });
         }
 
-        document.getElementById('widget-stop-name').textContent = stopName || 'Fermata ' + stopId;
+        document.getElementById('widget-stop-name').textContent = stopName || <?= json_encode(t('widget.stopFallback')) ?> + ' ' + stopId;
         document.getElementById('widget-stop-id').textContent = stopId;
         document.getElementById('widget-link').href = '/aut/stops/stop?id=' + encodeURIComponent(stopId) + '&name=' + encodeURIComponent(stopName);
 
@@ -179,7 +182,7 @@
         async function loadWidget() {
             if (!stopId) {
                 document.getElementById('widget-body').innerHTML =
-                    '<div class="widget-error">Parametro stop mancante. Usa ?stop=ID&name=Nome</div>';
+                    '<div class="widget-error">' + <?= json_encode(t('widget.missingParam')) ?> + '</div>';
                 return;
             }
 
@@ -190,7 +193,7 @@
 
                 if (!Array.isArray(passages) || passages.length === 0) {
                     document.getElementById('widget-body').innerHTML =
-                        '<div class="widget-empty">Nessun passaggio previsto al momento.</div>';
+                        '<div class="widget-empty">' + <?= json_encode(t('widget.empty')) ?> + '</div>';
                     return;
                 }
 
@@ -211,7 +214,7 @@
                 document.getElementById('widget-body').innerHTML = html;
             } catch (err) {
                 document.getElementById('widget-body').innerHTML =
-                    '<div class="widget-error">Errore nel caricamento dei dati.</div>';
+                    '<div class="widget-error">' + <?= json_encode(t('widget.error')) ?> + '</div>';
             }
         }
 

@@ -28,6 +28,9 @@ $router->add('/delete-cookie'           , 'Controller', 'deleteCookie');
 $router->add('/privacy'                 , 'Controller', 'deleteCookie');
 $router->add('/feedback'                , 'Controller', 'feedback');
 $router->add('/credits'                 , 'Controller', 'credits');
+$router->add('/sitemap.xml'             , 'Controller', 'sitemap');
+$router->add('/robots.txt'              , 'Controller', 'robotsTxt');
+$router->add('/js/i18n-dict.js'         , 'Controller', 'i18nJs');
 
 $router->add('/admin/login'             , 'Controller', 'adminLogin');
 $router->add('/admin/logout'            , 'Controller', 'adminLogout');

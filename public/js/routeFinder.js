@@ -326,8 +326,8 @@ function updateUI() {
     const originLabel = document.getElementById('origin-value');
     const destLabel = document.getElementById('destination-value');
 
-    if (originLabel) originLabel.textContent = searchState.origin?.name || 'Seleziona partenza';
-    if (destLabel) destLabel.textContent = searchState.destination?.name || 'Seleziona destinazione';
+    if (originLabel) originLabel.textContent = searchState.origin?.name || actvT('routeFinder.selectDeparture','Seleziona partenza');
+    if (destLabel) destLabel.textContent = searchState.destination?.name || actvT('routeFinder.selectDestination','Seleziona destinazione');
 }
 
 function updateOptimizeUI() {
@@ -355,7 +355,7 @@ function persistState() {
 /** Avvia la ricerca percorsi */
 function searchRoutes() {
     if (!searchState.origin || !searchState.destination) {
-        if (window.actvAlert) actvAlert('Inserisci sia la partenza che la destinazione.', 'Percorso incompleto');
+        if (window.actvAlert) actvAlert(actvT('js.rf.missing','Inserisci sia la partenza che la destinazione.'), actvT('js.rf.incomplete','Percorso incompleto'));
         return;
     }
 
@@ -444,8 +444,8 @@ function renderFavoriteRoutes() {
                 ${lineBadge}
                 <span class="fav-route-text">${escapeHtml(r.origin && r.origin.name)} \u2192 ${escapeHtml(r.destination && r.destination.name)}</span>
             </button>
-            <button class="fav-route-bell ${monitored ? 'active' : ''}" type="button" title="Avvisami quando passa il bus">\u{1F514}</button>
-            <button class="fav-route-del" type="button" title="Rimuovi tragitto">\u00D7</button>
+            <button class="fav-route-bell ${monitored ? 'active' : ''}" type="button" title="${actvT('js.rf.notify','Avvisami quando passa il bus')}">\u{1F514}</button>
+            <button class="fav-route-del" type="button" title="${actvT('js.rf.remove','Rimuovi tragitto')}">\u00D7</button>
         `;
         row.querySelector('.fav-route-main').addEventListener('click', () => loadFavoriteRoute(r));
         row.querySelector('.fav-route-bell').addEventListener('click', (e) => { e.stopPropagation(); toggleRouteNotify(r, e.currentTarget); });

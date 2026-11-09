@@ -59,18 +59,18 @@ function showWidgetDialog(stopId, stopName) {
     modal.innerHTML =
         '<div class="widget-modal">' +
             '<div class="widget-modal-header">' +
-                '<span>Condividi Widget</span>' +
+                `<span>${actvT('js.widget.share','Condividi Widget')}</span>` +
                 '<button class="widget-modal-close" onclick="closeWidgetDialog()">&times;</button>' +
             '</div>' +
             '<div class="widget-modal-body">' +
-                '<p class="widget-modal-desc">Incorpora i passaggi in tempo reale di questa fermata nel tuo sito web.</p>' +
-                '<label class="widget-label">Codice embed:</label>' +
+                `<p class="widget-modal-desc">${actvT('js.widget.embedDesc','Incorpora i passaggi in tempo reale di questa fermata nel tuo sito web.')}</p>` +
+                `<label class="widget-label">${actvT('js.widget.embedCode','Codice embed:')}</label>` +
                 '<textarea class="widget-code" id="widget-embed-code" readonly rows="3">' + embedCode.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</textarea>' +
-                '<button class="widget-copy-btn" onclick="copyWidgetCode()">Copia codice</button>' +
-                '<label class="widget-label" style="margin-top:12px;">Link diretto:</label>' +
+                `<button class="widget-copy-btn" onclick="copyWidgetCode()">${actvT('js.widget.copyCode','Copia codice')}</button>` +
+                `<label class="widget-label" style="margin-top:12px;">${actvT('js.widget.directLink','Link diretto:')}</label>` +
                 '<input class="widget-url-input" id="widget-url" readonly value="' + widgetUrl + '">' +
-                '<button class="widget-copy-btn widget-copy-link" onclick="copyWidgetLink()">Copia link</button>' +
-                '<div class="widget-preview-label">Anteprima:</div>' +
+                `<button class="widget-copy-btn widget-copy-link" onclick="copyWidgetLink()">${actvT('js.widget.copyLink','Copia link')}</button>` +
+                `<div class="widget-preview-label">${actvT('js.widget.preview','Anteprima:')}</div>` +
                 '<div class="widget-preview">' +
                     '<iframe src="' + widgetUrl + '" width="100%" height="350" frameborder="0" style="border-radius:12px;border:none;"></iframe>' +
                 '</div>' +
@@ -111,11 +111,11 @@ function showQrDialog(url) {
                 '<button class="widget-modal-close" onclick="closeQrDialog()">&times;</button>' +
             '</div>' +
             '<div class="widget-modal-body">' +
-                '<p class="widget-modal-desc">Inquadra il codice per aprire questa pagina su un altro dispositivo.</p>' +
+                `<p class="widget-modal-desc">${actvT('js.widget.qrDesc','Inquadra il codice per aprire questa pagina su un altro dispositivo.')}</p>` +
                 '<div class="qr-container" id="qr-code-container"></div>' +
-                '<label class="widget-label" style="margin-top:12px;">Link:</label>' +
+                `<label class="widget-label" style="margin-top:12px;">${actvT('js.widget.link','Link:')}</label>` +
                 '<input class="widget-url-input" id="qr-url" readonly value="' + safeUrl + '">' +
-                '<button class="widget-copy-btn widget-copy-link" onclick="copyQrLink()">Copia link</button>' +
+                `<button class="widget-copy-btn widget-copy-link" onclick="copyQrLink()">${actvT('js.widget.copyLink','Copia link')}</button>` +
             '</div>' +
         '</div>';
 
@@ -133,7 +133,7 @@ function showQrDialog(url) {
                 container.textContent = 'Impossibile generare il codice QR.';
             }
         } else {
-            container.textContent = 'Generatore QR non disponibile.';
+            container.textContent = actvT('js.widget.qrErr','Generatore QR non disponibile.');
         }
     }
 
@@ -153,7 +153,7 @@ function copyQrLink() {
     var input = document.getElementById('qr-url');
     if (!input) return;
     navigator.clipboard.writeText(input.value).then(function() {
-        showCopyFeedback('Link copiato!');
+        showCopyFeedback(actvT('js.widget.linkCopied','Link copiato!'));
     });
 }
 
@@ -162,7 +162,7 @@ function copyWidgetCode() {
     var textarea = document.getElementById('widget-embed-code');
     if (!textarea) return;
     navigator.clipboard.writeText(textarea.value).then(function() {
-        showCopyFeedback('Codice copiato!');
+        showCopyFeedback(actvT('js.widget.codeCopied','Codice copiato!'));
     });
 }
 
@@ -171,7 +171,7 @@ function copyWidgetLink() {
     var input = document.getElementById('widget-url');
     if (!input) return;
     navigator.clipboard.writeText(input.value).then(function() {
-        showCopyFeedback('Link copiato!');
+        showCopyFeedback(actvT('js.widget.linkCopied','Link copiato!'));
     });
 }
 

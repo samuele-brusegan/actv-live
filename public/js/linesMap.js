@@ -70,10 +70,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateQueryLabel() {
         const trips = filterMode.value === 'trips';
         document.getElementById('lines-query-label').textContent = trips ? 'ID corse' : 'Linee';
-        filterQuery.placeholder = trips ? 'ID corsa, ID corsa…' : '5E, 21';
+        filterQuery.placeholder = trips ? actvT('js.lm.tripPh','ID corsa, ID corsa…') : '5E, 21';
         document.getElementById('lines-query-help').textContent = trips
-            ? 'Separa più ID corsa con una virgola. Lascia vuoto per mostrare tutte le linee.'
-            : 'Separa più linee con una virgola. Lascia vuoto per mostrarle tutte.';
+            ? actvT('js.lm.tripHelp','Separa più ID corsa con una virgola. Lascia vuoto per mostrare tutte le linee.')
+            : actvT('linesMap.queryHelp','Separa più linee con una virgola. Lascia vuoto per mostrarle tutte.');
     }
     function populateFilters() {
         const params = currentParams();
@@ -93,10 +93,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const trips = linesMapTripIds(params);
         const lines = linesMapValues(params.get('line'));
         const stops = params.get('showStops') === '1';
-        const description = trips.length ? `${trips.length} ${trips.length === 1 ? 'corsa' : 'corse'}`
-            : lines.length ? `${lines.length === 1 ? 'Linea' : 'Linee'} ${lines.join(', ')}` : 'Tutte le linee';
+        const description = trips.length ? `${trips.length} ${trips.length === 1 ? actvT('js.rr.trip','corsa') : actvT('js.lm.trips','corse')}`
+            : lines.length ? `${lines.length === 1 ? actvT('linesMap.byLine','Linea') : actvT('linesMap.byLines','Linee')} ${lines.join(', ')}` : actvT('linesMap.allLines','Tutte le linee');
         const summary = document.getElementById('lines-filter-summary');
-        summary.textContent = description + (stops ? ' · Fermate' : '');
+        summary.textContent = description + (stops ? ' · ' + actvT('js.lm.stops','Fermate') : '');
         summary.title = summary.textContent;
         const count = Number(Boolean(trips.length || lines.length)) + Number(stops);
         const badge = document.getElementById('lines-filter-count');
@@ -198,9 +198,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const spinner = document.createElement('div');
         spinner.className = 'spinner';
         const label = document.createElement('div');
-        label.textContent = 'Caricamento linee…';
+        label.textContent = actvT('lineSchedule.loading','Caricamento linee…');
         loadingEl.append(spinner, label);
-        mapStatus.textContent = 'Caricamento percorsi…';
+        mapStatus.textContent = actvT('js.lm.loadRoutes','Caricamento percorsi…');
         document.getElementById('lines-map-stage').setAttribute('aria-busy', 'true');
 
         try {
@@ -213,15 +213,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     try { serverMessage = JSON.parse(responseText).error || ''; } catch (parseError) { /* risposta non JSON */ }
                     throw new Error(`HTTP ${response.status}${serverMessage ? `: ${serverMessage}` : ''}`);
                 }
-                if (!responseText.trim()) throw new Error('Il server ha restituito una risposta vuota');
+                if (!responseText.trim()) throw new Error(actvT('js.rr.empty','Il server ha restituito una risposta vuota.'));
 
                 let shapes;
                 try {
                     shapes = JSON.parse(responseText);
                 } catch (parseError) {
-                    throw new Error('Il server ha restituito dati non validi');
+                    throw new Error(actvT('js.lm.badData','Il server ha restituito dati non validi'));
                 }
-                if (!Array.isArray(shapes)) throw new Error(shapes?.error || 'Formato dati linee non valido');
+                if (!Array.isArray(shapes)) throw new Error(shapes?.error || actvT('js.lm.badFmt','Formato dati linee non valido'));
                 return shapes;
             });
             const shapeSets = await Promise.all(requests);
@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     const group = routeGroups.get(groupNumber);
                     group.layers.push(casing, polyline, ...stopLayers);
-                    group.labels.add(`${isBus ? 'Bus' : 'Vaporetto'} ${shape.route_short_name || shape.route_id || ''}`.trim());
+                    group.labels.add(`${isBus ? actvT('js.lm.bus','Bus') : actvT('js.lm.vap','Vaporetto')} ${shape.route_short_name || shape.route_id || ''}`.trim());
                     (shape.path || []).forEach(stop => {
                         if (stop.name) group.stops.add(stop.name);
                     });
@@ -414,25 +414,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
             loadingEl.style.display = 'none';
             mapStatus.textContent = drawnRoutes.length
-                ? `${drawnRoutes.length} ${drawnRoutes.length === 1 ? 'percorso sulla mappa' : 'percorsi sulla mappa'}`
-                : 'Nessun percorso trovato. Modifica i filtri o il servizio selezionato.';
+                ? `${actvT(drawnRoutes.length === 1 ? 'js.lm.route1' : 'js.lm.routeN','{n} percorsi sulla mappa',{n:drawnRoutes.length})}`
+                : actvT('js.lm.none','Nessun percorso trovato. Modifica i filtri o il servizio selezionato.');
 
         } catch (error) {
             if (controller.signal.aborted) return;
-            console.error('Errore caricamento linee:', error);
+            console.error(actvT('js.lm.err','Errore caricamento linee:'), error);
             layers.clearLayers();
             if (drawLanesListener) map.off('zoomend', drawLanesListener);
             document.querySelector('.route-map-legend')?.remove();
             loadingEl.replaceChildren();
             const message = document.createElement('p');
-            message.textContent = 'Impossibile caricare i percorsi. Riprova o modifica i filtri.';
+            message.textContent = actvT('js.lm.cant','Impossibile caricare i percorsi. Riprova o modifica i filtri.');
             const retry = document.createElement('button');
             retry.type = 'button';
             retry.className = 'lines-control';
             retry.textContent = 'Riprova';
             retry.addEventListener('click', () => loadLinesOnMap());
             loadingEl.append(message, retry);
-            mapStatus.textContent = 'Caricamento non riuscito';
+            mapStatus.textContent = actvT('js.lm.failed','Caricamento non riuscito');
         } finally {
             if (!controller.signal.aborted) document.getElementById('lines-map-stage').setAttribute('aria-busy', 'false');
         }

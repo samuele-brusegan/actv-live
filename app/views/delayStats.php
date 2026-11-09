@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?= I18n::lang() ?>">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Storico Ritardi - ACTV Live</title>
-        <?php require COMMON_HTML_HEAD; ?>
+        <?php
+        $SEO = ['title' => t('meta.delayStats.title'), 'desc' => t('meta.delayStats.desc')];
+        require COMMON_HTML_HEAD;
+        ?>
         <link rel="stylesheet" href="/css/delayStats.css">
         <script src="/js/delayHistory.js"></script>
     </head>
@@ -16,8 +18,8 @@
                     <?= getIcon('arrow_back', 24) ?>
                 </a>
             </div>
-            <div class="header-title">Storico Ritardi</div>
-            <div class="header-subtitle">Statistiche basate sui dati osservati</div>
+            <h1 class="header-title"><?= te('delay.title') ?></h1>
+            <div class="header-subtitle"><?= te('delay.subtitle') ?></div>
         </div>
 
         <div class="main-content pb-5">
@@ -26,53 +28,53 @@
             <div class="stats-overview" id="stats-overview">
                 <div class="stat-card">
                     <div class="stat-value" id="stat-total">-</div>
-                    <div class="stat-label">Rilevamenti</div>
+                    <div class="stat-label"><?= te('delay.total') ?></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-avg">-</div>
-                    <div class="stat-label">Ritardo medio</div>
+                    <div class="stat-label"><?= te('delay.avg') ?></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-max">-</div>
-                    <div class="stat-label">Ritardo max</div>
+                    <div class="stat-label"><?= te('delay.max') ?></div>
                 </div>
             </div>
 
             <!-- Quick Stats -->
             <div class="quick-stats" id="quick-stats">
                 <div class="quick-stat">
-                    <span class="quick-label">Linea peggiore:</span>
+                    <span class="quick-label"><?= te('delay.worstLine') ?></span>
                     <span class="quick-value" id="stat-worst-line">-</span>
                 </div>
                 <div class="quick-stat">
-                    <span class="quick-label">Ora migliore:</span>
+                    <span class="quick-label"><?= te('delay.bestHour') ?></span>
                     <span class="quick-value" id="stat-best-hour">-</span>
                 </div>
                 <div class="quick-stat">
-                    <span class="quick-label">Ora peggiore:</span>
+                    <span class="quick-label"><?= te('delay.worstHour') ?></span>
                     <span class="quick-value" id="stat-worst-hour">-</span>
                 </div>
             </div>
 
             <!-- By Line -->
-            <div class="section-title">Ritardo per Linea</div>
+            <div class="section-title"><?= te('delay.byLine') ?></div>
             <div id="line-stats">
-                <p class="text-center text-muted" id="line-empty">Nessun dato disponibile. Naviga le fermate per raccogliere dati.</p>
+                <p class="text-center text-muted" id="line-empty"><?= te('delay.noDataLine') ?></p>
             </div>
 
             <!-- By Hour Chart -->
-            <div class="section-title">Ritardo per Ora del Giorno</div>
+            <div class="section-title"><?= te('delay.byHour') ?></div>
             <div class="chart-container" id="hour-chart">
-                <p class="text-center text-muted" id="hour-empty">Nessun dato disponibile.</p>
+                <p class="text-center text-muted" id="hour-empty"><?= te('delay.noData') ?></p>
             </div>
 
             <!-- Actions -->
             <div class="stats-actions">
                 <button class="btn btn-outline-secondary rounded-pill px-4 py-2" onclick="location.reload()">
-                    Aggiorna
+                    <?= te('stop.refresh') ?>
                 </button>
                 <button class="btn btn-outline-danger rounded-pill px-4 py-2" onclick="confirmClear()">
-                    Cancella storico
+                    <?= te('delay.clear') ?>
                 </button>
             </div>
 
@@ -150,7 +152,7 @@
             }
 
             async function confirmClear() {
-                const confirmed = await actvConfirm('Lo storico locale verrà eliminato da questo dispositivo.', 'Cancella storico ritardi');
+                const confirmed = await actvConfirm(<?= json_encode(t('delay.clearConfirm')) ?>, <?= json_encode(t('delay.clearTitle')) ?>);
                 if (confirmed) {
                     clearDelayHistory();
                     renderStats();

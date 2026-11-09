@@ -7,9 +7,9 @@ class CookieNotice {
         this.options = Object.assign({
             cookieName: 'cookie_consent_accepted',
             title: 'Cookie & Privacy',
-            message: 'Utilizziamo i cookie per migliorare la tua esperienza e analizzare il traffico via Google Analytics.',
+            message: actvT('js.cookie.text','Utilizziamo i cookie per migliorare la tua esperienza e analizzare il traffico via Google Analytics.'),
             acceptLabel: 'Accetta',
-            moreLabel: 'Scopri di più',
+            moreLabel: actvT('js.cookie.more','Scopri di più'),
             moreUrl: '/privacy', // Default privacy path
         }, options);
 

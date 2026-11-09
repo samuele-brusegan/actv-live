@@ -14,8 +14,8 @@ function validVehiclePosition(vehicle, now = Date.now() / 1000) {
 
 function positionAgeLabel(vehicle) {
     return vehicle.position_timestamp
-        ? 'Posizione rilevata ' + new Date(vehicle.position_timestamp * 1000).toLocaleTimeString('it-IT')
-        : 'Ora rilevamento non disponibile';
+        ? actvT('js.live.posOk','Posizione rilevata ') + new Date(vehicle.position_timestamp * 1000).toLocaleTimeString('it-IT')
+        : actvT('js.live.noTime','Ora rilevamento non disponibile');
 }
 
 function matchesVehicleFilter(vehicle, query, params = new URLSearchParams(), fields = { line: true, destination: true, tripId: true }) {
@@ -276,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateSearchFields() {
         fieldSwitches.forEach(input => { input.checked = searchFields[input.dataset.searchField]; });
         document.getElementById('search-fields-warning').classList.toggle('hidden', Object.values(searchFields).some(Boolean));
-        filterInput.placeholder = searchFields.line ? 'Cerca: 5E, 21, …' : searchFields.destination ? 'Cerca destinazioni…' : searchFields.tripId ? 'Cerca ID corsa…' : 'Attiva un campo nelle impostazioni';
+        filterInput.placeholder = searchFields.line ? 'Cerca: 5E, 21, …' : searchFields.destination ? actvT('js.live.phDest','Cerca destinazioni…') : searchFields.tripId ? actvT('js.live.phTrip','Cerca ID corsa…') : actvT('js.live.enableField','Attiva un campo nelle impostazioni');
     }
 
     function clearBusMarkers() {
@@ -368,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function openBusTooltip(html, anchorFn, source = null) {
         tooltipAnchor = anchorFn;
         tooltipSource = source;
-        busTooltip.innerHTML = '<button class="bus-map-tooltip-close" type="button" aria-label="Chiudi">&times;</button>' + html;
+        busTooltip.innerHTML = `<button class="bus-map-tooltip-close" type="button" aria-label="${actvT('routeFinder.close','Chiudi')}">&times;</button>` + html;
         busTooltip.classList.remove('hidden');
         positionBusTooltip();
     }
@@ -441,10 +441,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderSearchHistory() {
         const history = getSearchHistory();
-        searchHistoryPanel.innerHTML = `<div class="map-panel-heading"><h2>Ricerche recenti</h2>${history.length ? '<button type="button" class="history-clear" data-clear-history>Svuota</button>' : ''}</div>`
+        searchHistoryPanel.innerHTML = `<div class="map-panel-heading"><h2>${actvT('liveMap.recentSearches','Ricerche recenti')}</h2>${history.length ? '<button type="button" class="history-clear" data-clear-history>Svuota</button>' : ''}</div>`
             + (history.length
                 ? history.map((value, index) => `<div class="search-history-row"><button type="button" class="search-history-item" data-query="${escapeHtml(value)}"><span>${escapeHtml(value)}</span></button><button type="button" class="history-remove" data-remove-history="${index}" aria-label="Rimuovi ricerca ${escapeHtml(value)}">Rimuovi</button></div>`).join('')
-                : '<p class="search-history-empty">Le ricerche confermate con Invio compariranno qui. Puoi cercare più linee, ad esempio 5E, 21.</p>');
+                : `<p class="search-history-empty">${actvT('js.live.histEmpty','Le ricerche confermate con Invio compariranno qui. Puoi cercare più linee, ad esempio 5E, 21.')}</p>`);
     }
 
     function rememberSearch(value) {
@@ -815,11 +815,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showUserPosition() {
         if (!navigator.geolocation) {
-            counterText.textContent = 'Posizione del dispositivo non disponibile';
+            counterText.textContent = actvT('js.live.noDevicePos','Posizione del dispositivo non disponibile');
             return;
         }
         spinnerEl.classList.remove('hidden');
-        counterText.textContent = 'Ricerca della tua posizione in corso…';
+        counterText.textContent = actvT('js.live.searchPos','Ricerca della tua posizione in corso…');
         navigator.geolocation.getCurrentPosition(position => {
             const lat = Number(position.coords.latitude), lng = Number(position.coords.longitude);
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
@@ -827,7 +827,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 userPositionMarker = L.marker([lat, lng], {
                     icon: L.divIcon({ className: '', html: '<div class="user-position-marker"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
                     zIndexOffset: 1500
-                }).bindPopup('La tua posizione').addTo(map);
+                }).bindPopup(actvT('js.home.myPos','La tua posizione')).addTo(map);
             } else userPositionMarker.setLatLng([lat, lng]);
             const accuracy = Number(position.coords.accuracy);
             if (Number.isFinite(accuracy)) {
@@ -836,10 +836,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             map.setView([lat, lng], Math.max(map.getZoom(), 15));
             spinnerEl.classList.add('hidden');
-            counterText.textContent = 'Posizione trovata';
+            counterText.textContent = actvT('js.live.posFound','Posizione trovata');
         }, error => {
             spinnerEl.classList.add('hidden');
-            counterText.textContent = error.code === 1 ? 'Permesso posizione non concesso' : 'Posizione non disponibile';
+            counterText.textContent = error.code === 1 ? actvT('js.live.noPerm','Permesso posizione non concesso') : actvT('js.live.noPos','Posizione non disponibile');
         }, { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 });
     }
 
@@ -879,22 +879,22 @@ document.addEventListener('DOMContentLoaded', () => {
     function makePopup(bus, pos, delayInfo) {
         const nextTime = pos.nextTime ? pos.nextTime.substring(0, 5) : '';
         
-        let rtStatus = '<span style="color:#999">○ Programmato (Dati non disp.)</span>';
+        let rtStatus = `<span style="color:#999">${actvT('js.live.schedNoData','○ Programmato (Dati non disp.)')}</span>`;
         if (delayInfo?.status === 'REALTIME') {
-            rtStatus = '<span style="color:#009E61">Posizione stimata da previsioni realtime</span>';
+            rtStatus = `<span style="color:#009E61">${actvT('js.live.estRt','Posizione stimata da previsioni realtime')}</span>`;
         } else if (delayInfo?.status === 'SCHEDULED_API_FLAG') {
-            // rtStatus = '<span style="color:#FF9800">⚠️ Programmato (No GPS)</span>';
-             rtStatus = '<span style="color:#757575">○ Programmato (No GPS)</span>';
+            // rtStatus = `<span style="color:#FF9800">${actvT('js.live.schedNoGpsW','⚠️ Programmato (No GPS)')}</span>`;
+             rtStatus = `<span style="color:#757575">${actvT('js.live.schedNoGps','○ Programmato (No GPS)')}</span>`;
         }
         
         let delayHtml = '';
         if (delayInfo?.delaySec) {
             const mins = Math.round(delayInfo.delaySec / 60);
             const color = mins > 0 ? '#E30613' : '#009E61';
-            delayHtml = `<div class="bus-popup-time" style="color:${color};font-weight:700">${mins > 0 ? '+' : ''}${mins} min ritardo</div>`;
+            delayHtml = `<div class="bus-popup-time" style="color:${color};font-weight:700">${mins > 0 ? '+' : ''}${mins} ${actvT('js.live.minDelay','min ritardo')}</div>`;
         }
 
-        let nextStop_noCapolinea = pos.nextStop.replace(' (capolinea)', '');
+        let nextStop_noCapolinea = pos.nextStop.replace(actvT('js.live.terminus',' (capolinea)'), '');
         
         let params = new URLSearchParams({ id: pos.nextStopId, name: nextStop_noCapolinea });
         
@@ -907,11 +907,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? `<a href="https://actv-live.test/aut/stops/stop?${params}" class="bus-popup-next">Prossima: ${pos.nextStop}</a>`
                     : ''
                 }
-                ${nextTime ? `<div class="bus-popup-time">Orario previsto: ${nextTime}</div>` : ''}
+                ${nextTime ? `<div class="bus-popup-time">${actvT('js.live.schedTime','Orario previsto: ')}${nextTime}</div>` : ''}
                 ${delayHtml}
                 <div class="bus-popup-time" style="margin-top:8px;opacity:0.6;font-size:9px">
                     Trip: ${bus.trip_id}
-                    ${delayInfo?.vehicle ? `<br>Veicolo: ${delayInfo.vehicle}` : ''}
+                    ${delayInfo?.vehicle ? `<br>${actvT('js.live.vehicle','Veicolo: ')}${delayInfo.vehicle}` : ''}
                 </div>
             </div>
         `;
@@ -919,13 +919,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function realtimePopup(vehicle, lineName) {
         const position = vehicle.vehicle_position || {};
-        const headsign = vehicle.trip_headsign || vehicle.route_long_name || 'Destinazione non disponibile';
+        const headsign = vehicle.trip_headsign || vehicle.route_long_name || actvT('js.live.noDest','Destinazione non disponibile');
         return `<div class="bus-popup">
             <div class="bus-popup-line">Linea ${escapeHtml(lineName)}</div>
             <div class="bus-popup-direction">→ ${escapeHtml(headsign)}</div>
             <div class="bus-popup-position">Posizione: ${Number(position.lat).toFixed(5)}, ${Number(position.lon).toFixed(5)}</div>
-            <div class="bus-popup-time">Trip: ${escapeHtml(vehicle.trip_id || 'non disponibile')}</div>
-            <div>${vehicle.route_guess ? 'Linea stimata · ' : ''}${escapeHtml(positionAgeLabel(vehicle))}</div>
+            <div class="bus-popup-time">Trip: ${escapeHtml(vehicle.trip_id || actvT('js.live.na','non disponibile'))}</div>
+            <div>${vehicle.route_guess ? actvT('js.live.estLine','Linea stimata · ') : ''}${escapeHtml(positionAgeLabel(vehicle))}</div>
             <div class="bus-popup-hint">Click: mostra percorso · doppio click: dettagli corsa</div>
         </div>`;
     }
@@ -1039,17 +1039,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function openBusDetails(id, item) {
         const bus = item?.busData || {};
         const position = bus.vehicle_position || item?.currentPos || {};
-        const headsign = bus.trip_headsign || bus.route_long_name || 'Destinazione non disponibile';
+        const headsign = bus.trip_headsign || bus.route_long_name || actvT('js.live.noDest','Destinazione non disponibile');
         const detailsUrl = bus.trip_id ? `/trip-details?tripId=${encodeURIComponent(bus.trip_id)}` : '#';
         busDetailsContent.innerHTML = `
             <h2 class="bus-details-title">Linea ${escapeHtml(bus.route_short_name || bus.route_id || 'N/D')}</h2>
             <div class="bus-details-destination">→ ${escapeHtml(headsign)}</div>
             <dl class="bus-details-grid">
-                <dt>Trip ID</dt><dd>${escapeHtml(bus.trip_id || 'Non disponibile')}</dd>
-                <dt>Route ID</dt><dd>${escapeHtml(bus.route_id || 'Non disponibile')}</dd>
-                <dt>Stato</dt><dd>${escapeHtml(item?.status === 'REALTIME' ? 'Posizione GPS' + (bus.route_guess ? ' · linea stimata' : '') : 'Posizione stimata')}</dd>
+                <dt>Trip ID</dt><dd>${escapeHtml(bus.trip_id || actvT('js.live.naCap','Non disponibile'))}</dd>
+                <dt>Route ID</dt><dd>${escapeHtml(bus.route_id || actvT('js.live.naCap','Non disponibile'))}</dd>
+                <dt>Stato</dt><dd>${escapeHtml(item?.status === 'REALTIME' ? actvT('js.live.gps','Posizione GPS') + (bus.route_guess ? actvT('js.live.estLine2',' · linea stimata') : '') : actvT('js.live.estPos','Posizione stimata'))}</dd>
                 <dt>Coordinate</dt><dd>${Number(position.lat).toFixed(5)}, ${Number(position.lon ?? position.lng).toFixed(5)}</dd>
-                ${item?.currentPos?.nextStop ? `<dt>Prossima fermata</dt><dd>${escapeHtml(item.currentPos.nextStop)}</dd>` : ''}
+                ${item?.currentPos?.nextStop ? `<dt>${actvT('js.live.nextStop','Prossima fermata')}</dt><dd>${escapeHtml(item.currentPos.nextStop)}</dd>` : ''}
             </dl>
             <div class="bus-details-actions"><a href="${detailsUrl}">Apri dettaglio corsa</a></div>`;
         busDetailsPanel.classList.remove('hidden');
@@ -1079,7 +1079,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await loadNavigationColors();
             const response = await fetch('/api/navigation/vehicles', { cache: 'no-store' });
-            if (!response.ok) throw new Error('Posizioni navigazione non disponibili');
+            if (!response.ok) throw new Error(actvT('js.live.noNav','Posizioni navigazione non disponibili'));
             const vehicles = await response.json();
             if (version !== navigationLoadVersion) return;
             if (serviceMode === 'automobilistico') { clearNavigationMarkers(); return; }
@@ -1100,7 +1100,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const old = navigationMarkers.get(id);
                 if (old) map.removeLayer(old);
                 const marker = L.marker([Number(position.lat), Number(position.lon)], { icon })
-                    .bindPopup(`<strong>⛴ Navigazione ${escapeHtml(lineName)}</strong><br>Trip ${escapeHtml(vehicle.trip_id || '-')}<br>${escapeHtml(positionAgeLabel(vehicle))}<br>${vehicle.status === 'cancelled' ? 'Corsa cancellata' : vehicle.status === 'delayed' ? `Ritardo: ${Math.round((vehicle.delay_seconds || 0) / 60)} min` : 'Programmata'}`)
+                    .bindPopup(`<strong>⛴ Navigazione ${escapeHtml(lineName)}</strong><br>Trip ${escapeHtml(vehicle.trip_id || '-')}<br>${escapeHtml(positionAgeLabel(vehicle))}<br>${vehicle.status === 'cancelled' ? actvT('js.rr.cancelled','Corsa cancellata') : vehicle.status === 'delayed' ? `Ritardo: ${Math.round((vehicle.delay_seconds || 0) / 60)} min` : actvT('js.live.scheduled','Programmata')}`)
                     .addTo(map);
                 navigationMarkers.set(id, marker);
             });
@@ -1175,13 +1175,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadBuses() {
         window.ACTVPerf?.mark('bus-load-start', { service: serviceMode });
-        if (serviceMode === 'navigation') { clearBusMarkers(); counterText.textContent = 'Solo navigazione'; spinnerEl.classList.add('hidden'); return; }
+        if (serviceMode === 'navigation') { clearBusMarkers(); counterText.textContent = actvT('js.live.onlyNav','Solo navigazione'); spinnerEl.classList.add('hidden'); return; }
         if (abortCtrl) abortCtrl.abort();
         abortCtrl = new AbortController();
         const signal = abortCtrl.signal;
 
         spinnerEl.classList.remove('hidden');
-        counterText.textContent = 'Ricerca dei mezzi in servizio…';
+        counterText.textContent = actvT('js.live.searching','Ricerca dei mezzi in servizio…');
 
         try {
             try {
@@ -1206,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 busMarkers.clear();
                 sidePanelList.innerHTML = '';
                 sidePanel.classList.add('hidden');
-                counterText.textContent = 'Nessun bus trovato';
+                counterText.textContent = actvT('js.live.noBuses','Nessun bus trovato');
                 spinnerEl.classList.add('hidden');
                 return;
             }
@@ -1363,7 +1363,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             spinnerEl.classList.add('hidden');
-            counterText.textContent = `${busMarkers.size} bus con posizione stimata`;
+            counterText.textContent = `${actvT('js.live.estCount','{n} bus con posizione stimata',{n:busMarkers.size})}`;
             lastUpdateEl.textContent = `Dati ricevuti ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
             window.ACTVPerf?.mark('bus-load-end', { markers: busMarkers.size, nonRealtime: finalNonRtCount });
 
@@ -1372,7 +1372,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 busMarkers.forEach(item => { map.removeLayer(item.marker); if (item.polyline) map.removeLayer(item.polyline); });
                 busMarkers.clear();
                 spinnerEl.classList.add('hidden');
-                counterText.textContent = 'Errore di caricamento';
+                counterText.textContent = actvT('js.live.loadErr','Errore di caricamento');
             }
         }
     }

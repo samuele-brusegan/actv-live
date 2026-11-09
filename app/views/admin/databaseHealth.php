@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?= I18n::lang() ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stato database - ACTV Live</title>
+    <?php $SEO = ['title' => 'Stato database - ACTV Live', 'robots' => 'noindex,nofollow']; ?>
     <?php require COMMON_HTML_HEAD; ?>
     <link rel="stylesheet" href="/css/admin.css">
     <link rel="stylesheet" href="/css/databaseHealth.css">

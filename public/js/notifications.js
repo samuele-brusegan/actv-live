@@ -191,8 +191,8 @@ async function checkDelays() {
                     if (!lastTime || (Date.now() - lastTime) > 300000) {
                         const lineName = (p.line || '').split('_')[0];
                         await sendLocalNotification(
-                            `Ritardo Linea ${lineName}`,
-                            `${lineName} verso ${p.destination} - ritardo ${delayMin} min (fermata ${stop.name})`,
+                            `${actvT('js.notif.delayTitle','Ritardo Linea')} ${lineName}`,
+                            actvT('js.notif.delayBody','{line} verso {dest} - ritardo {min} min (fermata {stop})',{line:lineName,dest:p.destination,min:delayMin,stop:stop.name}),
                             notifKey
                         );
                         lastNotified[notifKey] = Date.now();
@@ -209,8 +209,8 @@ async function checkDelays() {
             if (hadState) {
                 for (const d of departed) {
                     await sendLocalNotification(
-                        `Bus passato`,
-                        `Il bus ${d.line} verso ${d.dest} è appena passato a ${stop.name}`,
+                        actvT('js.notif.busPassed','Bus passato'),
+                        actvT('js.notif.passed','Il bus {line} verso {dest} è appena passato a {stop}',{line:d.line,dest:d.dest,stop:stop.name}),
                         `passed_${stop.id}_${d.line}_${d.dest}`
                     );
                 }

@@ -375,7 +375,7 @@ function updateHeader() {
         if (timeContainer) timeContainer.style.display = 'flex';
 
         if (state.arrivalTime === 'departure') {
-            timeTextEl.innerText = 'In partenza';
+            timeTextEl.innerText = actvT('js.td.departing','In partenza');
         } else {
             timeTextEl.innerText = formatMinutesRemaining(state.arrivalTime);
         }
@@ -414,7 +414,7 @@ function updateScheduleInfo() {
             delayEl.innerText = `−${-delay} min`;
         } else {
             delayEl.classList.add('is-ontime');
-            delayEl.innerText = 'in orario';
+            delayEl.innerText = actvT('js.td.onTime','in orario');
         }
     }
 }
@@ -429,7 +429,7 @@ async function fetchGTFSStops(tripId) {
     } catch (e) {
         console.error(e);
         const container = document.getElementById('stops-container');
-        if (container) container.innerHTML = '<div class="text-center text-danger">Errore caricamento percorso</div>';
+        if (container) container.innerHTML = `<div class="text-center text-danger">${actvT('js.td.routeErr','Errore caricamento percorso')}</div>`;
         return null;
     }
 }
@@ -536,7 +536,7 @@ async function openMap() {
     const dialog = document.getElementById('trip-map-dialog');
     if (!dialog || !state.tripId) return;
     if (typeof L === 'undefined') {
-        errorPopup('Mappa non disponibile. Verifica la connessione e riprova.');
+        errorPopup(actvT('js.td.noMap','Mappa non disponibile. Verifica la connessione e riprova.'));
         return;
     }
     dialog.hidden = false;
@@ -563,7 +563,7 @@ function updateTripMapHeader() {
     const lineBadge = document.getElementById('trip-map-line');
     const direction = document.getElementById('trip-map-direction');
     if (lineBadge) lineBadge.textContent = state.line || '--';
-    if (direction) direction.textContent = state.destination?.replace(/\\/g, '') || 'Corsa ACTV';
+    if (direction) direction.textContent = state.destination?.replace(/\\/g, '') || actvT('js.td.trip','Corsa ACTV');
 }
 
 function closeMap() {
@@ -631,11 +631,11 @@ function findMergedMapStop(stop) {
 function mapStopPassageLabel(stop) {
     const merged = findMergedMapStop(stop);
     const time = String(merged?.arrival_time || merged?.departure_time || stop?.arrival_time || stop?.departure_time || '');
-    if (time === 'departure') return 'Il bus è in partenza';
-    if (!time.includes(':')) return 'Orario non disponibile';
+    if (time === 'departure') return actvT('js.td.busDeparting','Il bus è in partenza');
+    if (!time.includes(':')) return actvT('js.td.noTime','Orario non disponibile');
     const remaining = formatMinutesRemaining(time);
-    if (isVisitedMapStop(stop)) return 'Fermata superata secondo la posizione GPS';
-    return `${merged?.hasRealTime ? 'Stima realtime' : 'Orario previsto'}: ${time.substring(0, 5)} · ${remaining}`;
+    if (isVisitedMapStop(stop)) return actvT('js.td.passedGps','Fermata superata secondo la posizione GPS');
+    return `${merged?.hasRealTime ? actvT('js.td.rtEst','Stima realtime') : actvT('js.live.schedTime','Orario previsto')}: ${time.substring(0, 5)} · ${remaining}`;
 }
 
 function createMapStopPopup(stop, index) {
@@ -770,7 +770,7 @@ function renderMapStops(stops) {
         const visitedClass = visited ? ' visited' : '';
         const terminal = isMapTerminalStop(stops, index) ? ' terminal' : '';
         const name = escapeMapHtml(stop.name || stop.stop_name || '');
-        const status = !tripMapProgress ? 'Posizione non disponibile' : visited ? 'Già passata' : 'Da raggiungere';
+        const status = !tripMapProgress ? actvT('js.live.noPos','Posizione non disponibile') : visited ? actvT('tripDetails.passed','Già passata') : actvT('tripDetails.upcoming','Da raggiungere');
 
         const merged = findMergedMapStop(stop);
         const rawTime = String(merged?.arrival_time || merged?.departure_time
@@ -787,9 +787,9 @@ function renderMapStops(stops) {
         } else if (rawTime === 'departure') {
             etaClass = 'live';
             etaMain = 'ora';
-            etaSub = 'in partenza';
-        } else if (remaining?.startsWith('Orario trascorso')) {
-            etaMain = merged?.hasRealTime ? 'Stima trascorsa' : 'Orario trascorso';
+            etaSub = actvT('js.td.departingLow','in partenza');
+        } else if (remaining?.startsWith(actvT('js.td.elapsed','Orario trascorso'))) {
+            etaMain = merged?.hasRealTime ? 'Stima trascorsa' : actvT('js.td.elapsed','Orario trascorso');
             etaSub = `prev. ${schedTime}`;
         } else if (merged?.hasRealTime && remaining) {
             etaClass = 'live';
@@ -847,10 +847,10 @@ function ensureTripGeometry() {
             shapes = response.ok ? await response.json() : [];
         }
         tripMapShape = Array.isArray(shapes) ? shapes.find(item => String(item.trip_id) === String(state.tripId)) : null;
-        if (!tripMapShape) throw new Error('Percorso non disponibile');
+        if (!tripMapShape) throw new Error(actvT('js.td.noRoute','Percorso non disponibile'));
         const geometry = Array.isArray(tripMapShape.shape) && tripMapShape.shape.length > 1 ? tripMapShape.shape : tripMapShape.path;
         const points = (geometry || []).map(point => [Number(point.lat), Number(point.lng)]).filter(point => point.every(Number.isFinite));
-        if (points.length < 2) throw new Error('Traccia non disponibile');
+        if (points.length < 2) throw new Error(actvT('js.td.noTrack','Traccia non disponibile'));
         tripMapGeometry = points;
         const stops = Array.isArray(tripMapShape.path) ? tripMapShape.path : state.stopsGTFS;
         tripMapStops = stops || [];
@@ -899,7 +899,7 @@ async function loadTripMap() {
         });
         renderMapStops(stops || []);
         if (tripMapVehiclePosition) updateTripMapProgress(tripMapVehiclePosition);
-        if (status && !tripMapVehiclePosition) status.textContent = 'Ricerca posizione del mezzo...';
+        if (status && !tripMapVehiclePosition) status.textContent = actvT('js.td.searchVeh','Ricerca posizione del mezzo...');
     } catch (error) {
         if (status) status.textContent = error.message;
     }
@@ -1213,7 +1213,7 @@ function startTripMapUserLocation() {
         if (!tripMapUserMarker) {
             tripMapUserMarker = L.circleMarker([lat, lng], {
                 radius: 8, color: '#fff', weight: 3, fillColor: '#1769e0', fillOpacity: 1, pane: 'markerPane'
-            }).addTo(tripMap).bindPopup('La tua posizione');
+            }).addTo(tripMap).bindPopup(actvT('js.home.myPos','La tua posizione'));
         } else {
             tripMapUserMarker.setLatLng([lat, lng]);
         }
@@ -1228,7 +1228,7 @@ function startTripMapUserLocation() {
             }
         }
     };
-    const fail = error => console.info('Posizione utente non disponibile sulla mappa', error?.message || error);
+    const fail = error => console.info(actvT('js.td.noUserPos','Posizione utente non disponibile sulla mappa'), error?.message || error);
     if (typeof navigator.geolocation.watchPosition === 'function') {
         tripMapGeoWatchId = navigator.geolocation.watchPosition(update, fail, {
             enableHighAccuracy: true, maximumAge: 15000, timeout: 10000
@@ -1258,7 +1258,7 @@ function updateNearbyVehicleMarkers(nearby) {
             iconSize: [30, 30],
             iconAnchor: [15, 15]
         });
-        const popup = `<strong>${lineName ? 'Linea ' + escapeMapHtml(lineName) : 'Mezzo ACTV'}</strong>`
+        const popup = `<strong>${lineName ? actvT('linesMap.byLine','Linea') + ' ' + escapeMapHtml(lineName) : actvT('js.td.vehicle','Mezzo ACTV')}</strong>`
             + (headsign ? `<br>${escapeMapHtml(headsign)}` : '')
             + `<br>${distanceLabel ? 'a ' + distanceLabel + ' dal bus' : 'nelle vicinanze'}`;
         const existing = tripMapNearbyMarkers.get(key);
@@ -1284,18 +1284,18 @@ async function refreshTripVehicle() {
     if (!state.tripId || tripMapVehicleRefreshing) return;
     tripMapVehicleRefreshing = true;
     const status = document.getElementById('trip-map-status');
-    if (status) status.innerHTML = '<span class="trip-map-live-dot"></span>Ricerca del mezzo in corso…';
+    if (status) status.innerHTML = `<span class="trip-map-live-dot"></span>${actvT('js.td.searching','Ricerca del mezzo in corso…')}`;
     try {
         const params = new URLSearchParams({ service: 'automobilistico', tripId: state.tripId, nearby: NEARBY_BUS_RADIUS_M });
         const response = await fetch(`/api/realtime/vehicles?${params.toString()}`, { cache: 'no-store' });
-        if (!response.ok) throw new Error('Posizione non disponibile');
+        if (!response.ok) throw new Error(actvT('js.live.noPos','Posizione non disponibile'));
         const payload = await response.json();
         const vehicles = Array.isArray(payload) ? payload : payload.vehicles || [];
         const vehicle = selectTripVehicle(vehicles, state.tripId);
         const lat = Number(vehicle?.vehicle_position?.lat), lng = Number(vehicle?.vehicle_position?.lon);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
             clearTripVehicle();
-            if (status) status.innerHTML = '<span class="trip-map-live-dot offline"></span>Nessun mezzo attivo rilevato su questa corsa';
+            if (status) status.innerHTML = `<span class="trip-map-live-dot offline"></span>${actvT('js.td.noVehicle','Nessun mezzo attivo rilevato su questa corsa')}`;
             return;
         }
         updateNearbyVehicleMarkers(vehicles.filter(item => item.nearby === true));

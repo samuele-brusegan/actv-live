@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?= I18n::lang() ?>">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Tutte le Stazioni - ACTV</title>
         <?php
+        $SEO = ['title' => t('meta.stops.title'), 'desc' => t('meta.stops.desc')];
         require COMMON_HTML_HEAD;
         ?>
         <link rel="stylesheet" href="/css/structure/structure-stopList.css">
@@ -21,27 +21,27 @@
                     <?= getIcon('arrow_back', 24) ?>
                 </a>
             </div> 
-            <div class="header-title">Tutte le<br>Stazioni</div>
+            <h1 class="header-title"><?= t('stops.title') ?></h1>
         </div>
 
         <!-- Contenuto Principale -->
         <div class="main-content pb-5">
             
             <div class="list-tabs">
-                <button type="button" class="list-tab active" id="tab-list" onclick="showListView()">Elenco</button>
-                <button type="button" class="list-tab" id="tab-zones" onclick="showZonesView()">Per zona</button>
+                <button type="button" class="list-tab active" id="tab-list" onclick="showListView()"><?= te('stops.tabList') ?></button>
+                <button type="button" class="list-tab" id="tab-zones" onclick="showZonesView()"><?= te('stops.tabZones') ?></button>
             </div>
 
             <div class="search-container" id="search-container">
-                <input type="text" id="search-input" class="search-input" placeholder="Cerca stazione..." onkeyup="filterStations()">
+                <input type="text" id="search-input" class="search-input" placeholder="<?= te('stops.searchPh') ?>" onkeyup="filterStations()">
             </div>
 
             <div id="list-view">
-            <div class="section-title">Elenco Stazioni</div>
+            <div class="section-title"><?= te('stops.listTitle') ?></div>
             
             <div id="stations-list">
                 <?php if (empty($stations)): ?>
-                    <p class='text-center text-muted'>Nessuna stazione trovata.</p>
+                    <p class='text-center text-muted'><?= te('stops.none') ?></p>
                 <?php else: ?>
                     <?php 
                         // Merge stations by clean name
@@ -99,7 +99,7 @@
                                     $linesHtml .= '...';
                                 }
                             } else {
-                                $linesHtml = 'Nessuna linea disponibile';
+                                $linesHtml = te('stops.noLines');
                             }
                             
                             // Use first ID for the link
@@ -133,7 +133,7 @@
                                 <div class="stop-info ms-3" style="flex-grow: 1;">
                                     <span class="stop-name d-block"><?= htmlspecialchars($station['name']) ?></span>
                                     <!-- Subtitle for Lines -->
-                                    <span class="stop-desc">Linee: <?= $linesHtml ?></span>
+                                    <span class="stop-desc"><?= te('stops.linesLabel') ?> <?= $linesHtml ?></span>
                                 </div>
                             </div>
                             <div class="quick-action">
@@ -150,6 +150,18 @@
         </div>
 
         <script>
+            const I18N = <?= json_encode([
+                'navTitle' => t('stops.navTitle'),
+                'navLine' => t('stops.navLine'),
+                'lineaLabel' => t('stops.lineaLabel'),
+                'linesLabel' => t('stops.linesLabel'),
+                'noRealtime' => t('stops.noRealtime'),
+                'noZones' => t('stops.noZones'),
+                'zonesTitle' => t('stops.zonesTitle'),
+                'allZones' => t('stops.allZones'),
+                'none' => t('stops.none'),
+            ], JSON_UNESCAPED_UNICODE) ?>;
+
             function escapeStopListHtml(value) {
                 return String(value ?? '').replace(/[&<>\"']/g, character => ({
                     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
@@ -176,10 +188,10 @@
                     const list = document.getElementById('stations-list');
                     if (!list) return;
                     const emptyMessage = list.querySelector(':scope > p');
-                    if (emptyMessage && /Nessuna stazione/i.test(emptyMessage.textContent)) emptyMessage.remove();
+                    if (emptyMessage && emptyMessage.textContent.includes(I18N.none)) emptyMessage.remove();
                     const heading = document.createElement('div');
                     heading.className = 'section-title navigation-section-title';
-                    heading.textContent = 'Fermate Navigazione';
+                    heading.textContent = I18N.navTitle;
                     list.appendChild(heading);
 
                     grouped.forEach(stop => {
@@ -190,13 +202,13 @@
                         card.dataset.name = stop.name.toUpperCase();
                         card.dataset.allIds = JSON.stringify(stop.ids);
                         card.dataset.service = 'navigation';
-                        card.dataset.lines = JSON.stringify(['' + 'Navigazione']);
+                        card.dataset.lines = JSON.stringify([I18N.navLine]);
                         card.innerHTML = `
                             <div class="d-flex align-items-center" style="width: 100%;">
                                 <div class="stop-ids-container">${stop.ids.map(id => `<div class="stop-id-badge">${escapeStopListHtml(id)}</div>`).join('')}</div>
                                 <div class="stop-info ms-3" style="flex-grow: 1;">
                                     <span class="stop-name d-block">${escapeStopListHtml(stop.name)}</span>
-                                    <span class="stop-desc">Linea: ⛴ Navigazione</span>
+                                    <span class="stop-desc">${I18N.lineaLabel} ⛴ ${I18N.navLine}</span>
                                 </div>
                             </div>
                             <div class="quick-action"><span style="font-size: 20px; color: #ccc;">&rsaquo;</span></div>`;
@@ -225,7 +237,7 @@
                             return `<span class="stop-line-badge" style="background:${escapeStopListHtml(color.route_color)};color:${escapeStopListHtml(color.route_text_color)}">${escapeStopListHtml(line)}</span>`;
                         }).join(' ');
                         const description = card.querySelector('.stop-desc');
-                        if (description && html) description.innerHTML = `${service === 'navigation' ? 'Linea: ' : 'Linee: '}${html}`;
+                        if (description && html) description.innerHTML = `${service === 'navigation' ? I18N.lineaLabel : I18N.linesLabel} ${html}`;
                     });
                 } catch (error) {
                     console.warn('Colori linee non disponibili:', error);
@@ -330,7 +342,7 @@
                             </div>
                             <div class="stop-info ms-3" style="flex-grow: 1;">
                                 <span class="stop-name d-block">${station.stop_name}</span>
-                                <span class="stop-desc">Servizio non in tempo reale (Server ACTV Down)</span>
+                                <span class="stop-desc">${I18N.noRealtime}</span>
                             </div>
                         </div>
                         <div class="quick-action">
@@ -391,8 +403,8 @@
                 if (!container) return;
                 buildZonesIndex();
                 const keys = Object.keys(zonesIndex).sort((a, b) => a.localeCompare(b, 'it'));
-                if (keys.length === 0) { container.innerHTML = "<p class='no-results'>Nessuna zona disponibile.</p>"; return; }
-                container.innerHTML = '<div class="section-title">Zone</div>' + keys.map(k => {
+                if (keys.length === 0) { container.innerHTML = '<p class="no-results">' + I18N.noZones + '</p>'; return; }
+                container.innerHTML = '<div class="section-title">' + I18N.zonesTitle + '</div>' + keys.map(k => {
                     const z = zonesIndex[k];
                     const safe = k.replace(/"/g, '&quot;');
                     return '<button type="button" class="zone-row stop-card" data-zone="' + safe + '">' +
@@ -413,7 +425,7 @@
                 if (!container || !zonesIndex || !zonesIndex[key]) return;
                 const z = zonesIndex[key];
                 container.innerHTML =
-                    '<button type="button" class="zone-back stop-card" onclick="renderZonesIndex()"><span><span class="chevron-back">&lsaquo;</span> Tutte le zone</span></button>' +
+                    '<button type="button" class="zone-back stop-card" onclick="renderZonesIndex()"><span><span class="chevron-back">&lsaquo;</span> ' + I18N.allZones + '</span></button>' +
                     '<div class="section-title">' + z.label + '</div><div id="zone-stations"></div>';
                 const list = document.getElementById('zone-stations');
                 z.cards.forEach(card => {

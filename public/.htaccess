@@ -9,3 +9,25 @@ RewriteCond %{REQUEST_FILENAME} !-d
 
 # Riscrive tutte le altre richieste a index.php
 RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Compressione testuale (migliora LCP / Core Web Vitals)
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml application/xml text/plain
+</IfModule>
+
+# Cache lunga per asset statici
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType image/svg+xml "access plus 30 days"
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/x-icon "access plus 30 days"
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType application/manifest+json "access plus 1 day"
+</IfModule>
+<IfModule mod_headers.c>
+    <FilesMatch "\.(css|js|svg|png|ico|webp|webmanifest)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
+</IfModule>

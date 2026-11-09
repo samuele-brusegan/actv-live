@@ -55,7 +55,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         returnTime = localStorage.getItem('route_return_time') || departureTime;
 
         if (!originData || !destinationData) {
-            showErrorState('Seleziona una partenza e una destinazione valide.');
+            showErrorState(actvT('js.rr.invalid','Seleziona una partenza e una destinazione valide.'));
             return;
         }
 
@@ -66,7 +66,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         await performRouteSearch();
     } catch (err) {
         console.error("Errore critico durante l'init:", err);
-        showErrorState(`Errore inizializzazione: ${err.message}`);
+        showErrorState(`${actvT('js.rr.initErr','Errore inizializzazione: {msg}',{msg:err.message})}`);
     }
 });
 
@@ -141,10 +141,10 @@ async function fetchRoutes(from, to, date, time, optimize, mode = 'all', fromSer
         });
     } catch (error) {
         if (error?.name === 'AbortError') {
-            throw new Error('La ricerca ha superato il tempo massimo. Riprova tra poco.');
+            throw new Error(actvT('js.rr.timeout','La ricerca ha superato il tempo massimo. Riprova tra poco.'));
         }
         throw new Error(navigator.onLine
-            ? 'Il servizio percorsi non è raggiungibile. Riprova tra poco.'
+            ? actvT('js.rr.down','Il servizio percorsi non è raggiungibile. Riprova tra poco.')
             : 'Connessione assente. Controlla la rete e riprova.');
     } finally {
         clearTimeout(timeout);
@@ -169,11 +169,11 @@ async function fetchRoutes(from, to, date, time, optimize, mode = 'all', fromSer
             try { data = JSON.parse(responseText.slice(jsonStart)); } catch (ignored) { data = null; }
         }
         if (data) {
-            if (!data.success) throw new Error(data.error || 'Errore durante la ricerca.');
+            if (!data.success) throw new Error(data.error || actvT('js.rr.err','Errore durante la ricerca.'));
             return data.routes || [];
         }
         throw new Error(response.ok
-            ? 'Il server ha restituito una risposta non valida.'
+            ? actvT('js.rr.badResp','Il server ha restituito una risposta non valida.')
             : `HTTP ${response.status}: risposta non valida dal server.`);
     }
 
@@ -181,9 +181,9 @@ async function fetchRoutes(from, to, date, time, optimize, mode = 'all', fromSer
         throw new Error(data?.error || `HTTP ${response.status}: errore durante la ricerca.`);
     }
     if (!data || typeof data !== 'object') {
-        throw new Error('Il server ha restituito una risposta vuota.');
+        throw new Error(actvT('js.rr.empty','Il server ha restituito una risposta vuota.'));
     }
-    if (!data.success) throw new Error(data.error || 'Errore durante la ricerca.');
+    if (!data.success) throw new Error(data.error || actvT('js.rr.err','Errore durante la ricerca.'));
     const routes = data.routes || [];
     try {
         const cache = JSON.parse(localStorage.getItem(ROUTE_RESULTS_CACHE_KEY) || '{}');
@@ -225,7 +225,7 @@ async function performRouteSearch() {
         } else if (returnTripEnabled && returnRoutes.length > 0) {
             switchDirection('ritorno');
         } else {
-            showErrorState('Nessun percorso trovato per i parametri specificati.');
+            showErrorState(actvT('js.rr.none','Nessun percorso trovato per i parametri specificati.'));
         }
 
         // Il realtime è un arricchimento: non deve bloccare la visualizzazione
@@ -249,9 +249,9 @@ function distanceMeters(aLat, aLon, bLat, bLon) {
 
 function formatVehicleDistance(meters) {
     if (!Number.isFinite(meters)) return '';
-    if (meters < 150) return 'in prossimità della fermata';
-    if (meters < 1000) return `a circa ${Math.max(100, Math.round(meters / 100) * 100)} m dalla fermata`;
-    return `a circa ${(meters / 1000).toFixed(meters < 10000 ? 1 : 0).replace('.', ',')} km dalla fermata`;
+    if (meters < 150) return actvT('js.rr.near','in prossimità della fermata');
+    if (meters < 1000) return `${actvT('js.rr.meters','a circa {m} m dalla fermata',{m:Math.max(100, Math.round(meters / 100) * 100)})}`;
+    return `${actvT('js.rr.km','a circa {km} km dalla fermata',{km:(meters / 1000).toFixed(meters < 10000 ? 1 : 0).replace('.', ',')})}`;
 }
 
 function computeVehicleProgress(position, shape, boardingStopId) {
@@ -387,7 +387,7 @@ function switchDirection(direction) {
     if (!allRoutes || allRoutes.length === 0) {
         const listEl = document.getElementById('routes-list');
         if (listEl) {
-            listEl.innerHTML = `<div class="no-routes-text" style="text-align:center; padding:1.5rem;">Nessun percorso trovato per questa direzione.</div>`;
+            listEl.innerHTML = `<div class="no-routes-text" style="text-align:center; padding:1.5rem;">${actvT('js.rr.noneDir','Nessun percorso trovato per questa direzione.')}</div>`;
         }
         return;
     }
@@ -455,7 +455,7 @@ function formatDuration(minutes) {
     const hours = Math.floor((minutes % 1440) / 60);
     const rest = minutes % 60;
     const parts = [];
-    if (days) parts.push(`${days} ${days === 1 ? 'giorno' : 'giorni'}`);
+    if (days) parts.push(`${days} ${days === 1 ? actvT('js.rr.day1','giorno') : actvT('js.rr.dayN','giorni')}`);
     if (hours) parts.push(`${hours} h`);
     if (rest || !parts.length) parts.push(`${rest} min`);
     return parts.join(' ');
@@ -514,7 +514,7 @@ function renderRouteResults(routes) {
                         ${legsHtml}
                     </div>
                     <div class="route-footer">
-                        ${compareMode ? '' : `<button class="btn-select" onclick='confirmRouteSelection(${routeJson}, event)'>Seleziona &rarr;</button>`}
+                        ${compareMode ? '' : `<button class="btn-select" onclick='confirmRouteSelection(${routeJson}, event)>${actvT('js.rr.select','Seleziona')} &rarr;</button>`}
                     </div>
                 </div>
             </div>
@@ -545,7 +545,7 @@ function renderLegHTML(leg, route, index) {
         ? `<div class="line-badge badge-walking">${getWalkingIcon()}</div>
            <div class="connector-info">Cammina per ${Math.round(leg.duration)} min${Number.isFinite(Number(leg.distance)) ? ` (${Math.round(Number(leg.distance))}m)` : ''}</div>`
         : `<div class="line-badge ${badge.class}" title="${getModeLabel(leg)}"${getBadgeStyle(leg)}>${leg.mode === 'water' ? '⛴ ' : ''}${badge.name}</div>
-           <div class="connector-info">per ${leg.stops_count} fermate${leg.status === 'cancelled' ? ' · Corsa cancellata' : leg.status === 'delayed' ? ` · +${Math.round((leg.delay_seconds || 0) / 60)} min` : ''}${leg.realtime_vehicle ? `<span class="vehicle-live-info"><span class="vehicle-live-dot"></span>${leg.vehicle_progress?.boardingPassed ? 'Il mezzo ha già superato la fermata di salita' : `Mezzo rilevato${leg.vehicle_distance_m != null ? ` ${formatVehicleDistance(leg.vehicle_distance_m)}` : ''}${leg.vehicle_progress?.stopsToBoarding > 0 ? ` · ${leg.vehicle_progress.stopsToBoarding} fermat${leg.vehicle_progress.stopsToBoarding === 1 ? 'a' : 'e'} prima della salita` : ''}${leg.vehicle_progress?.nearestStop ? ` · vicino a ${leg.vehicle_progress.nearestStop}` : ''}`}</span>` : ''}</div>`;
+           <div class="connector-info">per ${leg.stops_count} fermate${leg.status === 'cancelled' ? ' · ' + actvT('js.rr.cancelled','Corsa cancellata') : leg.status === 'delayed' ? ` · +${Math.round((leg.delay_seconds || 0) / 60)} min` : ''}${leg.realtime_vehicle ? `<span class="vehicle-live-info"><span class="vehicle-live-dot"></span>${leg.vehicle_progress?.boardingPassed ? actvT('js.stop.passed','Il mezzo ha già superato questa fermata') : `Mezzo rilevato${leg.vehicle_distance_m != null ? ` ${formatVehicleDistance(leg.vehicle_distance_m)}` : ''}${leg.vehicle_progress?.stopsToBoarding > 0 ? ` · ${leg.vehicle_progress.stopsToBoarding} fermat${leg.vehicle_progress.stopsToBoarding === 1 ? 'a' : 'e'} prima della salita` : ''}${leg.vehicle_progress?.nearestStop ? ` · vicino a ${leg.vehicle_progress.nearestStop}` : ''}`}</span>` : ''}</div>`;
 
     html += `<div class="timeline-connector">${connectorContent}</div>`;
 
@@ -607,7 +607,7 @@ function updateCompareBar() {
     const compareBtn = document.querySelector('.btn-compare');
 
     if (countEl) {
-        countEl.textContent = `${selectedRoutes.length} selezionat${selectedRoutes.length === 1 ? 'o' : 'i'}`;
+        countEl.textContent = `${actvT('js.rr.selCount','{n} selezionati',{n:selectedRoutes.length})}`;
     }
     if (compareBtn) {
         compareBtn.disabled = selectedRoutes.length < 2;
@@ -643,7 +643,7 @@ function renderComparisonView(routes) {
     // Route labels
     html += `<div class="compare-row compare-header-row">
         <div class="compare-label"></div>
-        ${routes.map((_, i) => `<div class="compare-cell compare-route-label">Percorso ${i + 1}</div>`).join('')}
+        ${routes.map((_, i) => `<div class="compare-cell compare-route-label">${actvT('js.rr.route','Percorso')} ${i + 1}</div>`).join('')}
     </div>`;
 
     // Lines
@@ -720,7 +720,7 @@ function renderComparisonView(routes) {
         ${routes.map((r, i) => {
             const routeJson = JSON.stringify(r).replace(/'/g, "&#39;");
             return `<button class="btn-select-compare" onclick='confirmRouteSelection(${routeJson}, event)'>
-                Seleziona Percorso ${i + 1}
+                Seleziona ${actvT('js.rr.route','Percorso')} ${i + 1}
             </button>`;
         }).join('')}
     </div>`;
@@ -746,7 +746,7 @@ function toggleComparisonMap() {
     const button = shell.querySelector('.compare-map-expand');
     if (button) {
         button.textContent = expanded ? '×' : '⛶';
-        button.setAttribute('aria-label', expanded ? 'Riduci mappa' : 'Espandi mappa');
+        button.setAttribute('aria-label', expanded ? actvT('js.rr.collapse','Riduci mappa') : actvT('routeResults.expandMap','Espandi mappa'));
     }
     setTimeout(() => comparisonMap?.invalidateSize(), 100);
 }
@@ -844,7 +844,7 @@ function comparisonMapPopup(records) {
     const sameStop = records.length > 1;
     const rows = records.map(record => `<div class="compare-stop-line">
         <span class="compare-stop-route-badge">Percorso ${record.routeNumber}</span>
-        <span>${record.direction === 'down' ? '<span class="compare-stop-direction compare-stop-direction-down" title="Scendi qui">↘</span>' : record.direction === 'up' ? '<span class="compare-stop-direction compare-stop-direction-up" title="Sali qui">↗</span>' : ''}<strong>Linea ${escapeComparisonHtml(record.line || '?')}</strong> · ${escapeComparisonHtml(record.mode || 'Servizio')}<br><span class="compare-stop-time">Arrivo ${escapeComparisonHtml(record.arrivalTime || '--:--')}</span></span>
+        <span>${record.direction === 'down' ? `<span class="compare-stop-direction compare-stop-direction-down" title="${actvT('js.rr.off','Scendi qui')}">↘</span>` : record.direction === 'up' ? `<span class="compare-stop-direction compare-stop-direction-up" title="${actvT('js.rr.on','Sali qui')}">↗</span>` : ''}<strong>${actvT('linesMap.byLine','Linea')} ${escapeComparisonHtml(record.line || '?')}</strong> · ${escapeComparisonHtml(record.mode || 'Servizio')}<br><span class="compare-stop-time">Arrivo ${escapeComparisonHtml(record.arrivalTime || '--:--')}</span></span>
     </div>`).join(sameStop ? '<hr>' : '');
     return `<div class="compare-stop-popup">
         <strong class="compare-stop-name">${escapeComparisonHtml(first.name || 'Fermata')}</strong>
@@ -858,7 +858,7 @@ async function loadComparisonMap(routes) {
     if (!mapEl) return;
 
     if (typeof L === 'undefined') {
-        if (statusEl) statusEl.textContent = 'Mappa non disponibile in questo momento.';
+        if (statusEl) statusEl.textContent = actvT('js.rr.noMap','Mappa non disponibile in questo momento.');
         return;
     }
 
@@ -908,7 +908,7 @@ async function loadComparisonMap(routes) {
         }));
         const shapes = shapeSets.flat();
         const shapeByTrip = new Map(shapes.map(shape => [String(shape.trip_id || ''), shape]));
-        if (!shapes.length) throw new Error('Geometria non disponibile');
+        if (!shapes.length) throw new Error(actvT('js.rr.noGeom','Geometria non disponibile'));
 
         comparisonMap = L.map(mapEl, { zoomControl: true, attributionControl: true });
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1012,22 +1012,22 @@ async function loadComparisonMap(routes) {
             });
             L.marker([lat, lng], { icon, zIndexOffset: 800 })
                 .addTo(comparisonMap)
-                .bindPopup(`<strong>Mezzo reale · ${escapeComparisonHtml(line)}</strong><br>Percorso ${routeIndex + 1}<br>Corsa ${escapeComparisonHtml(leg.trip_id)}`);
+                .bindPopup(`<strong>${actvT('js.rr.realVehicle','Mezzo reale')} · ${escapeComparisonHtml(line)}</strong><br>${actvT('js.rr.route','Percorso')} ${routeIndex + 1}<br>${actvT('js.rr.trip','Corsa')} ${escapeComparisonHtml(leg.trip_id)}`);
             bounds.push([lat, lng]);
             realtimeCount++;
         }));
 
-        if (!bounds.length) throw new Error('Nessun punto disponibile');
+        if (!bounds.length) throw new Error(actvT('js.rr.noPts','Nessun punto disponibile'));
         comparisonMap.fitBounds(bounds, { padding: [18, 18] });
         if (statusEl) {
             statusEl.innerHTML = routes.map((_, i) =>
-                `<span><i style="background:${colors[i % colors.length]}"></i>Percorso ${i + 1}</span>`
+                `<span><i style="background:${colors[i % colors.length]}"></i>${actvT('js.rr.route','Percorso')} ${i + 1}</span>`
             ).join('') + (realtimeCount ? `<span class="compare-live-count"><span class="vehicle-live-dot"></span>${realtimeCount} ${realtimeCount === 1 ? 'mezzo rilevato' : 'mezzi rilevati'}</span>` : '');
         }
         setTimeout(() => comparisonMap?.invalidateSize(), 80);
     } catch (error) {
         console.error('[ACTV] Errore mappa confronto:', error);
-        if (statusEl) statusEl.textContent = 'Impossibile caricare la mappa dei percorsi.';
+        if (statusEl) statusEl.textContent = actvT('js.rr.mapErr','Impossibile caricare la mappa dei percorsi.');
     }
 }
 

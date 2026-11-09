@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?= I18n::lang() ?>">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Trova Percorso - ACTV</title>
-        <?php require COMMON_HTML_HEAD; ?>
+        <?php
+        $SEO = ['title' => t('meta.routeFinder.title'), 'desc' => t('meta.routeFinder.desc')];
+        require COMMON_HTML_HEAD;
+        ?>
         <link rel="stylesheet" href="/css/structure/structure-routeFinder.css">
         <link rel="stylesheet" href="/css/routeFinder.css">
         <script src="/js/favoriteRoutes.js"></script>
@@ -18,7 +20,7 @@
             <div style="height: 20px;">
                 <a href="/" style="color: white; text-decoration: none; font-size: 24px;">&larr;</a>
             </div>
-            <div class="header-title">Trova<br>Percorso</div>
+            <h1 class="header-title"><?= t('routeFinder.title') ?></h1>
         </div>
 
         <!-- Main Content -->
@@ -26,7 +28,7 @@
 
             <!-- Tragitti preferiti (nascosti se vuoti) -->
             <div class="favorite-routes-section" id="favorite-routes-section" style="display: none;">
-                <div class="section-label">tragitti preferiti:</div>
+                <div class="section-label"><?= te('routeFinder.favRoutes') ?></div>
                 <div id="favorite-routes-list"></div>
             </div>
             
@@ -34,8 +36,8 @@
             <div class="selection-card" onclick="selectStation('origin')">
                 <div class="selection-icon">📍</div>
                 <div class="selection-content">
-                    <div class="selection-label">partenza</div>
-                    <div class="selection-value" id="origin-value">Seleziona partenza</div>
+                    <div class="selection-label"><?= te('routeFinder.departure') ?></div>
+                    <div class="selection-value" id="origin-value"><?= te('routeFinder.selectDeparture') ?></div>
                 </div>
             </div>
 
@@ -46,17 +48,17 @@
             <div class="selection-card" onclick="selectStation('destination')">
                 <div class="selection-icon">📍</div>
                 <div class="selection-content">
-                    <div class="selection-label">destinazione</div>
-                    <div class="selection-value" id="destination-value">Seleziona destinazione</div>
+                    <div class="selection-label"><?= te('routeFinder.destination') ?></div>
+                    <div class="selection-value" id="destination-value"><?= te('routeFinder.selectDestination') ?></div>
                 </div>
             </div>
 
             <details class="journey-options">
-                <summary>Opzioni di partenza e ritorno</summary>
+                <summary><?= te('routeFinder.options') ?></summary>
 
             <!-- Date/Time Triggers -->
             <div class="datetime-section">
-                <div class="section-label">seleziona data e ora partenza:</div>
+                <div class="section-label"><?= te('routeFinder.dateTime') ?></div>
                 <div class="datetime-inputs">
                     <div class="datetime-trigger" onclick="openDateModal()">
                         <span id="display-date"><?= date('d/m/Y') ?></span>
@@ -71,17 +73,17 @@
 
             <!-- Optimization Selector -->
             <div class="optimize-section">
-                <div class="section-label">ottimizza per:</div>
+                <div class="section-label"><?= te('routeFinder.optimize') ?></div>
                 <div class="optimize-pills">
-                    <button class="optimize-pill active" data-value="time">tempo</button>
-                    <button class="optimize-pill" data-value="transfers">cambi</button>
-                    <button class="optimize-pill" data-value="walking">a piedi</button>
+                    <button class="optimize-pill active" data-value="time"><?= te('routeFinder.optTime') ?></button>
+                    <button class="optimize-pill" data-value="transfers"><?= te('routeFinder.optTransfers') ?></button>
+                    <button class="optimize-pill" data-value="walking"><?= te('routeFinder.optWalking') ?></button>
                 </div>
             </div>
 
             <!-- Return Trip Toggle -->
             <div class="toggle-container">
-                <span class="toggle-label">ritorno</span>
+                <span class="toggle-label"><?= te('routeFinder.return') ?></span>
                 <label class="toggle-switch">
                     <input type="checkbox" id="return-toggle" onchange="toggleReturn()">
                     <span class="toggle-slider"></span>
@@ -90,7 +92,7 @@
 
             <!-- Return Time (visibile solo con "ritorno" attivo) -->
             <div class="datetime-section return-section" id="return-section" style="display: none;">
-                <div class="section-label">orario di ritorno:</div>
+                <div class="section-label"><?= te('routeFinder.returnTime') ?></div>
                 <div class="datetime-inputs">
                     <div class="datetime-trigger" onclick="openTimeModal('return')">
                         <span id="display-return-time">--:--</span>
@@ -102,17 +104,17 @@
             </details>
 
             <!-- Search Button -->
-            <button class="search-button" onclick="searchRoutes()">ricerca soluzioni</button>
+            <button class="search-button" onclick="searchRoutes()"><?= te('routeFinder.search') ?></button>
 
         </div>
 
         <div id="station-picker-panel" class="station-picker-panel" aria-hidden="true">
             <div class="station-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="station-picker-title">
                 <div class="station-picker-head">
-                    <h2 id="station-picker-title" class="picker-compact-title">Scegli una fermata</h2>
-                    <button type="button" class="station-picker-close" onclick="closeStationPicker()" aria-label="Chiudi">×</button>
+                    <h2 id="station-picker-title" class="picker-compact-title"><?= te('routeFinder.pickStop') ?></h2>
+                    <button type="button" class="station-picker-close" onclick="closeStationPicker()" aria-label="<?= te('routeFinder.close') ?>">×</button>
                 </div>
-                <iframe id="station-picker-frame" title="Selezione fermata" loading="lazy"></iframe>
+                <iframe id="station-picker-frame" title="<?= te('routeFinder.pickStopTitle') ?>" loading="lazy"></iframe>
             </div>
         </div>
 
@@ -134,8 +136,8 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button class="btn-primary" onclick="confirmDate()">fatto</button>
-                    <button class="btn-outline" onclick="closeDateModal()">annulla</button>
+                    <button class="btn-primary" onclick="confirmDate()"><?= te('routeFinder.done') ?></button>
+                    <button class="btn-outline" onclick="closeDateModal()"><?= te('routeFinder.cancel') ?></button>
                 </div>
             </div>
         </div>
@@ -157,8 +159,8 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button class="btn-primary" onclick="confirmTime()">fatto</button>
-                    <button class="btn-outline" onclick="closeTimeModal()">annulla</button>
+                    <button class="btn-primary" onclick="confirmTime()"><?= te('routeFinder.done') ?></button>
+                    <button class="btn-outline" onclick="closeTimeModal()"><?= te('routeFinder.cancel') ?></button>
                 </div>
             </div>
         </div>

@@ -183,7 +183,7 @@
         count.textContent = trips.length + (trips.length === 1 ? ' corsa' : ' corse');
         if (!trips.length) {
             renderPagination();
-            list.innerHTML = '<p class="empty-state">Nessuna corsa trovata per questa tratta nella data selezionata.</p>';
+            list.innerHTML = `<p class="empty-state">${actvT('js.tf.noTripsDate','Nessuna corsa trovata per questa tratta nella data selezionata.')}</p>`;
             return;
         }
         const totalPages = Math.ceil(trips.length / PAGE_SIZE);
@@ -196,7 +196,7 @@
             return '<button type="button" class="trip-option' + (inMotion ? ' is-in-motion' : '') + '" data-trip-id="' + escapeHtml(trip.trip_id) + '" aria-pressed="false">' +
                 '<span class="trip-time">' + escapeHtml(trip.departure_time || '--:--') + ' → ' + escapeHtml(trip.arrival_time || '--:--') + '</span>' +
                 '<span><span class="trip-headsign">' + escapeHtml(trip.headsign || 'Direzione non indicata') + '</span>' +
-                    (inMotion ? '<span class="trip-live-label">In movimento secondo orario</span>' : '') +
+                    (inMotion ? `<span class="trip-live-label">${actvT('js.tf.moving','In movimento secondo orario')}</span>` : '') +
                     '<span class="trip-id">trip_id: ' + escapeHtml(trip.trip_id) + '</span></span>' +
             '</button>';
         }).join('');
@@ -242,7 +242,7 @@
 
     async function loadLines(restoredState = null) {
         $('line-input').disabled = true;
-        setStatus('Caricamento linee...', 'loading');
+        setStatus(actvT('lineSchedule.loading','Caricamento linee…'), 'loading');
         try {
             const date = dateValue();
             const data = await fetchJson('/api/line-catalog?service=automobilistico&date=' + encodeURIComponent(date));
@@ -252,11 +252,11 @@
                 $('line-input').value = restoredState.line;
                 await onLineChange(restoredState);
             } else {
-                setStatus('Seleziona una linea per continuare.');
+                setStatus(actvT('js.tf.pickLine','Seleziona una linea per continuare.'));
             }
         } catch (error) {
-            resetSelect($('line-input'), 'Catalogo linee non disponibile', true);
-            setStatus('Non è stato possibile caricare le linee.', 'error');
+            resetSelect($('line-input'), actvT('js.tf.noLineCat','Catalogo linee non disponibile'), true);
+            setStatus(actvT('js.tf.cantLines','Non è stato possibile caricare le linee.'), 'error');
         }
     }
 
@@ -265,7 +265,7 @@
         const data = await fetchJson('/api/line-variants?line=' + encodeURIComponent(line) +
             '&service=automobilistico&date=' + encodeURIComponent(date) +
             '&day=' + encodeURIComponent(dayValue(date)));
-        if (!data.success) throw new Error(data.error || 'Varianti non disponibili');
+        if (!data.success) throw new Error(data.error || actvT('js.tf.noVar','Varianti non disponibili'));
         return data.variants || [];
     }
 
@@ -273,7 +273,7 @@
         const origin = $('origin-input').value;
         const destination = $('destination-input').value;
         if (!state.line || !origin || !destination) return;
-        setStatus('Ricerca delle corse...', 'loading');
+        setStatus(actvT('js.tf.searching','Ricerca delle corse...'), 'loading');
         renderTrips([]);
         saveSessionState();
         try {
@@ -283,7 +283,7 @@
                 '&destination=' + encodeURIComponent(destination) +
                 '&date=' + encodeURIComponent(date) +
                 '&day=' + encodeURIComponent(dayValue(date)));
-            if (!data.success) throw new Error(data.error || 'Corse non disponibili');
+            if (!data.success) throw new Error(data.error || actvT('js.tf.noTrips','Corse non disponibili'));
             state.trips = data.trips || [];
             state.currentPage = 1;
             const savedTripId = restoredState?.tripId || '';
@@ -295,39 +295,39 @@
             }
             renderTrips(state.trips);
             if (savedTripIndex >= 0) selectTrip(savedTripId);
-            setStatus(state.trips.length ? 'Seleziona una corsa per aprire i dettagli.' : 'Nessuna corsa trovata per questa tratta.');
+            setStatus(state.trips.length ? actvT('js.tf.pickTrip','Seleziona una corsa per aprire i dettagli.') : actvT('js.tf.noneLeg','Nessuna corsa trovata per questa tratta.'));
             saveSessionState();
         } catch (error) {
             renderTrips([]);
-            setStatus('Non è stato possibile caricare le corse.', 'error');
+            setStatus(actvT('js.tf.cantTrips','Non è stato possibile caricare le corse.'), 'error');
         }
     }
 
     async function onLineChange(restoredState = null) {
         state.line = $('line-input').value;
         state.variants = [];
-        resetSelect($('origin-input'), state.line ? 'Caricamento partenze...' : 'Prima scegli una linea', true);
-        resetSelect($('destination-input'), 'Prima scegli la partenza', true);
+        resetSelect($('origin-input'), state.line ? actvT('js.tf.loadOrig','Caricamento partenze...') : actvT('tripFinder.pickLineFirst','Prima scegli una linea'), true);
+        resetSelect($('destination-input'), actvT('tripFinder.pickOriginFirst','Prima scegli la partenza'), true);
         renderTrips([]);
         saveSessionState();
         if (!state.line) {
-            setStatus('Seleziona una linea per continuare.');
+            setStatus(actvT('js.tf.pickLine','Seleziona una linea per continuare.'));
             return;
         }
-        setStatus('Caricamento fermate della linea...', 'loading');
+        setStatus(actvT('js.tf.loadStops','Caricamento fermate della linea...'), 'loading');
         try {
             state.variants = await loadVariants(state.line);
             const origins = uniqueOrigins(state.variants);
-            renderStops($('origin-input'), origins, 'Seleziona la partenza');
+            renderStops($('origin-input'), origins, actvT('js.tf.pickOrig','Seleziona la partenza'));
             if (restoredState?.origin && origins.some(stop => String(stop.id) === String(restoredState.origin))) {
                 $('origin-input').value = restoredState.origin;
                 await onOriginChange(restoredState);
                 return;
             }
-            setStatus('Ora scegli la partenza.');
+            setStatus(actvT('js.tf.nowOrig','Ora scegli la partenza.'));
         } catch (error) {
-            resetSelect($('origin-input'), 'Fermate non disponibili', true);
-            setStatus('Non è stato possibile caricare le fermate della linea.', 'error');
+            resetSelect($('origin-input'), actvT('js.tf.noStops','Fermate non disponibili'), true);
+            setStatus(actvT('js.tf.cantStops','Non è stato possibile caricare le fermate della linea.'), 'error');
         }
     }
 
@@ -336,9 +336,9 @@
         state.variants = [];
         state.trips = [];
         state.currentPage = 1;
-        resetSelect($('line-input'), 'Caricamento linee...', true);
-        resetSelect($('origin-input'), 'Prima scegli una linea', true);
-        resetSelect($('destination-input'), 'Prima scegli la partenza', true);
+        resetSelect($('line-input'), actvT('lineSchedule.loading','Caricamento linee…'), true);
+        resetSelect($('origin-input'), actvT('tripFinder.pickLineFirst','Prima scegli una linea'), true);
+        resetSelect($('destination-input'), actvT('tripFinder.pickOriginFirst','Prima scegli la partenza'), true);
         renderTrips([]);
         saveSessionState();
         loadLines();
@@ -346,21 +346,21 @@
 
     async function onOriginChange(restoredState = null) {
         const origin = $('origin-input').value;
-        resetSelect($('destination-input'), origin ? 'Seleziona la destinazione' : 'Prima scegli la partenza', !origin);
+        resetSelect($('destination-input'), origin ? actvT('js.tf.pickDest','Seleziona la destinazione') : actvT('tripFinder.pickOriginFirst','Prima scegli la partenza'), !origin);
         renderTrips([]);
         saveSessionState();
         if (!origin) {
-            setStatus('Ora scegli la partenza.');
+            setStatus(actvT('js.tf.nowOrig','Ora scegli la partenza.'));
             return;
         }
         const destinations = destinationsForOrigin(state.variants, origin);
-        renderStops($('destination-input'), destinations, 'Seleziona la destinazione');
+        renderStops($('destination-input'), destinations, actvT('js.tf.pickDest','Seleziona la destinazione'));
         if (restoredState?.destination && destinations.some(stop => String(stop.id) === String(restoredState.destination))) {
             $('destination-input').value = restoredState.destination;
             await loadTrips(restoredState);
             return;
         }
-        setStatus('Ora scegli la destinazione.');
+        setStatus(actvT('js.tf.nowDest','Ora scegli la destinazione.'));
     }
 
     function openTripDetails() {

@@ -94,7 +94,7 @@
         runs.forEach(run => {
             const key = JSON.stringify(run.times);
             if (!groups.has(key)) groups.set(key, { ...run, calendars: new Set() });
-            groups.get(key).calendars.add(run.calendar || 'Validità non disponibile');
+            groups.get(key).calendars.add(run.calendar || actvT('js.ls.noValidity','Validità non disponibile'));
         });
         return Array.from(groups.values(), ({ calendars, ...run }) => ({
             ...run, calendar: Array.from(calendars).join(' / ')
@@ -120,14 +120,14 @@
     function $(id) { return document.getElementById(id); }
 
     function renderFeedMeta(updatedAt) {
-        $('feed-meta').textContent = 'Orari programmati del feed · Tutti i giorni di servizio' +
-            (updatedAt ? ' · Aggiornamento: ' + new Date(updatedAt).toLocaleDateString('it-IT') : ' · Aggiornamento non disponibile');
+        $('feed-meta').textContent = actvT('js.ls.feedAll','Orari programmati del feed · Tutti i giorni di servizio') +
+            (updatedAt ? actvT('js.ls.updated',' · Aggiornamento: ') + new Date(updatedAt).toLocaleDateString('it-IT') : actvT('js.ls.noUpdate',' · Aggiornamento non disponibile'));
     }
 
     function filterCatalog() {
         const needle = $('line-search').value.trim().toLocaleLowerCase('it');
         const lines = state.catalog.filter(l => !needle || (l.line + ' ' + l.name).toLocaleLowerCase('it').includes(needle));
-        $('line-input').innerHTML = '<option value="">' + (lines.length ? 'Seleziona una linea' : 'Nessuna linea trovata') + '</option>' +
+        $('line-input').innerHTML = '<option value="">' + (lines.length ? actvT('js.ls.pick','Seleziona una linea') : actvT('js.ls.none','Nessuna linea trovata')) + '</option>' +
             lines.map(l => '<option value="' + esc(l.line) + '">' + esc(l.line) + ' — ' + esc(l.name || 'Linea ' + l.line) + '</option>').join('');
         if (lines.some(l => l.line === state.line)) $('line-input').value = state.line;
     }
@@ -148,13 +148,13 @@
             filterCatalog(); $('line-input').disabled = false;
             if ($('line-input').value) loadVariants();
             else {
-                setStatus(state.catalog.length ? '' : 'Nessuna linea disponibile per questo servizio.', 'info');
+                setStatus(state.catalog.length ? '' : actvT('js.ls.noneSvc','Nessuna linea disponibile per questo servizio.'), 'info');
                 $('variant-detail').innerHTML = '<div class="schedule-empty"><h2>Da quale linea partiamo?</h2><p>Scegli una linea per vedere tutte le corse. Le indicazioni di validità distinguono i giorni di servizio.</p></div>';
             }
         } catch (e) {
             if (request !== catalogRequest) return;
             $('line-input').innerHTML = '<option value="">Linee non disponibili</option>';
-            setStatus('Impossibile caricare le linee. Riprova oppure cambia servizio.', 'warning');
+            setStatus(actvT('js.ls.cantLines','Impossibile caricare le linee. Riprova oppure cambia servizio.'), 'warning');
             const retry = document.createElement('button');
             retry.type = 'button'; retry.className = 'btn btn-outline-primary ms-2'; retry.textContent = 'Riprova';
             retry.addEventListener('click', loadCatalog); $('status').appendChild(retry);
@@ -194,26 +194,26 @@
             if (request !== variantsRequest) return;
             if (!data.success) throw new Error('variants');
             variants = data.variants || [];
-            if (!variants.length) { setStatus('Nessun percorso disponibile per questa linea.', 'warning'); return; }
+            if (!variants.length) { setStatus(actvT('js.ls.noRoutes','Nessun percorso disponibile per questa linea.'), 'warning'); return; }
             setStatus(''); renderVariants();
         } catch (e) {
-            if (request === variantsRequest) setStatus('Impossibile caricare i percorsi. Seleziona di nuovo la linea per riprovare.', 'danger');
+            if (request === variantsRequest) setStatus(actvT('js.ls.cantRoutes','Impossibile caricare i percorsi. Seleziona di nuovo la linea per riprovare.'), 'danger');
         }
     }
 
     function renderVariants() {
         const wrap = $('variants');
-        const headsigns = [...new Set(variants.map(v => v.headsign || v.terminus || 'Senza destinazione'))];
+        const headsigns = [...new Set(variants.map(v => v.headsign || v.terminus || actvT('js.ls.noDest','Senza destinazione')))];
         wrap.innerHTML = '<h2 class="schedule-section-title">Direzione</h2><div class="direction-list" role="group" aria-label="Direzione"></div><div id="route-options"></div>';
         const chooseDirection = headsign => {
             wrap.querySelectorAll('.direction-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.textContent === headsign);
                 btn.setAttribute('aria-pressed', String(btn.textContent === headsign));
             });
-            const matching = variants.filter(v => (v.headsign || v.terminus || 'Senza destinazione') === headsign);
+            const matching = variants.filter(v => (v.headsign || v.terminus || actvT('js.ls.noDest','Senza destinazione')) === headsign);
             const routeGroups = groupVariantsByRoute(matching);
             const routes = $('route-options');
-            routes.innerHTML = '<h3 class="schedule-section-title">' + (routeGroups.length > 1 ? 'Scegli il percorso' : 'Percorso') + '</h3>';
+            routes.innerHTML = '<h3 class="schedule-section-title">' + (routeGroups.length > 1 ? actvT('js.ls.pickRoute','Scegli il percorso') : 'Percorso') + '</h3>';
             routeGroups.forEach((items, index) => {
                 const longest = items.reduce((a, b) => a.stops.length >= b.stops.length ? a : b);
                 const button = document.createElement('button');
@@ -271,16 +271,16 @@
         const stops = data.stops || [];
         const runs = groupIdenticalRuns(data.runs || []);
 
-        const calendars = [...new Set(runs.map(r => r.calendar || 'Validità non disponibile'))];
+        const calendars = [...new Set(runs.map(r => r.calendar || actvT('js.ls.noValidity','Validità non disponibile')))];
         const mapUrl = '/lines-map?tripGroups=' + encodeURIComponent('1:' + state.selectedTrips.join(','));
         detail.innerHTML = '<div class="schedule-result-heading"><div><h2>Linea ' + esc(state.line) + ' <span>→ ' + esc(data.headsign || '') + '</span></h2><p>' + stops.length + ' fermate · ' + runs.length + (runs.length === 1 ? ' partenza' : ' partenze') + ' · Orario completo</p></div><a class="schedule-map-link" href="' + esc(mapUrl) + '">Vedi percorso sulla mappa ↗</a></div>' +
-            '<details class="schedule-validity"><summary>Giorni e validità delle corse</summary><p>Le corse sono mostrate senza filtri. Il numero sotto ogni partenza rimanda alla sua validità.</p>' +
+            `<details class="schedule-validity"><summary>${actvT('js.ls.validityTitle','Giorni e validità delle corse')}</summary><p>Le corse sono mostrate senza filtri. Il numero sotto ogni partenza rimanda alla sua validità.</p>` +
             calendars.map((label,i) => '<div><strong>' + (i+1) + '</strong> ' + esc(label) + '</div>').join('') + '</details>';
         if (!runs.length) {
-            detail.innerHTML += '<div class="alert alert-warning">Nessuna corsa disponibile per questo percorso.</div>';
+            detail.innerHTML += `<div class="alert alert-warning">${actvT('js.ls.noTrips','Nessuna corsa disponibile per questo percorso.')}</div>`;
             return;
         }
-        detail.innerHTML += '<label class="schedule-stop-label" for="stop-picker">Consulta una fermata</label><select id="stop-picker" class="form-select"><option value="">Tutte le fermate</option>' + stops.map((s,i) => '<option value="' + i + '">' + esc(s.name) + '</option>').join('') + '</select><div id="stop-panel" class="stop-panel" aria-live="polite"></div><p class="schedule-table-hint">Scorri gli orari in orizzontale. Seleziona una partenza per aprire la corsa sulla mappa.</p>';
+        detail.innerHTML += `<label class="schedule-stop-label" for="stop-picker">${actvT('js.ls.pickStop','Consulta una fermata')}</label><select id="stop-picker" class="form-select"><option value="">${actvT('stationSelector.all','Tutte le fermate')}</option>${stops.map((s,i) => '<option value="' + i + '">' + esc(s.name) + '</option>').join('')}</select><div id="stop-panel" class="stop-panel" aria-live="polite"></div><p class="schedule-table-hint">${actvT('js.ls.hint','Scorri gli orari in orizzontale. Seleziona una partenza per aprire la corsa sulla mappa.')}</p>`;
 
         // Raggruppa le fermate consecutive che condividono la "zona".
         // La zona è il prefisso di parole comune al gruppo: così
@@ -337,7 +337,7 @@
         runs.forEach((r, i) => {
             const mapUrl = '/lines-map?tripId=' + encodeURIComponent(r.trip_id) + '&showStops=1';
             head += '<th class="run-col" title="Apri la corsa sulla mappa">' +
-                '<a class="run-map-link" href="' + esc(mapUrl) + '">' + esc(r.start) + '<small class="run-calendar" title="' + esc(r.calendar || 'Validità non disponibile') + '">' + (calendars.indexOf(r.calendar || 'Validità non disponibile') + 1) + '</small></a></th>';
+                '<a class="run-map-link" href="' + esc(mapUrl) + '">' + esc(r.start) + '<small class="run-calendar" title="' + esc(r.calendar || actvT('js.ls.noValidity','Validità non disponibile')) + '">' + (calendars.indexOf(r.calendar || actvT('js.ls.noValidity','Validità non disponibile')) + 1) + '</small></a></th>';
         });
         head += '</tr>';
 
@@ -378,7 +378,7 @@
             const stop = stops[Number(index)];
             detail.querySelector('tr[data-row="' + index + '"]').classList.add('row-active');
             $('stop-panel').innerHTML = '<h3>' + esc(stop.name) + '</h3><p>Tutti i passaggi della linea ' + esc(state.line) + ' in questa direzione</p><div class="stop-times">' +
-                runs.filter(r => r.times[Number(index)]).map(r => '<a href="/lines-map?tripId=' + encodeURIComponent(r.trip_id) + '&amp;showStops=1" title="' + esc(r.calendar || '') + '">' + esc(r.times[Number(index)]) + '<small>' + (calendars.indexOf(r.calendar || 'Validità non disponibile')+1) + '</small></a>').join('') + '</div>';
+                runs.filter(r => r.times[Number(index)]).map(r => '<a href="/lines-map?tripId=' + encodeURIComponent(r.trip_id) + '&amp;showStops=1" title="' + esc(r.calendar || '') + '">' + esc(r.times[Number(index)]) + '<small>' + (calendars.indexOf(r.calendar || actvT('js.ls.noValidity','Validità non disponibile'))+1) + '</small></a>').join('') + '</div>';
         }
         $('stop-picker').addEventListener('change', e => selectStop(e.target.value));
         detail.querySelectorAll('.stop-name-btn').forEach((btn,index) => btn.addEventListener('click', () => {

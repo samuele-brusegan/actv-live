@@ -27,7 +27,7 @@ beforeEach(() => {
         document:new Proxy(document,{get(target,key){
             if(key==='addEventListener')return(event,callback)=>{if(event==='DOMContentLoaded')initialize=callback;else target.addEventListener(event,callback);};
             const value=target[key];return typeof value==='function'?value.bind(target):value;
-        }}),window,localStorage,URLSearchParams,AbortController,console,ACTVRouteLanes:lanes,
+        }}),window,localStorage,URLSearchParams,AbortController,console,actvT,ACTVRouteLanes:lanes,
         fetch:jest.fn(async()=>response([route('21')])),
         L:{map:()=>map,tileLayer:()=>({addTo(){}}),point:(x,y)=>({x,y}),polyline:()=>layer(),circleMarker:()=>layer(),
             layerGroup:()=>({items:new Set(),addTo(){return this;},clearLayers(){this.items.forEach(item=>active.delete(item));this.items.clear();}})}

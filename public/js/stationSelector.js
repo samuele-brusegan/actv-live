@@ -22,7 +22,7 @@ async function loadStops() {
     renderRecent();
     try {
         const response = await fetch('/api/stops', { cache: 'no-store' });
-        if (!response.ok) throw new Error('Catalogo locale non disponibile');
+        if (!response.ok) throw new Error(actvT('js.sel.noCatalog','Catalogo locale non disponibile'));
         const responseText = await response.text();
         let data;
         try {
@@ -112,8 +112,8 @@ async function fetchExternalStops() {
         return {
             id: ids[0] || fallbackId,
             ids: ids.length ? ids : [fallbackId],
-            name: name || `Fermata ${fallbackId}`,
-            stop_name: name || `Fermata ${fallbackId}`,
+            name: name || `${actvT('js.stop.stop','Fermata')} ${fallbackId}`,
+            stop_name: name || `${actvT('js.stop.stop','Fermata')} ${fallbackId}`,
             stop_lat: Number(stop.latitude),
             stop_lon: Number(stop.longitude),
             type: 'stop',
@@ -185,7 +185,7 @@ function createStopCardHTML(stop, isFavorite) {
                 <div class="stop-icon">🚏</div>
                 <div class="stop-content">
                     <div class="stop-name">${displayName}</div>
-                    <div class="stop-meta">${(stop.services || []).includes('navigation') ? 'Bus + Navigazione' : 'Bus'}</div>
+                    <div class="stop-meta">${(stop.services || []).includes('navigation') ? actvT('js.sel.busNav','Bus + Navigazione') : 'Bus'}</div>
                 </div>
             </div>`;
 }
@@ -237,7 +237,7 @@ function addToRecent(stop) {
 /** Conferma la scelta e torna al cercapercorsi */
 function confirmSelection() {
     if (!selectedStop) {
-        if (window.actvAlert) actvAlert('Seleziona una fermata o un indirizzo prima di continuare.', 'Fermata non selezionata');
+        if (window.actvAlert) actvAlert(actvT('js.sel.pick','Seleziona una fermata o un indirizzo prima di continuare.'), actvT('js.sel.notSel','Fermata non selezionata'));
         return;
     }
 
@@ -419,7 +419,7 @@ function renderAllResults(stops, addresses = [], suggestions = [], showFullList 
     let html = '';
 
     if (suggestions.length > 0) {
-        html += '<div class="subsection-title">CRONOLOGIA E PREFERITI</div>';
+        html += `<div class="subsection-title">${actvT('js.sel.histFav','CRONOLOGIA E PREFERITI')}</div>`;
         html += suggestions.map(item => createStopCardHTML(item, false)).join('');
     }
 
@@ -429,13 +429,13 @@ function renderAllResults(stops, addresses = [], suggestions = [], showFullList 
     }
 
     if (stops.length > 0) {
-        html += '<div class="subsection-title">FERMATE</div>';
+        html += `<div class="subsection-title">${actvT('js.sel.stops','FERMATE')}</div>`;
         const visibleStops = showFullList ? stops : stops.slice(0, 25);
         html += visibleStops.map(stop => createStopCardHTML(stop, false)).join('');
     }
 
     if (stops.length === 0 && addresses.length === 0 && suggestions.length === 0) {
-        html = '<div class="no-results">Nessun risultato trovato</div>';
+        html = `<div class="no-results">${actvT('js.sel.noRes','Nessun risultato trovato')}</div>`;
     }
 
     listEl.innerHTML = html;
